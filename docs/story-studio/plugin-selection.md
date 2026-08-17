@@ -21,7 +21,7 @@
 - **仅作参考**：借鉴功能与测试，不作为运行时依赖；
 - **不采用**：与架构冲突、重复基础能力或风险大于收益。
 
-当前没有第三方插件达到“采用”。三个优先插件已通过首轮 `rc.7` Host/Profile smoke，详见[插件兼容性报告](plugin-compatibility-report.md)；它们仍须完成真实能力、桌面 UI 和 packaged Electron 门禁。
+`dsh-drop-to-path` 已由产品负责人指定为 MVP 文件输入入口，并通过 `rc.7` 临时 Web Profile 的安装、Loader、Host 路由和 Client manifest smoke。其余候选状态详见[插件兼容性报告](plugin-compatibility-report.md)。
 
 ## 2. 总体复用矩阵
 
@@ -29,8 +29,9 @@
 | --- | --- | --- | --- |
 | Session、Workspace、设置、附件 | DSH 官方 seam | 无需插件 | 采用官方能力 |
 | 文件读写与文本搜索 | `ctx.fs`、官方 fs tools | 无需插件 | 采用官方能力 |
+| 文件拖拽、粘贴与路径注入 | Workspace、composer | `dsh-drop-to-path` | **MVP 使用** |
 | 文件树、编辑器、Git Diff | 官方没有完整编辑工作台 | `dsh-better-sidebar`、`dsh-compass` | Better Sidebar 优先试验；Compass 只读 fallback |
-| Office/PDF 输入 | 官方附件 + fs | `dsh-rich-file-reader`、`dsh-files` | Rich File Reader 优先试验 |
+| Office/PDF 文本解析 | fs | `dsh-rich-file-reader` | 与 Drop to Path 组合验证；不再承担主要输入入口 |
 | Agent 变更回退 | Session fork、Git | `dsh-checkpoint-rewind` | 优先试验 |
 | Git 命令 | subprocess/shell | `dsh-plugin-git-workflow` | 暂不预装 |
 | Markdown 笔记 | 工作区文件 | `dsh-md-notes` | 可选工具，不作为作品数据 |
@@ -43,7 +44,17 @@
 
 ## 3. 优先试验插件
 
-### 3.1 `dsh-rich-file-reader`
+### 3.1 `dsh-drop-to-path`
+
+- 来源：[loudMore/dsh-drop-to-path](https://github.com/loudMore/dsh-drop-to-path)
+- 检查版本：`0.1.0`，包名 `@dsh-external/dsh-drop-to-path`。
+- 许可证：MIT。
+- 能力：拖拽或粘贴图片、PDF、Office 文档和常见媒体文件，将文件复制到当前工作区 `.drops/`，发送时把工作区路径写入对话。
+- 已验证：DSH `0.1.0-rc.7` 临时 Web Profile 可安装并启动；`drop-to-path` Loader row、Host 导入路由和 Client face 均存在。
+- 决策：**MVP 使用**，作为 Story Studio 的统一文件输入入口。文档内容解析由后续工具按工作区路径完成。
+- 组合边界：不同时启用另一个全页面拖拽插件；`dsh-rich-file-reader` 若保留，只提供 `read_rich_file` / `ocr_pdf` 解析能力。
+
+### 3.2 `dsh-rich-file-reader`
 
 - 来源：[shixiliya1/dsh-rich-file-reader](https://github.com/shixiliya1/dsh-rich-file-reader)
 - 检查版本：`0.3.1` GitHub release；本机 Web Profile 已安装该版本；npm registry 未发现同名包。
@@ -52,10 +63,10 @@
 - 能力：`read_rich_file`、`ocr_pdf`、Word/Excel/PPT/PDF/图片读取，以及 Web composer 的“导入文档”入口。
 - 正面证据：有 Host/Client 双面清单、Office/PDF 测试、本地 OCR、附件机制和输入大小限制。
 - 风险：依赖 `office-oxide`、Tesseract、Canvas 等原生或重型运行时；中文 OCR 语言包可能首次联网；未声明 `rc.7`。
-- 决策：**优先试验**。若通过 `rc.7`、Electron ABI、macOS/Windows 和真实中文文件测试，作为 MVP 文档输入插件。
+- 决策：**解析候选**。不再作为主要文件输入入口；与 `dsh-drop-to-path` 组合后按工作区路径读取 DOCX 和文本层 PDF，中文扫描 PDF OCR 仅作辅助能力。
 - 淘汰条件：无法在 packaged app 中稳定装载、原生依赖不可复现、composer 与其他插件冲突，或真实剧本文档提取质量不可接受。
 
-### 3.2 `dsh-better-sidebar`
+### 3.3 `dsh-better-sidebar`
 
 - 来源：[omdsh-dev/DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar)
 - registry 观察版本：`0.12.3`；检查的仓库快照清单为 `0.12.2`，生产评估必须重新审核精确 `0.12.3` tarball。
@@ -66,7 +77,7 @@
 - 决策：**优先试验**，但不直接预装。验证通过后，MVP 只启用真正需要的文件和 Git 能力；终端和浏览器能力按内部安全策略决定。
 - fallback：若写能力或高级模式不稳定，使用 `dsh-compass` 提供只读文件/Git 观察，并依赖系统编辑器或官方 produced-files 打开能力。
 
-### 3.3 `dsh-checkpoint-rewind`
+### 3.4 `dsh-checkpoint-rewind`
 
 - 来源：[PerryLink/dsh-checkpoint-rewind](https://github.com/PerryLink/dsh-checkpoint-rewind)
 - registry 观察版本：`0.5.1`；检查的源码清单为 `0.5.0`，需要重新审核 `0.5.1` 发布包。

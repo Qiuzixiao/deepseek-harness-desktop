@@ -1,8 +1,8 @@
 # Story Studio 插件兼容性报告
 
-状态：**阶段 0，首轮 Host/Profile smoke 已完成**
+状态：**阶段 0，首轮 Host/Profile 与 Rich File Reader 行为验证已完成**
 
-测试日期：2026-08-17
+测试日期：2026-08-18
 
 DSH Runtime：`0.1.0-rc.7`
 测试分支：`feat/story-studio-composition-spike`
@@ -10,6 +10,8 @@ DSH Runtime：`0.1.0-rc.7`
 ## 1. 本轮结论
 
 三个优先插件都已分别通过精确发布物审计和隔离 Web Profile runtime smoke；三个插件也已在同一个 Profile 中同时通过安装、Cordis 配置展开、Host Loader settlement、loopback Web 根页面和 Client manifest 检查。
+
+Rich File Reader 已进一步通过中文 DOCX、表格、长文档分页、两页文本层 PDF、损坏文件和不支持格式的真实工具调用。中文扫描 PDF OCR 只能识别部分文本，当前不作为稳定输入门禁。产品文件入口改用 `dsh-drop-to-path`；Rich File Reader 只承担路径后的文档解析。
 
 这是一项**初步兼容证据**，不是生产准入。当前可以继续进入真实能力和 Desktop packaged runtime 验证，但还不能把任何插件标记为“采用”或预装到用户 Profile。
 
@@ -89,8 +91,8 @@ dsh-rich-file-reader
 
 以下项目仍是生产阻塞项：
 
-- Rich File Reader 对真实中文 DOC/DOCX/XLS/XLSX/PPT/PPTX/PDF 的读取；
-- 扫描中文 PDF OCR、语言包下载和失败边界；
+- Rich File Reader 对旧版 DOC/XLS、XLSX、PPT/PPTX 的真实中文文件读取；
+- 扫描中文 PDF 的稳定中文语言包与失败边界；
 - Better Sidebar 文件读取、保存、Git diff、暂存、提交和终端；
 - Better Sidebar 与官方/第三方 composer、overlay、details 的视觉和交互冲突；
 - Checkpoint 的真实 capture、preview、确认、restore 和 guard checkpoint；
@@ -105,7 +107,7 @@ dsh-rich-file-reader
 
 | 插件 | 当前状态 | 下一门禁 |
 | --- | --- | --- |
-| Rich File Reader | 初步 `rc.7` Host/Profile 通过 | 真实中文文档与 Electron native smoke |
+| Rich File Reader | DOCX 与文本层 PDF 可用；中文 OCR 不稳定 | 作为路径解析工具验证 Electron native smoke |
 | Better Sidebar | 初步 `rc.7` Host/Profile 通过 | 文件/Git 行为、UI 两种模式、`node-pty` ABI |
 | Checkpoint Rewind | 初步 `rc.7` Host/Profile 通过 | 真实 Git/非 Git 回退合同和确认门 |
 
@@ -120,6 +122,7 @@ corepack yarn story-studio:plugins:smoke --plugin rich-file-reader
 corepack yarn story-studio:plugins:smoke --plugin better-sidebar
 corepack yarn story-studio:plugins:smoke --plugin checkpoint-rewind
 corepack yarn story-studio:plugins:smoke
+corepack yarn story-studio:rich-file-reader:smoke --skip-ocr
 ```
 
 `audit` 和 `smoke` 会访问锁定的 HTTPS tarball。日常 `corepack yarn check` 只执行无网络的锁模块行为测试，不下载第三方代码。

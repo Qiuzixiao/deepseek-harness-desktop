@@ -2,7 +2,7 @@
 
 状态：**方案评审稿**  
 基线：DSH `0.1.0-rc.7`，DSH Desktop `2.0.1`  
-更新日期：2026-08-17
+更新日期：2026-08-18
 
 Story Studio 是基于 DSH Desktop 的内部 AI 编剧平台，面向短剧编剧、小说编剧和编导。产品的首要目标不是建立一套新的 Agent Runtime，而是把 DSH 官方能力、经过验证的社区插件、产品 Preset、Skills 和动态 Workflow 组合成稳定的创作工作台。
 
@@ -29,6 +29,7 @@ Story Studio 是基于 DSH Desktop 的内部 AI 编剧平台，面向短剧编�
 6. 文件树、编辑器、Git、文档读取、回退、知识库和 Office 导出优先评估现有插件，不预设由产品团队自研。
 7. 社区市场只用于发现候选插件。任何候选进入产品 Profile 前都必须经过固定版本、代码审计、许可证、`rc.7` Loader、桌面模式和打包验证。
 8. MVP 不开发付费、账号、云同步、多人协同或开放插件市场安装器。
+9. MVP 使用 `dsh-drop-to-path` 作为拖拽/粘贴文件进入对话的统一入口；文件进入工作区后，再由文档读取工具按路径解析。
 
 ## 证据边界
 
@@ -37,6 +38,7 @@ Story Studio 是基于 DSH Desktop 的内部 AI 编剧平台，面向短剧编�
 - 当前仓库固定的 DeepSeek Harness `0.1.0-rc.7` 源码和能力文档；
 - DSH Desktop 的 Profile、Host/Client、Desktop service 和打包实现；
 - 本机已安装的 `dsh-rich-file-reader@0.3.1`；
+- 已在 DSH `0.1.0-rc.7` 临时 Web Profile 中启动的 `@dsh-external/dsh-drop-to-path@0.1.0`；
 - DSH 1024Store 目录与 GitHub 候选仓库；
 - 对候选插件的 `package.json`、Cordis patch、README、源码结构、测试目录和许可证的静态检查；
 - 用户创建的 `script-studio` Preset 及其实际生成结果。

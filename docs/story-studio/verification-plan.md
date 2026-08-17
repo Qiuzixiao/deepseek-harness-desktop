@@ -33,11 +33,12 @@
 
 ### 2.3 组合门禁
 
-首选组合：Rich File Reader + Better Sidebar + Checkpoint Rewind。
+首选组合：Drop to Path + Rich File Reader（解析工具）+ Better Sidebar + Checkpoint Rewind。
 
 必须验证：
 
-- composer 按钮、拖拽和附件不会被两个插件重复处理；
+- `dsh-drop-to-path` 是唯一全页面拖拽/粘贴入口，其他插件不重复处理同一文件；
+- 拖入 DOCX/PDF 后，消息中的工作区路径可以直接交给 `read_rich_file`；
 - 文件编辑触发一次可识别 checkpoint，不形成无限事件循环；
 - Better Sidebar Git 操作不破坏 Checkpoint 的 Git provider；
 - 回退后文件树、diff 和 produced-files 刷新一致；
