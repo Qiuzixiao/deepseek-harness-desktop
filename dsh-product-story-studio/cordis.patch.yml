@@ -3,3 +3,5 @@
 - insert:
     - id: drop-to-path
       name: '@dsh-external/dsh-drop-to-path'
+    - id: rich-file-reader
+      name: dsh-rich-file-reader

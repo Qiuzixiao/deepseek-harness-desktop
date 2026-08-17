@@ -31,6 +31,7 @@ const ALLOWED_LICENSES = new Set([
   'CC0-1.0',
   'Zlib',
   'Python-2.0',
+  'MIT OR Apache-2.0',
 ])
 
 /**

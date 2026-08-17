@@ -35,7 +35,7 @@ Story Studio 是基于 DSH Desktop 的内部 AI 编剧平台，面向短剧编�
 ## 当前实现
 
 - Desktop 交付一个可发现的 `story-studio` system Preset，并复用同版本 DSH `standard` Preset 的完整工具组合；
-- Preset 内置 `story-intake` 和 `story-project` 两个首批 Skills；
+- Preset 内置 `story-intake`、`story-project`、`short-drama-writing`、`novel-writing`、`reference-analysis` 和 `story-review` 六个首批 Skills；
 - Electron 安装包内置 `dsh-product-story-studio`、固定 commit 的 `dsh-drop-to-path` 和 Story Studio 资源；首次启动自动创建 `story-studio` Profile，不需要运行安装命令或访问 GitHub；
 - 当前仍未实现短剧正文、小说正文、参考拆解和审校 Skills，也未把 Rich File Reader 加入产品 Profile。
 

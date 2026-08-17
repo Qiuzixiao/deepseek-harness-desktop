@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict'
+import { execFile } from 'node:child_process'
+import { mkdtemp, readFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { promisify } from 'node:util'
+import test from 'node:test'
+
+const exec = promisify(execFile)
+const root = new URL('../../', import.meta.url)
+const script = new URL('dsh-plugin-desktop/resources/agent-presets/story-studio/skills/story-project/scripts/story-project.mjs', root)
+
+test('Story Studio project contract initializes and reports a short-drama project', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'story-studio-project-contract-'))
+  const project = join(home, 'story')
+  const run = async (...args) => exec(process.execPath, [script.pathname, ...args], { encoding: 'utf8' })
+
+  const initialized = JSON.parse((await run('init', project, '--title', '1998父子局', '--medium', 'short-drama')).stdout)
+  assert.equal(initialized.ok, true)
+  assert.equal(initialized.medium, 'short-drama')
+  const validated = JSON.parse((await run('validate', project)).stdout)
+  assert.equal(validated.ok, true)
+  const status = JSON.parse((await run('status', project)).stdout)
+  assert.equal(status.project.title, '1998父子局')
+  assert.equal(status.files.characters, 0)
+  assert.match(await readFile(join(project, 'brief.md'), 'utf8'), /原始需求/u)
+})

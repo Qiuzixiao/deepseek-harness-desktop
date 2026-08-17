@@ -220,6 +220,7 @@
     "adm-zip": "^0.6.0",
     "dsh-community-market": "0.1.0-dev.0",
     "dsh-product-story-studio": "0.1.0",
+    "dsh-rich-file-reader": "https://github.com/shixiliya1/dsh-rich-file-reader/releases/download/v0.3.1/dsh-rich-file-reader-0.3.1.tgz",
     "koffi": "3.1.5",
     "node-addon-require-builtin": "^0.1.4",
     "pnpm": "11.7.0",

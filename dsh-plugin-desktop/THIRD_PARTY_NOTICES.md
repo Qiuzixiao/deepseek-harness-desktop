@@ -242,6 +242,9 @@ the package names, versions, and licenses for transparency.
 | @mistralai/mistralai | 2.2.6 | Apache-2.0 |
 | @mixmark-io/domino | 2.2.0 | BSD-2-Clause |
 | @modelcontextprotocol/sdk | 1.30.0 | MIT |
+| @napi-rs/canvas | 1.0.6 | MIT |
+| @napi-rs/canvas-darwin-arm64 | 1.0.6 | MIT |
+| @napi-rs/canvas-darwin-x64 | 1.0.6 | MIT |
 | @opentelemetry/api | 1.9.1 | Apache-2.0 |
 | @opentelemetry/api-logs | 0.220.0 | Apache-2.0 |
 | @opentelemetry/core | 2.9.0 | Apache-2.0 |
@@ -282,6 +285,7 @@ the package names, versions, and licenses for transparency.
 | @standard-schema/spec | 1.1.0 | MIT |
 | @tanstack/react-virtual | 3.14.9 | MIT |
 | @tanstack/virtual-core | 3.17.7 | MIT |
+| @tesseract.js-data/eng | 1.0.0 | MIT |
 | @types/debug | 4.1.13 | MIT |
 | @types/hast | 3.0.5 | MIT |
 | @types/katex | 0.16.8 | MIT |
@@ -305,6 +309,7 @@ the package names, versions, and licenses for transparency.
 | async-generator-function | 1.0.0 | MIT |
 | base64-js | 1.5.1 | MIT |
 | bignumber.js | 9.3.1 | MIT |
+| bmp-js | 0.1.0 | MIT |
 | body-parser | 2.3.0 | MIT |
 | bowser | 2.14.1 | MIT |
 | buffer-equal-constant-time | 1.0.1 | BSD-3-Clause |
@@ -325,7 +330,6 @@ the package names, versions, and licenses for transparency.
 | cookie-signature | 1.2.2 | MIT |
 | cors | 2.8.6 | MIT |
 | cross-spawn | 7.0.6 | MIT |
-| data-uri-to-buffer | 4.0.1 | MIT |
 | debug | 4.4.3 | MIT |
 | decode-named-character-reference | 1.3.0 | MIT |
 | depd | 2.0.0 | MIT |
@@ -335,6 +339,7 @@ the package names, versions, and licenses for transparency.
 | diff | 9.0.0 | BSD-3-Clause |
 | dsh-community-market | 0.1.0-dev.0 | MIT |
 | dsh-product-story-studio | 0.1.0 | MIT |
+| dsh-rich-file-reader | 0.3.1 | MIT |
 | dunder-proto | 1.0.1 | MIT |
 | ecdsa-sig-formatter | 1.0.11 | Apache-2.0 |
 | ee-first | 1.1.1 | MIT |
@@ -352,10 +357,8 @@ the package names, versions, and licenses for transparency.
 | extend | 3.0.2 | MIT |
 | fast-deep-equal | 3.1.3 | MIT |
 | fast-uri | 3.1.5 | BSD-3-Clause |
-| fetch-blob | 3.2.0 | MIT |
 | fflate | 0.8.3 | MIT |
 | finalhandler | 2.1.1 | MIT |
-| formdata-polyfill | 4.0.10 | MIT |
 | forwarded | 0.2.0 | MIT |
 | fresh | 2.0.0 | MIT |
 | function-bind | 1.1.2 | MIT |
@@ -377,11 +380,13 @@ the package names, versions, and licenses for transparency.
 | http-proxy-agent | 7.0.2 | MIT |
 | https-proxy-agent | 7.0.6 | MIT |
 | iconv-lite | 0.7.3 | MIT |
+| idb-keyval | 6.3.0 | Apache-2.0 |
 | immer | 10.2.0 | MIT |
 | inherits | 2.0.4 | ISC |
 | ip-address | 10.5.0 | MIT |
 | ipaddr.js | 1.9.1 | MIT |
 | is-promise | 4.0.0 | MIT |
+| is-url | 1.2.4 | MIT |
 | isexe | 2.0.0 | ISC |
 | jose | 6.2.8 | MIT |
 | js-tokens | 4.0.0 | MIT |
@@ -452,21 +457,23 @@ the package names, versions, and licenses for transparency.
 | node-addon-require-builtin | 0.1.4 | MIT |
 | node-addon-require-builtin-darwin-arm64 | 0.1.4 | MIT |
 | node-addon-require-builtin-darwin-x64 | 0.1.4 | MIT |
-| node-domexception | 1.0.0 | MIT |
-| node-fetch | 3.3.2 | MIT |
+| node-fetch | 2.7.0 | MIT |
 | node-pty | 1.2.0-beta.15 | MIT |
 | object-assign | 4.1.1 | MIT |
 | object-inspect | 1.13.4 | MIT |
+| office-oxide | 0.1.8 | MIT OR Apache-2.0 |
 | on-finished | 2.4.1 | MIT |
 | once | 1.4.0 | ISC |
 | oniguruma-parser | 0.12.2 | MIT |
 | oniguruma-to-es | 4.3.6 | MIT |
 | openai | 6.26.0 | Apache-2.0 |
+| opencollective-postinstall | 2.0.3 | MIT |
 | p-retry | 4.6.2 | MIT |
 | parseurl | 1.3.3 | MIT |
 | partial-json | 0.1.7 | MIT |
 | path-key | 3.1.1 | MIT |
 | path-to-regexp | 8.4.2 | MIT |
+| pdfjs-dist | 6.2.108 | Apache-2.0 |
 | picocolors | 1.1.1 | ISC |
 | picomatch | 4.0.5 | MIT |
 | pkce-challenge | 5.0.1 | MIT |
@@ -480,6 +487,7 @@ the package names, versions, and licenses for transparency.
 | react | 18.3.1 | MIT |
 | react-dom | 18.3.1 | MIT |
 | readdirp | 4.1.2 | MIT |
+| regenerator-runtime | 0.13.11 | MIT |
 | regex | 6.1.0 | MIT |
 | regex-recursion | 6.0.2 | MIT |
 | regex-utilities | 2.3.0 | MIT |
@@ -504,7 +512,10 @@ the package names, versions, and licenses for transparency.
 | space-separated-tokens | 2.0.2 | MIT |
 | statuses | 2.0.2 | MIT |
 | stringify-entities | 4.0.4 | MIT |
+| tesseract.js | 7.0.0 | Apache-2.0 |
+| tesseract.js-core | 7.0.0 | Apache-2.0 |
 | toidentifier | 1.0.1 | MIT |
+| tr46 | 0.0.3 | MIT |
 | trim-lines | 3.0.1 | MIT |
 | ts-algebra | 2.0.0 | MIT |
 | tslib | 2.8.1 | 0BSD |
@@ -523,11 +534,14 @@ the package names, versions, and licenses for transparency.
 | vary | 1.1.2 | MIT |
 | vfile | 6.0.3 | MIT |
 | vfile-message | 4.0.3 | MIT |
-| web-streams-polyfill | 3.3.3 | MIT |
+| wasm-feature-detect | 1.9.0 | Apache-2.0 |
+| webidl-conversions | 3.0.1 | BSD-2-Clause |
+| whatwg-url | 5.0.0 | MIT |
 | which | 2.0.2 | ISC |
 | wrappy | 1.0.2 | ISC |
 | ws | 8.21.3 | MIT |
 | yaml | 2.9.0 | ISC |
+| zlibjs | 0.3.1 | MIT |
 | zod | 4.4.3 | MIT |
 | zod-to-json-schema | 3.25.2 | ISC |
 | zustand | 4.4.7 | MIT |

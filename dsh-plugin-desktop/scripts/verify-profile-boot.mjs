@@ -160,6 +160,10 @@ try {
     || ctx.desktopProfiles.current.dir !== prepared.profile.dir) {
     throw new Error('assembled desktop profile service has the wrong active identity')
   }
+  const toolNames = new Set(ctx.tools.schemas().map(schema => schema.name))
+  for (const name of ['read_rich_file', 'ocr_pdf']) {
+    if (!toolNames.has(name)) throw new Error(`Story Studio profile is missing packaged document tool ${name}`)
+  }
   const hostServiceProbe = ctx.get(HOST_SERVICE_PROBE_KEY)
   if (hostServiceProbe?.current?.name !== STORY_STUDIO_PROFILE_NAME
     || hostServiceProbe.current.dir !== prepared.profile.dir
@@ -223,6 +227,7 @@ try {
     '@deepseek-ai/dsh-client-ui-sidebar',
     '@deepseek-ai/dsh-client-ui-directory-picker-browse',
     '@dsh-external/dsh-drop-to-path',
+    'dsh-rich-file-reader',
   ]) {
     if (!ids.has(id)) throw new Error(`assembled advanced Web graph is missing ${id}`)
   }

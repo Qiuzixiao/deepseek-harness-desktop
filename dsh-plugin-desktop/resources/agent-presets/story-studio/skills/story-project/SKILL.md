@@ -62,6 +62,16 @@ currentDeliverable: brief
 
 ## 3. 创建和继续
 
+本 Skill 同目录的 `scripts/story-project.mjs` 是确定性项目工具。加载本 Skill 后先读取脚本，优先通过 `run_code` 执行它，而不是手工猜目录：
+
+```text
+node <story-project skill root>/scripts/story-project.mjs init <作品目录> --title <作品名> --medium short-drama
+node <story-project skill root>/scripts/story-project.mjs validate <作品目录>
+node <story-project skill root>/scripts/story-project.mjs status <作品目录>
+```
+
+`init` 发现已有 `story.yml` 会失败，禁止覆盖既有作品。`validate` 和 `status` 的 JSON 输出是项目状态的确定性来源；长段内容仍由 Agent 写入 Markdown。
+
 创建项目前先确认用户确实需要长期落盘，并检查目标目录是否已存在。不得覆盖现有 `story.yml` 或正文。目录存在时先读取并继续，不另建同名项目。
 
 继续项目时按本轮任务最小读取：

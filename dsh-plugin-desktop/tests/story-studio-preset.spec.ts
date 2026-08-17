@@ -50,13 +50,15 @@ describe('Story Studio preset', () => {
   })
 
   it('publishes valid model-invocable Story Studio skills', () => {
-    expect(skillFrontmatter('story-intake')).toEqual(expect.objectContaining({
-      name: 'story-intake',
-      description: expect.stringContaining('模糊故事想法'),
-    }))
-    expect(skillFrontmatter('story-project')).toEqual(expect.objectContaining({
-      name: 'story-project',
-      description: expect.stringContaining('作品目录'),
-    }))
+    for (const [name, description] of [
+      ['story-intake', '模糊故事想法'],
+      ['story-project', '作品目录'],
+      ['short-drama-writing', '短剧'],
+      ['novel-writing', '小说'],
+      ['reference-analysis', '参考材料'],
+      ['story-review', '审校'],
+    ] as const) {
+      expect(skillFrontmatter(name)).toEqual(expect.objectContaining({ name, description: expect.stringContaining(description) }))
+    }
   })
 })
