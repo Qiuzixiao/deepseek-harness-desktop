@@ -30,7 +30,7 @@ Story Studio 以专用 DSH Profile 交付，组合官方 Workspace、Session、A
 9. 作为编剧，我希望一名主要人物拥有独立人物档案，以便多人或多个 Agent 并行时减少文件冲突。
 10. 作为编导，我希望人物、时间线、地点、道具和时代事实能够被审校，以便在交付前发现连续性错误。
 11. 作为编剧，我希望审校先输出证据和建议而不是直接覆盖正文，以便保留创作判断权。
-12. 作为编剧，我希望能导入 Word、PDF、Excel 和 PPT 参考资料，以便使用已有剧本、分集表和项目提案。
+12. 作为编剧，我希望能导入 DOCX 和文本层 PDF 参考资料，以便使用已有剧本；Excel、PPT 和扫描 PDF 的完整生产不属于当前 MVP。
 13. 作为编导，我希望参考分析标记来源文件和可定位位置，以便复核结论而不是信任无来源摘要。
 14. 作为内容负责人，我希望对标分析只抽象结构、节奏和角色功能，以便降低复写原作表达的风险。
 15. 作为编剧，我希望所有重要产出保存到项目目录，以便在外部编辑器中继续工作并避免只存在聊天记录。
@@ -43,7 +43,7 @@ Story Studio 以专用 DSH Profile 交付，组合官方 Workspace、Session、A
 22. 作为编剧，我希望 Agent 只加载本轮相关设定和正文，以便长篇项目不会因全量上下文而失控。
 23. 作为编剧，我希望能检索早期人物事实和伏笔，以便续写时保持前后一致。
 24. 作为维护者，我希望只有真实基准证明需要时才引入 RAG，以便控制应用体积、模型下载和原生依赖。
-25. 作为编剧，我希望最终作品可以导出为 Markdown、TXT 和专业 DOCX/PDF，以便进入下游审稿和制作流程。
+25. 作为编剧，我希望最终作品以清晰的 Markdown/YAML 项目文件交付；专业 DOCX/PDF 排版导出留给后续阶段。
 26. 作为维护者，我希望第三方插件被锁定到精确版本和校验和，以便产品升级可复现。
 27. 作为维护者，我希望第三方插件分别通过安装、调用、重启和卸载测试，以便某个插件失败时可独立排除。
 28. 作为维护者，我希望产品同时验证 Desktop compatibility 和 advanced 模式，以便第三方 UI 不破坏桌面壳。
@@ -65,8 +65,8 @@ Story Studio 以专用 DSH Profile 交付，组合官方 Workspace、Session、A
 - 使用官方 Workspace、Session、fs、attachments、presets、skills、subagents、workflow、jobs、questions、web 和 Client Slots。
 - 文档导入、文件编辑/Git 和回退先评估现有插件，未通过 `rc.7` 与桌面发行门禁前不预装。
 - 项目合同解析、验证、迁移和状态推导设计为可独立测试的深模块。
-- 项目工作台延后到文件合同和内部工作方式稳定后开发。
-- 工作台优先使用标准 Client Slot；第三方侧边栏 service 只能是可选适配。
+- 项目工作台使用产品 Client Slot 实现名称创建与作品选择，并复用 Better Sidebar 的文件树、编辑器和预览。
+- 新建作品只输入名称，统一写入全局作品根目录，不调用目录选择器。
 - RAG 必须经过统一中文语料基准，只选择一个实现进入产品 Profile。
 - 第三方依赖锁记录版本/commit、来源、hash、许可证、权限、原生依赖和兼容证据。
 
@@ -76,7 +76,7 @@ Story Studio 以专用 DSH Profile 交付，组合官方 Workspace、Session、A
 - `story-project` 的初始化、验证、状态和迁移使用真实临时文件测试。
 - 模糊需求、专业需求、冲突需求、参考拆解和长篇续写建立固定场景回归。
 - 第三方插件先单独验证，再验证 Rich File Reader、文件/Git UI 和 Checkpoint 的组合。
-- 文档输入使用真实中文 PDF、扫描件、DOCX、XLSX 和 PPTX 样例。
+- 文档输入仅以真实 DOCX 和文本层 PDF 为当前验收样例；不验收 XLSX、PPTX 和扫描 PDF 生产流程。
 - Checkpoint 测试覆盖 tracked、untracked、staged、ignored、Git 与非 Git 项目。
 - Client 插件验证普通 Web、Desktop compatibility、Desktop advanced 和最小窗口布局。
 - 涉及原生依赖的插件必须在 macOS 与 Windows packaged app 中验证。
@@ -92,7 +92,10 @@ Story Studio 以专用 DSH Profile 交付，组合官方 Workspace、Session、A
 - 重写 DSH Agent Runtime、Session、Workspace、文件系统或 Web Client；
 - 在 MVP 中强制安装本地 embedding/RAG；
 - 自动发布到短剧或小说平台；
-- 用一个第三方小说插件的数据协议定义整个 Story Studio 产品。
+- 用一个第三方小说插件的数据协议定义整个 Story Studio 产品；
+- 专业 DOCX/PDF 排版导出；
+- Excel、PPT 和扫描 PDF 的完整生产流程；
+- 安装包发布（当前阶段只运行本地开发版）。
 
 ## Further Notes
 

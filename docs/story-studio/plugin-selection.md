@@ -31,11 +31,11 @@
 | 文件读写与文本搜索 | `ctx.fs`、官方 fs tools | 无需插件 | 采用官方能力 |
 | 文件拖拽、粘贴与路径注入 | Workspace、composer | `dsh-drop-to-path` | **MVP 使用** |
 | 文件树、编辑器、Git Diff | 官方没有完整编辑工作台 | `dsh-better-sidebar`、`dsh-compass` | Better Sidebar 优先试验；Compass 只读 fallback |
-| Office/PDF 文本解析 | fs | `dsh-rich-file-reader` | 与 Drop to Path 组合验证；不再承担主要输入入口 |
+| DOCX/文本层 PDF 解析 | fs | `dsh-rich-file-reader` | 与 Drop to Path 组合验证；不再承担主要输入入口 |
 | Agent 变更回退 | Session fork、Git | `dsh-checkpoint-rewind` | 优先试验 |
 | Git 命令 | subprocess/shell | `dsh-plugin-git-workflow` | 暂不预装 |
 | Markdown 笔记 | 工作区文件 | `dsh-md-notes` | 可选工具，不作为作品数据 |
-| Office/PDF 输出 | 工作区文件 | `@huiliyi37/dsh-office` | 第二阶段评估 |
+| 专业 DOCX/PDF 输出 | 工作区文件 | `@huiliyi37/dsh-office` | 当前不实现 |
 | 本地知识库/RAG | fs search、compaction | `dsh-knowledge`、Mindspace | 延后做召回基准 |
 | 小说工作流 | Preset、Skills、Workflow | `dsh-novel-writer`、`dsh-tool-writing` | 仅作参考 |
 | 世界书 | Skills、项目设定文件 | `dsh-LorebookMD` | 仅作参考 |
@@ -63,7 +63,7 @@
 - 能力：`read_rich_file`、`ocr_pdf`、Word/Excel/PPT/PDF/图片读取，以及 Web composer 的“导入文档”入口。
 - 正面证据：有 Host/Client 双面清单、Office/PDF 测试、本地 OCR、附件机制和输入大小限制。
 - 风险：依赖 `office-oxide`、Tesseract、Canvas 等原生或重型运行时；中文 OCR 语言包可能首次联网；未声明 `rc.7`。
-- 决策：**MVP 预装**。不作为主要文件输入入口；与 `dsh-drop-to-path` 组合后按工作区路径读取 DOCX 和文本层 PDF，中文扫描 PDF OCR 仅作辅助能力。
+- 决策：**MVP 预装**。不作为主要文件输入入口；当前只验收按工作区路径读取 DOCX 和文本层 PDF。Excel、PPT 和扫描 PDF 的完整生产不进入本轮验收。
 - 淘汰条件：无法在 packaged app 中稳定装载、原生依赖不可复现、composer 与其他插件冲突，或真实剧本文档提取质量不可接受。
 
 ### 3.3 `dsh-better-sidebar`
@@ -76,6 +76,12 @@
 - 风险：权限和攻击面大；包含 Git 写操作、终端和 `node-pty`；UI 占位可能与 Desktop advanced frame 冲突；发布非常活跃，需要严格锁版。
 - 决策：**MVP 预装**。精确 `0.12.3` 发布物已进入产品 Profile，并对 Canvas、嵌套 `node-pty` 和 universal macOS 资产执行安装包验证；内部工具保留终端和 Git 能力。
 - fallback：若写能力或高级模式不稳定，使用 `dsh-compass` 提供只读文件/Git 观察，并依赖系统编辑器或官方 produced-files 打开能力。
+
+### 3.3.1 项目 UI 候选结论
+
+- `WenhongPan/dsh-projects` 提供项目管理 UI，但新建流程仍以选择目录为核心，不符合“只输入作品名称、统一全局根目录”的产品要求，因此不直接引入。
+- `joejojoking-cloud/dsh-file-explorer`、`yu2025-luo/dsh-file-panel`、`ZrSiO4-y/dsh-explorer`、`ghbhiee/dsh-plugin-workbench` 和 `nirvanaslash/dsh-artifact-preview` 已作为文件树/预览候选检索；现阶段 Better Sidebar 已覆盖 Explorer、编辑、预览和 Git，继续增加同类插件只会造成 UI 入口冲突。
+- 最终方案是产品包只实现薄项目层，通用工作台继续复用 Better Sidebar。
 
 ### 3.4 `dsh-checkpoint-rewind`
 
