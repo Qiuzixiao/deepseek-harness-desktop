@@ -198,6 +198,7 @@ describe('published package surface', () => {
       'package.json',
       'resources/**',
       '!node_modules/node-pty/build/**',
+      '!**/node_modules/node-pty/build/**',
     ])
     expect(manifest.build?.mac?.icon).toBe('build/app-icon-mac.png')
     expect(manifest.build?.mac?.mergeASARs).toBe(false)
@@ -256,7 +257,10 @@ describe('published package surface', () => {
       target: ['dir'],
       x64ArchFiles: expect.stringContaining('node-pty/prebuilds/darwin-*'),
     }))
+    expect(manifest.build?.mac?.x64ArchFiles).toContain('@napi-rs/canvas-darwin-*')
+    expect(manifest.build?.mac?.x64ArchFiles).toContain('office-oxide/prebuilds/darwin-*')
     expect(manifest.build?.files).toContain('!node_modules/node-pty/build/**')
+    expect(manifest.build?.files).toContain('!**/node_modules/node-pty/build/**')
     expect(manifest.devDependencies?.['@electron/asar']).toBe('3.4.1')
   })
 
@@ -344,7 +348,7 @@ describe('published package surface', () => {
     expect(workspaceManifest.resolutions).toMatchObject({
       'koffi@npm:^3.1.0': '3.1.5',
     })
-    expect(lockfile).toContain('"koffi@npm:3.1.5":')
+    expect(lockfile).toContain('resolution: "koffi@npm:3.1.5"')
     expect(lockfile).toContain('@koromix/koffi-win32-x64@npm:3.1.5')
     expect(lockfile).not.toContain('"koffi@npm:3.1.4":')
     expect(lockfile).not.toContain('@koromix/koffi-win32-x64@npm:3.1.4')

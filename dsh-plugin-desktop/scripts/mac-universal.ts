@@ -21,6 +21,10 @@ export const MACOS_UNIVERSAL_NATIVE_ENTRIES = [
   },
   {
     arch: 'arm64',
+    path: 'node_modules/@napi-rs/canvas-darwin-arm64/skia.darwin-arm64.node',
+  },
+  {
+    arch: 'arm64',
     path: 'node_modules/@vscode/ripgrep-darwin-arm64/bin/rg',
   },
   {
@@ -29,11 +33,23 @@ export const MACOS_UNIVERSAL_NATIVE_ENTRIES = [
   },
   {
     arch: 'arm64',
+    path: 'node_modules/office-oxide/prebuilds/darwin-arm64/liboffice_oxide.dylib',
+  },
+  {
+    arch: 'arm64',
     path: 'node_modules/node-pty/prebuilds/darwin-arm64/pty.node',
   },
   {
     arch: 'arm64',
     path: 'node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper',
+  },
+  {
+    arch: 'arm64',
+    path: 'node_modules/dsh-better-sidebar/node_modules/node-pty/prebuilds/darwin-arm64/pty.node',
+  },
+  {
+    arch: 'arm64',
+    path: 'node_modules/dsh-better-sidebar/node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper',
   },
   {
     arch: 'x86_64',
@@ -49,11 +65,19 @@ export const MACOS_UNIVERSAL_NATIVE_ENTRIES = [
   },
   {
     arch: 'x86_64',
+    path: 'node_modules/@napi-rs/canvas-darwin-x64/skia.darwin-x64.node',
+  },
+  {
+    arch: 'x86_64',
     path: 'node_modules/@vscode/ripgrep-darwin-x64/bin/rg',
   },
   {
     arch: 'x86_64',
     path: 'node_modules/node-addon-require-builtin-darwin-x64/prebuilt/darwin-x64-napi-v9.node',
+  },
+  {
+    arch: 'x86_64',
+    path: 'node_modules/office-oxide/prebuilds/darwin-x64/liboffice_oxide.dylib',
   },
   {
     arch: 'x86_64',
@@ -63,12 +87,22 @@ export const MACOS_UNIVERSAL_NATIVE_ENTRIES = [
     arch: 'x86_64',
     path: 'node_modules/node-pty/prebuilds/darwin-x64/spawn-helper',
   },
+  {
+    arch: 'x86_64',
+    path: 'node_modules/dsh-better-sidebar/node_modules/node-pty/prebuilds/darwin-x64/pty.node',
+  },
+  {
+    arch: 'x86_64',
+    path: 'node_modules/dsh-better-sidebar/node_modules/node-pty/prebuilds/darwin-x64/spawn-helper',
+  },
 ] as const satisfies readonly { readonly arch: MacUniversalArch; readonly path: string }[]
 
 /** Generated host-architecture files that must never shadow the prebuilt pair. */
 export const FORBIDDEN_MACOS_UNIVERSAL_ENTRIES = [
   'node_modules/node-pty/build/Release/pty.node',
   'node_modules/node-pty/build/Release/spawn-helper',
+  'node_modules/dsh-better-sidebar/node_modules/node-pty/build/Release/pty.node',
+  'node_modules/dsh-better-sidebar/node_modules/node-pty/build/Release/spawn-helper',
 ] as const
 
 /** Injectable filesystem seam for source-runtime preparation. */

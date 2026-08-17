@@ -5,7 +5,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { boot } from '@deepseek-ai/dsh-app-boot'
+import { Inbox } from '@deepseek-ai/dsh-agent'
 import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import {
   createLaunchEnvironmentSnapshot,
   DSH_LAUNCH_ENVIRONMENT_KEY,
@@ -20,6 +22,8 @@ const BIN_NAME = 'dsh-plugin-desktop-profile-smoke'
 const HOST_SERVICE_PLUGIN_NAME = 'dsh-desktop-host-services-smoke-plugin'
 const HOST_SERVICE_PROBE_KEY = 'desktopHostServiceProbe'
 const home = mkdtempSync(join(tmpdir(), 'dsh-desktop-profile-'))
+const originalDshHome = process.env.DSH_HOME
+process.env.DSH_HOME = home
 let ctx
 let releasePackageResolver
 let pnpmRuntime
@@ -161,8 +165,64 @@ try {
     throw new Error('assembled desktop profile service has the wrong active identity')
   }
   const toolNames = new Set(ctx.tools.schemas().map(schema => schema.name))
-  for (const name of ['read_rich_file', 'ocr_pdf']) {
+  for (const name of ['read_rich_file', 'ocr_pdf', 'checkpoint']) {
     if (!toolNames.has(name)) throw new Error(`Story Studio profile is missing packaged document tool ${name}`)
+  }
+  let checkpointSettings
+  for (let attempt = 0; attempt < 50 && checkpointSettings === undefined; attempt += 1) {
+    checkpointSettings = ctx.settings.describe().find(entry => entry.ns === 'checkpoint-rewind')
+    if (checkpointSettings === undefined) await new Promise(resolve => setTimeout(resolve, 10))
+  }
+  if (checkpointSettings?.value?.enabled !== true || checkpointSettings.applies !== 'live') {
+    throw new Error(`Story Studio profile has no working checkpoint settings registration: ${JSON.stringify(checkpointSettings)}`)
+  }
+  const checkpointWorkspace = join(home, 'checkpoint-workspace')
+  mkdirSync(checkpointWorkspace, { recursive: true })
+  writeFileSync(join(checkpointWorkspace, 'brief.md'), '# Checkpoint smoke\n')
+  const checkpointSession = ctx.sessions.create(SessionId('story-studio-checkpoint-smoke'), {
+    meta: { cwd: checkpointWorkspace },
+  })
+  const checkpointScope = ctx.plugin(() => {})
+  const checkpointAgent = {
+    id: checkpointSession.id,
+    options: {},
+    session: checkpointSession,
+    inbox: new Inbox(checkpointSession, { inserted() {}, discarded() {}, claimed() {} }),
+    ctx: checkpointScope.ctx,
+    status: 'idle',
+    send() {},
+    followup() {},
+    steer() {},
+    inject() {},
+    cancel() {},
+    runMaintenance: task => task(new AbortController().signal),
+    whenIdle: () => Promise.resolve(),
+  }
+  ctx.agents.register(checkpointAgent)
+  checkpointSession.append('turn/start', { turn: 1 })
+  checkpointSession.append('step/start', { turn: 1, step: 1 })
+  checkpointSession.append('step/end', { turn: 1, step: 1 })
+  checkpointSession.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+  const commandNames = new Set(ctx.commands.list(checkpointAgent).map(command => command.name))
+  for (const name of ['checkpoint', 'rewind']) {
+    if (!commandNames.has(name)) throw new Error(`Story Studio profile is missing /${name}`)
+  }
+  const checkpointResult = await ctx.commands.execute(
+    checkpointAgent,
+    '/checkpoint note packaged profile smoke',
+    new AbortController().signal,
+  )
+  if (checkpointResult?.result?.kind !== 'success'
+    || !checkpointResult.result.text.startsWith('checkpoint: captured #')) {
+    throw new Error(`Story Studio checkpoint command failed: ${JSON.stringify(checkpointResult)}`)
+  }
+  const rewindList = await ctx.commands.execute(
+    checkpointAgent,
+    '/rewind',
+    new AbortController().signal,
+  )
+  if (rewindList?.result?.kind !== 'success' || !rewindList.result.text.includes('packaged profile smoke')) {
+    throw new Error(`Story Studio rewind list failed: ${JSON.stringify(rewindList)}`)
   }
   const hostServiceProbe = ctx.get(HOST_SERVICE_PROBE_KEY)
   if (hostServiceProbe?.current?.name !== STORY_STUDIO_PROFILE_NAME
@@ -228,6 +288,8 @@ try {
     '@deepseek-ai/dsh-client-ui-directory-picker-browse',
     '@dsh-external/dsh-drop-to-path',
     'dsh-rich-file-reader',
+    'dsh-better-sidebar',
+    'dsh-checkpoint-rewind',
   ]) {
     if (!ids.has(id)) throw new Error(`assembled advanced Web graph is missing ${id}`)
   }
@@ -242,4 +304,6 @@ try {
   releasePackageResolver?.()
   pnpmRuntime?.dispose()
   rmSync(home, { recursive: true, force: true })
+  if (originalDshHome === undefined) delete process.env.DSH_HOME
+  else process.env.DSH_HOME = originalDshHome
 }

@@ -6,6 +6,7 @@ import {
   REQUIRED_UNPACKED_PACKAGE_SPECIFIERS,
   REQUIRED_UNPACKED_RUNTIME_ENTRIES,
   REQUIRED_WINDOWS_X64_NODE_PTY_ENTRIES,
+  repairPackagedMacHelperModes,
   resolvePackagedAsarPath,
   resolvePackagedUnpackedRoot,
   verifyPackagedRuntime,
@@ -38,6 +39,18 @@ function completePackageResolver(unpackedRoot: string): PackageResolver {
 }
 
 describe('packaged desktop runtime verification', () => {
+  it('repairs every packaged macOS node-pty helper mode', () => {
+    const chmod = vi.fn()
+    repairPackagedMacHelperModes('/unpacked', () => true, chmod)
+
+    expect(chmod.mock.calls).toHaveLength(4)
+    expect(chmod.mock.calls.every(([, mode]) => mode === 0o755)).toBe(true)
+    expect(chmod.mock.calls.map(([path]) => path)).toEqual(expect.arrayContaining([
+      join('/unpacked', 'node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper'),
+      join('/unpacked', 'node_modules/dsh-better-sidebar/node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper'),
+    ]))
+  })
+
   it('tracks the ConPTY-only native surface shipped by node-pty 1.2', () => {
     expect(REQUIRED_WINDOWS_X64_NODE_PTY_ENTRIES).toEqual([
       'node_modules/node-pty/prebuilds/win32-x64/conpty.node',

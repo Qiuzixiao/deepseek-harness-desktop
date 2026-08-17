@@ -1,0 +1,40 @@
+diff --git a/index.mjs b/index.mjs
+index 2261ccd88b86fd62592dac6dc68bcec9953df0b5..d540f157e6ea0e0d9591f7b7d4b29b60a7dbc1d0 100644
+--- a/index.mjs
++++ b/index.mjs
+@@ -284,7 +284,7 @@ export async function apply(ctx, config = {}) {
+     return () => liveListeners.delete(listener)
+   }
+   ctx.inject(['settings'], (sctx) => {
+-    const scope = sctx.settings.register(checkpointSettingsNamespace(), checkpointSettingsSchema, {
++    const scope = sctx.settings.register(checkpointSettingsNamespace(), Config, {
+       base: resolved,
+       expose: true,
+       applies: 'live',
+@@ -772,9 +772,12 @@ export async function apply(ctx, config = {}) {
+ 
+   // --- checkpoint 模型工具（可选能力：tools 服务装配时注册；配置可关）。
+   ctx.inject(['tools'], (toolsCtx) => {
++    let disposeTool
+     const update = () => {
++      disposeTool?.()
++      disposeTool = undefined
+       if (liveConfig.checkpointTool === true) {
+-        toolsCtx.effect(() => toolsCtx.tools.register(defineTool({
++        disposeTool = toolsCtx.effect(() => toolsCtx.tools.register(defineTool({
+           name: CHECKPOINT_TOOL,
+           description: 'Capture a manual unified checkpoint of the current session: workspace files (git snapshot), session event cursor, and plugin configuration, with an optional note. Use /rewind later to restore any of the three states. Checkpoints are additive and need no approval.',
+           parameters: {
+@@ -813,7 +816,11 @@ export async function apply(ctx, config = {}) {
+     }
+     const unwatch = onLiveChange(update)
+     update()
+-    toolsCtx.effect(() => () => { unwatch() }, `${PLUGIN_NAME}.checkpoint-tool.watch`)
++    toolsCtx.effect(() => () => {
++      unwatch()
++      disposeTool?.()
++      disposeTool = undefined
++    }, `${PLUGIN_NAME}.checkpoint-tool.watch`)
+   })
+ 
+   /**

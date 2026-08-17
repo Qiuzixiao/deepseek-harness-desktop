@@ -1,6 +1,6 @@
 # Story Studio 规划文档
 
-状态：**方案评审稿**  
+状态：**MVP 实施中，安装包组合已落地**
 基线：DSH `0.1.0-rc.7`，DSH Desktop `2.0.1`  
 更新日期：2026-08-18
 
@@ -36,8 +36,9 @@ Story Studio 是基于 DSH Desktop 的内部 AI 编剧平台，面向短剧编�
 
 - Desktop 交付一个可发现的 `story-studio` system Preset，并复用同版本 DSH `standard` Preset 的完整工具组合；
 - Preset 内置 `story-intake`、`story-project`、`short-drama-writing`、`novel-writing`、`reference-analysis` 和 `story-review` 六个首批 Skills；
-- Electron 安装包内置 `dsh-product-story-studio`、固定 commit 的 `dsh-drop-to-path` 和 Story Studio 资源；首次启动自动创建 `story-studio` Profile，不需要运行安装命令或访问 GitHub；
-- 当前仍未实现短剧正文、小说正文、参考拆解和审校 Skills，也未把 Rich File Reader 加入产品 Profile。
+- Electron 安装包内置 `dsh-product-story-studio`、固定 commit 的 `dsh-drop-to-path`、`dsh-rich-file-reader@0.3.1`、`dsh-better-sidebar@0.12.3`、经过本仓库 `rc.7` 兼容补丁的 `dsh-checkpoint-rewind@0.5.1` 和 Story Studio 资源；首次启动自动创建 `story-studio` Profile，不需要运行安装命令或访问 GitHub；
+- `read_rich_file`、`ocr_pdf`、文件树/编辑器/Git diff、`checkpoint`、`/checkpoint` 和 `/rewind` 随产品 Profile 装配；macOS universal DMG 会校验 Office、Canvas 和两份 `node-pty` 的双架构原生资产；
+- 短剧正文、小说正文、参考拆解和审校均由已打包 Skills 提供，创作文件以 Story Studio 项目合同落盘。
 
 ## 证据边界
 
@@ -47,7 +48,7 @@ Story Studio 是基于 DSH Desktop 的内部 AI 编剧平台，面向短剧编�
 
 - 当前仓库固定的 DeepSeek Harness `0.1.0-rc.7` 源码和能力文档；
 - DSH Desktop 的 Profile、Host/Client、Desktop service 和打包实现；
-- 本机已安装的 `dsh-rich-file-reader@0.3.1`；
+- 已打包并通过 `rc.7` Profile 验证的四个产品插件；
 - 已在 DSH `0.1.0-rc.7` 临时 Web Profile 中启动的 `@dsh-external/dsh-drop-to-path@0.1.0`；
 - DSH 1024Store 目录与 GitHub 候选仓库；
 - 对候选插件的 `package.json`、Cordis patch、README、源码结构、测试目录和许可证的静态检查；

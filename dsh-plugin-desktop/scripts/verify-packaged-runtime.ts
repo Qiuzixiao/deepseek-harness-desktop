@@ -1,6 +1,6 @@
 /** Fail-loud verification of the runtime entries sealed into Electron's app.asar. */
 
-import { existsSync } from 'node:fs'
+import { chmodSync, existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { isAbsolute, join, relative, sep } from 'node:path'
 import { listPackage } from '@electron/asar'
@@ -94,6 +94,17 @@ export const REQUIRED_UNPACKED_RUNTIME_ENTRIES = [
   'node_modules/dsh-rich-file-reader/lib/index.js',
   'node_modules/dsh-rich-file-reader/lib/client.js',
   'node_modules/dsh-rich-file-reader/LICENSE',
+  'node_modules/dsh-better-sidebar/package.json',
+  'node_modules/dsh-better-sidebar/cordis.patch.yml',
+  'node_modules/dsh-better-sidebar/lib/index.js',
+  'node_modules/dsh-better-sidebar/lib/client.js',
+  'node_modules/dsh-better-sidebar/LICENSE',
+  'node_modules/dsh-checkpoint-rewind/package.json',
+  'node_modules/dsh-checkpoint-rewind/cordis.patch.yml',
+  'node_modules/dsh-checkpoint-rewind/index.mjs',
+  'node_modules/dsh-checkpoint-rewind/client/index.js',
+  'node_modules/dsh-checkpoint-rewind/LICENSE',
+  'node_modules/dsh-checkpoint-rewind/THIRD_PARTY_NOTICES.md',
   'node_modules/@deepseek-ai/dsh/package.json',
   'node_modules/@deepseek-ai/dsh/lib/bin.js',
   'node_modules/@deepseek-ai/dsh-app-boot/lib/index.js',
@@ -128,6 +139,9 @@ export const REQUIRED_UNPACKED_PACKAGE_SPECIFIERS = [
   'dsh-plugin-desktop/windows-pwsh-sandbox',
   'dsh-plugin-desktop/package.json',
   'dsh-product-story-studio/package.json',
+  'dsh-better-sidebar/package.json',
+  'dsh-checkpoint-rewind/package.json',
+  'dsh-rich-file-reader/package.json',
   '@deepseek-ai/dsh-base/package.json',
   '@deepseek-ai/dsh-web-app/package.json',
 ] as const
@@ -137,6 +151,25 @@ export type ArchiveLister = (archivePath: string, options: { isPack: boolean }) 
 
 /** Injectable physical-file probe used by focused tests. */
 export type FileProbe = (filename: string) => boolean
+
+/** Injectable mode repair used for executable helper files copied by Electron Builder. */
+export type FileModeWriter = (filename: string, mode: number) => void
+
+/**
+ * Restore execute bits that package traversal can drop from nested node-pty helpers.
+ * Both architecture prebuilds ship in universal packages and must remain executable.
+ */
+export function repairPackagedMacHelperModes(
+  unpackedRoot: string,
+  exists: FileProbe = existsSync,
+  chmod: FileModeWriter = chmodSync,
+): void {
+  for (const entry of MACOS_UNIVERSAL_NATIVE_ENTRIES) {
+    if (!entry.path.endsWith('/spawn-helper')) continue
+    const helper = join(unpackedRoot, entry.path)
+    if (exists(helper)) chmod(helper, 0o755)
+  }
+}
 
 /** Injectable Node package resolver used by focused tests. */
 export type PackageResolver = (specifier: string) => string
@@ -287,6 +320,9 @@ export function verifyPackagedRuntime(
  * @returns A promise that rejects before signing when the runtime is incomplete.
  */
 export async function afterPack(context: PackagedRuntimeContext): Promise<void> {
+  if (context.electronPlatformName === 'darwin') {
+    repairPackagedMacHelperModes(resolvePackagedUnpackedRoot(context))
+  }
   verifyPackagedRuntime(context)
 }
 

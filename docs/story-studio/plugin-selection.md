@@ -63,7 +63,7 @@
 - 能力：`read_rich_file`、`ocr_pdf`、Word/Excel/PPT/PDF/图片读取，以及 Web composer 的“导入文档”入口。
 - 正面证据：有 Host/Client 双面清单、Office/PDF 测试、本地 OCR、附件机制和输入大小限制。
 - 风险：依赖 `office-oxide`、Tesseract、Canvas 等原生或重型运行时；中文 OCR 语言包可能首次联网；未声明 `rc.7`。
-- 决策：**解析候选**。不再作为主要文件输入入口；与 `dsh-drop-to-path` 组合后按工作区路径读取 DOCX 和文本层 PDF，中文扫描 PDF OCR 仅作辅助能力。
+- 决策：**MVP 预装**。不作为主要文件输入入口；与 `dsh-drop-to-path` 组合后按工作区路径读取 DOCX 和文本层 PDF，中文扫描 PDF OCR 仅作辅助能力。
 - 淘汰条件：无法在 packaged app 中稳定装载、原生依赖不可复现、composer 与其他插件冲突，或真实剧本文档提取质量不可接受。
 
 ### 3.3 `dsh-better-sidebar`
@@ -74,7 +74,7 @@
 - 能力：文件树、CodeMirror 编辑、Markdown/HTML/PDF/Office 预览、终端、Git diff/历史/暂存/提交、后台任务、插件 tab/viewer service。
 - 正面证据：一个现有插件覆盖了原计划中最容易重复开发的文件、编辑器、Git 和任务 UI；公开 `ctx.betterSidebar` 扩展接口。
 - 风险：权限和攻击面大；包含 Git 写操作、终端和 `node-pty`；UI 占位可能与 Desktop advanced frame 冲突；发布非常活跃，需要严格锁版。
-- 决策：**优先试验**，但不直接预装。验证通过后，MVP 只启用真正需要的文件和 Git 能力；终端和浏览器能力按内部安全策略决定。
+- 决策：**MVP 预装**。精确 `0.12.3` 发布物已进入产品 Profile，并对 Canvas、嵌套 `node-pty` 和 universal macOS 资产执行安装包验证；内部工具保留终端和 Git 能力。
 - fallback：若写能力或高级模式不稳定，使用 `dsh-compass` 提供只读文件/Git 观察，并依赖系统编辑器或官方 produced-files 打开能力。
 
 ### 3.4 `dsh-checkpoint-rewind`
@@ -86,7 +86,7 @@
 - 能力：工作区、会话游标和配置三态 checkpoint；Git 仓库使用无引用对象快照，非 Git 目录使用 copy provider；回退前确认和守护 checkpoint。
 - 正面证据：默认不移动 HEAD、不修改 Git 历史或索引；有单元测试、headless 集成流程和明确安全文档。
 - 风险：会监听写入工具和 session 事件；`rc.6` 对自定义 session event 有已知限制；默认每步 checkpoint 可能影响大项目性能和存储。
-- 决策：**优先试验**。生产配置需要限制快照数量/体积，保持 `workspaceRestore: restore`，禁止 `reset-hard`。
+- 决策：**MVP 预装并维护兼容补丁**。本仓库补齐 `rc.7` Settings schema 和配置热更新时的工具单例注册；生产配置保持 `workspaceRestore: restore`，回退前必须确认，不启用 `reset-hard`。
 - 淘汰条件：`rc.7` session 语义不兼容、与 Git 插件互相干扰、恢复无法保持未跟踪文件和用户索引边界，或大型项目性能不达标。
 
 ## 4. 第二阶段候选
