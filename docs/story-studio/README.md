@@ -15,6 +15,7 @@ Story Studio 是基于 DSH Desktop 的内部 AI 编剧平台，面向短剧编�
 | [产品需求文档](requirements.md) | 用户问题、解决方案、用户故事、实施与测试决策、范围边界 |
 | [总体实施方案](implementation-plan.md) | 产品目标、架构分层、模块边界、阶段路线和交付物 |
 | [插件选型与复用矩阵](plugin-selection.md) | 官方能力、第三方插件逐项决策、版本、风险和生产准入门槛 |
+| [插件兼容性报告](plugin-compatibility-report.md) | 精确发布物、`rc.7` Profile smoke 结果、已知限制和下一门禁 |
 | [Agent 与项目数据设计](agent-and-data-design.md) | 模糊需求处理、Preset/Skill 设计、创作流程和文件事实源 |
 | [验证与验收计划](verification-plan.md) | `rc.7` 组合试验、场景回归、打包验证和发布门禁 |
 

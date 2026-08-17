@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "dshRuntime": "0.1.0-rc.7",
+  "plugins": [
+    {
+      "id": "rich-file-reader",
+      "package": "dsh-rich-file-reader",
+      "version": "0.3.1",
+      "source": "https://github.com/shixiliya1/dsh-rich-file-reader/releases/download/v0.3.1/dsh-rich-file-reader-0.3.1.tgz",
+      "sha256": "9900d34c06d1f3d1b0ac6813eba7c79b964a63e8ac6740ead4fb127c3f68c4b2",
+      "maxBytes": 10485760,
+      "license": "MIT",
+      "bundleRow": "rich-file-reader",
+      "nativeBuilds": [
+        "koffi",
+        "office-oxide",
+        "tesseract.js"
+      ]
+    },
+    {
+      "id": "better-sidebar",
+      "package": "dsh-better-sidebar",
+      "version": "0.12.3",
+      "source": "https://registry.npmjs.org/dsh-better-sidebar/-/dsh-better-sidebar-0.12.3.tgz",
+      "sha256": "8d9dd6abd7cf5f01965856bf2bdd2a2ec0cc03535f158335391e31f74231381a",
+      "maxBytes": 10485760,
+      "license": "MIT",
+      "bundleRow": "better-sidebar",
+      "nativeBuilds": [
+        "node-pty",
+        "protobufjs"
+      ]
+    },
+    {
+      "id": "checkpoint-rewind",
+      "package": "dsh-checkpoint-rewind",
+      "version": "0.5.1",
+      "source": "https://registry.npmjs.org/dsh-checkpoint-rewind/-/dsh-checkpoint-rewind-0.5.1.tgz",
+      "sha256": "f3ad47de27e6495155d6082e9ec00c04b2ef78f96841559831adbf243690bbde",
+      "maxBytes": 10485760,
+      "license": "Apache-2.0",
+      "bundleRow": "checkpoint-rewind",
+      "nativeBuilds": []
+    }
+  ]
+}

@@ -21,7 +21,7 @@
 - **仅作参考**：借鉴功能与测试，不作为运行时依赖；
 - **不采用**：与架构冲突、重复基础能力或风险大于收益。
 
-当前没有第三方插件达到“采用”；它们必须先完成[验证与验收计划](verification-plan.md)。
+当前没有第三方插件达到“采用”。三个优先插件已通过首轮 `rc.7` Host/Profile smoke，详见[插件兼容性报告](plugin-compatibility-report.md)；它们仍须完成真实能力、桌面 UI 和 packaged Electron 门禁。
 
 ## 2. 总体复用矩阵
 
