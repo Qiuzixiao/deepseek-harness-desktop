@@ -227,6 +227,7 @@ the package names, versions, and licenses for transparency.
 | @deepseek-ai/dsh-workspace | 0.1.0-rc.7 | MIT |
 | @deepseek-ai/node-addon-landlock-run | 0.1.1 | BSD-3-Clause |
 | @deepseek-ai/schemastery | 3.18.1 | MIT |
+| @dsh-external/dsh-drop-to-path | 0.1.0 | MIT |
 | @earendil-works/pi-ai | 0.82.1 | MIT |
 | @google/genai | 1.52.0 | Apache-2.0 |
 | @hono/node-server | 2.1.0 | MIT |
@@ -333,6 +334,7 @@ the package names, versions, and licenses for transparency.
 | devlop | 1.1.0 | MIT |
 | diff | 9.0.0 | BSD-3-Clause |
 | dsh-community-market | 0.1.0-dev.0 | MIT |
+| dsh-product-story-studio | 0.1.0 | MIT |
 | dunder-proto | 1.0.1 | MIT |
 | ecdsa-sig-formatter | 1.0.11 | Apache-2.0 |
 | ee-first | 1.1.1 | MIT |

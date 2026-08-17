@@ -9,8 +9,11 @@ import {
   desktopShellModeFromSettings,
   desktopBundleList,
   ensureDesktopProfile,
+  ensureStoryStudioProfile,
   prepareDesktopProfile,
   readDesktopShellMode,
+  STORY_STUDIO_PACKAGE_NAME,
+  STORY_STUDIO_PROFILE_NAME,
 } from '../src/profile.ts'
 
 const homes: string[] = []
@@ -95,6 +98,34 @@ describe('desktop profile composition', () => {
     const manifest = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>
     writeFileSync(path, JSON.stringify({ ...manifest, dsh: { profile: { bundles: 'not-an-array' } } }) + '\n')
     expect(() => ensureDesktopProfile(home)).toThrow('dsh.profile.bundles must be an array')
+  })
+
+  it('creates the bundled Story Studio profile without profile-local installation', () => {
+    const home = temporaryHome()
+    const dir = ensureStoryStudioProfile(home)
+    const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as {
+      dependencies: Record<string, string>
+      dsh: { profile: { bundles: string[] } }
+    }
+
+    expect(manifest.dependencies).toEqual({})
+    expect(manifest.dsh.profile.bundles).toEqual([
+      '@deepseek-ai/dsh-base',
+      '@deepseek-ai/dsh-web-app',
+      STORY_STUDIO_PACKAGE_NAME,
+    ])
+
+    const prepared = prepareDesktopProfile(undefined, home, 'darwin', STORY_STUDIO_PROFILE_NAME)
+    const rows = composeEntries([prepared.patches])
+    expect(rows).toContainEqual({
+      id: 'drop-to-path',
+      name: '@dsh-external/dsh-drop-to-path',
+    })
+    expect(prepared.profile.layers.map(layer => layer.packageName)).toEqual([
+      '@deepseek-ai/dsh-base',
+      '@deepseek-ai/dsh-web-app',
+      STORY_STUDIO_PACKAGE_NAME,
+    ])
   })
 
   it('assembles the Host shell without replacing the upstream client shell', () => {

@@ -14,6 +14,7 @@ const fail = message => { throw new Error(`verify-layout: ${message}`) }
 const workspace = readJson('package.json')
 const upstream = readJson('upstream.json')
 const plugin = readJson('dsh-plugin-desktop/package.json')
+const storyStudio = readJson('dsh-product-story-studio/package.json')
 const fabric = readJson('dsh-community-fabric/package.json')
 const market = readJson('dsh-community-market/package.json')
 const upstreamPackage = readJson('deepseek-harness/package.json')
@@ -27,13 +28,15 @@ if (workspace.packageManager !== 'yarn@4.18.0') {
 }
 if (JSON.stringify(workspace.workspaces) !== JSON.stringify([
   'dsh-plugin-desktop',
+  'dsh-product-story-studio',
   'dsh-community-fabric',
   'dsh-community-market',
 ])) {
-  fail('the root Yarn workspace must contain the desktop, community-fabric, and community-market packages')
+  fail('the root Yarn workspace must contain the desktop, Story Studio, community-fabric, and community-market packages')
 }
 for (const [name, manifest] of [
   ['dsh-plugin-desktop', plugin],
+  ['dsh-product-story-studio', storyStudio],
   ['dsh-community-fabric', fabric],
   ['dsh-community-market', market],
 ]) {
@@ -41,6 +44,7 @@ for (const [name, manifest] of [
 }
 if (fabric.name !== 'dsh-community-fabric') fail('the Fabric workspace must own dsh-community-fabric')
 if (market.name !== 'dsh-community-market') fail('the market workspace must own dsh-community-market')
+if (storyStudio.name !== 'dsh-product-story-studio') fail('the Story Studio workspace must own dsh-product-story-studio')
 const claudePath = resolve(root, 'CLAUDE.md')
 const claudeStat = lstatSync(claudePath)
 // Windows checkouts materialize the symlink as a regular file holding the
@@ -76,6 +80,7 @@ if (typeof upstreamPackage.packageManager !== 'string' || !upstreamPackage.packa
 for (const [owner, manifest] of [
   ['root', workspace],
   ['desktop', plugin],
+  ['story-studio', storyStudio],
   ['fabric', fabric],
   ['market', market],
 ]) {

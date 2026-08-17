@@ -10,6 +10,7 @@
   },
   "workspaces": [
     "dsh-plugin-desktop",
+    "dsh-product-story-studio",
     "dsh-community-fabric",
     "dsh-community-market"
   ],

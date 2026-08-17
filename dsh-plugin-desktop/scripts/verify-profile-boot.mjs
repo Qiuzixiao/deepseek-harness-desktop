@@ -13,7 +13,7 @@ import {
 import { DESKTOP_SETTINGS_NAMESPACE } from '../lib/index.js'
 import { installDesktopPnpmRuntime } from '../lib/desktop-runtime-environment.js'
 import { installProfilePackageResolver } from '../lib/module-resolution.js'
-import { prepareDesktopProfile } from '../lib/profile.js'
+import { prepareDesktopProfile, STORY_STUDIO_PROFILE_NAME } from '../lib/profile.js'
 import { DesktopProfileService } from '../lib/profile-service.js'
 
 const BIN_NAME = 'dsh-plugin-desktop-profile-smoke'
@@ -29,7 +29,7 @@ const trayItems = []
 
 try {
   writeFileSync(join(home, 'settings.yaml'), 'dsh-desktop:\n  mode: advanced\n')
-  const prepared = prepareDesktopProfile('1', home, 'win32')
+  const prepared = prepareDesktopProfile('1', home, 'win32', STORY_STUDIO_PROFILE_NAME)
   const hostServicePluginDir = join(
     prepared.profile.dir,
     'node_modules',
@@ -114,7 +114,7 @@ try {
       host.provide(DSH_LAUNCH_ENVIRONMENT_KEY, createLaunchEnvironmentSnapshot([]))
       host.provide('desktopRuntime', runtime)
       host.provide('desktopPnpmBootstrap', {
-        activeProfileName: 'desktop',
+        activeProfileName: STORY_STUDIO_PROFILE_NAME,
         activeProfileDir: prepared.profile.dir,
         homeDir: prepared.homeDir,
         appExecutable: process.execPath,
@@ -127,11 +127,11 @@ try {
       })
       await host.plugin(DesktopProfileService, {
         current: {
-          name: 'desktop',
+          name: STORY_STUDIO_PROFILE_NAME,
           dir: prepared.profile.dir,
         },
         list: () => [{
-          name: 'desktop',
+          name: STORY_STUDIO_PROFILE_NAME,
           dir: prepared.profile.dir,
           exists: true,
           bundles: prepared.profile.layers.map(layer => layer.packageName),
@@ -156,12 +156,12 @@ try {
   if (storyStudio?.trust !== 'system' || storyStudio.name !== 'Story Studio') {
     throw new Error(`assembled desktop profile is missing the Story Studio system preset: ${JSON.stringify(storyStudio)}`)
   }
-  if (ctx.desktopProfiles.current.name !== 'desktop'
+  if (ctx.desktopProfiles.current.name !== STORY_STUDIO_PROFILE_NAME
     || ctx.desktopProfiles.current.dir !== prepared.profile.dir) {
     throw new Error('assembled desktop profile service has the wrong active identity')
   }
   const hostServiceProbe = ctx.get(HOST_SERVICE_PROBE_KEY)
-  if (hostServiceProbe?.current?.name !== 'desktop'
+  if (hostServiceProbe?.current?.name !== STORY_STUDIO_PROFILE_NAME
     || hostServiceProbe.current.dir !== prepared.profile.dir
     || hostServiceProbe.pnpm?.serviceName !== 'desktopPnpm'
     || hostServiceProbe.pnpm.lookupRun !== 'function'
@@ -202,8 +202,8 @@ try {
     && !trayItems.some(item => item.label() === 'Open DSH Terminal')) {
     throw new Error('assembled desktop profile is missing the terminal tray command')
   }
-  const profileMenu = trayItems.find(item => item.label() === 'Profile: desktop')
-  if (profileMenu?.submenu?.()[0]?.label() !== 'desktop') {
+  const profileMenu = trayItems.find(item => item.label() === `Profile: ${STORY_STUDIO_PROFILE_NAME}`)
+  if (profileMenu?.submenu?.()[0]?.label() !== STORY_STUDIO_PROFILE_NAME) {
     throw new Error('assembled desktop profile is missing the active profile tray submenu')
   }
   const response = await fetch(expectedUrl)
@@ -222,6 +222,7 @@ try {
     '@deepseek-ai/dsh-client-ui-conversation',
     '@deepseek-ai/dsh-client-ui-sidebar',
     '@deepseek-ai/dsh-client-ui-directory-picker-browse',
+    '@dsh-external/dsh-drop-to-path',
   ]) {
     if (!ids.has(id)) throw new Error(`assembled advanced Web graph is missing ${id}`)
   }

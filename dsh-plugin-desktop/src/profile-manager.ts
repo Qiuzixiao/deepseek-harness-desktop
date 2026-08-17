@@ -23,11 +23,13 @@ import {
 } from '@deepseek-ai/dsh-app-boot'
 
 const BIN_NAME = 'dsh-plugin-desktop'
-const DEFAULT_PROFILE_NAME = 'desktop'
+const DEFAULT_PROFILE_NAME = 'story-studio'
+const DESKTOP_PROFILE_NAME = 'desktop'
 const WEB_PROFILE_NAME = 'web'
 const BASE_BUNDLE_NAME = '@deepseek-ai/dsh-base'
 const WEB_BUNDLE_NAME = '@deepseek-ai/dsh-web-app'
 const DESKTOP_BUNDLE_NAME = 'dsh-plugin-desktop'
+const STORY_STUDIO_BUNDLE_NAME = 'dsh-product-story-studio'
 const PROFILE_MANIFEST_FILENAME = 'package.json'
 const STATE_VERSION = 1
 const MAX_STATE_BYTES = 4 * 1024
@@ -115,7 +117,7 @@ function existingProfile(name: string, home: string): DesktopProfileSummary {
   try {
     const bundles = manifestBundles(readProfileManifest(BIN_NAME, dir))
     const desktopBundleIndex = bundles.indexOf(DESKTOP_BUNDLE_NAME)
-    const problem = name !== DEFAULT_PROFILE_NAME && desktopBundleIndex !== -1
+    const problem = name !== DESKTOP_PROFILE_NAME && desktopBundleIndex !== -1
       ? `${DESKTOP_BUNDLE_NAME} is launcher-owned and must not appear in dsh.profile.bundles`
       : undefined
     const baseBundleIndex = bundles.indexOf(BASE_BUNDLE_NAME)
@@ -125,7 +127,7 @@ function existingProfile(name: string, home: string): DesktopProfileSummary {
       dir,
       exists: true,
       bundles,
-      webCapable: problem === undefined && (name === DEFAULT_PROFILE_NAME
+      webCapable: problem === undefined && (name === DESKTOP_PROFILE_NAME
         || baseBundleIndex !== -1 && webBundleIndex > baseBundleIndex),
       ...(problem === undefined ? {} : { problem }),
     }
@@ -142,7 +144,10 @@ function existingProfile(name: string, home: string): DesktopProfileSummary {
 }
 
 /** Describe one profile that upstream app-boot will lazily initialize. */
-function virtualProfile(name: typeof DEFAULT_PROFILE_NAME | typeof WEB_PROFILE_NAME, home: string): DesktopProfileSummary {
+function virtualProfile(
+  name: typeof DEFAULT_PROFILE_NAME | typeof DESKTOP_PROFILE_NAME | typeof WEB_PROFILE_NAME,
+  home: string,
+): DesktopProfileSummary {
   const bundles = PROFILE_TEMPLATES.web
   if (bundles === undefined) {
     throw new Error(`${BIN_NAME}: installed dsh-app-boot has no web profile template`)
@@ -151,14 +156,20 @@ function virtualProfile(name: typeof DEFAULT_PROFILE_NAME | typeof WEB_PROFILE_N
     name,
     dir: resolveProfileDir(name, home),
     exists: false,
-    bundles: [...bundles],
+    bundles: name === DEFAULT_PROFILE_NAME ? [...bundles, STORY_STUDIO_BUNDLE_NAME] : [...bundles],
     webCapable: true,
   }
 }
 
 /** Deterministic profile order with the product defaults first. */
 function compareProfiles(left: DesktopProfileSummary, right: DesktopProfileSummary): number {
-  const priority = (name: string): number => name === DEFAULT_PROFILE_NAME ? 0 : name === WEB_PROFILE_NAME ? 1 : 2
+  const priority = (name: string): number => name === DEFAULT_PROFILE_NAME
+    ? 0
+    : name === DESKTOP_PROFILE_NAME
+      ? 1
+      : name === WEB_PROFILE_NAME
+        ? 2
+        : 3
   const difference = priority(left.name) - priority(right.name)
   if (difference !== 0) return difference
   return left.name < right.name ? -1 : left.name > right.name ? 1 : 0
@@ -187,7 +198,7 @@ export function listDesktopProfiles(home: string): DesktopProfileSummary[] {
   } catch (cause) {
     if ((cause as NodeJS.ErrnoException).code !== 'ENOENT') throw cause
   }
-  for (const name of [DEFAULT_PROFILE_NAME, WEB_PROFILE_NAME] as const) {
+  for (const name of [DEFAULT_PROFILE_NAME, DESKTOP_PROFILE_NAME, WEB_PROFILE_NAME] as const) {
     if (!summaries.has(name)) summaries.set(name, virtualProfile(name, home))
   }
   return [...summaries.values()].sort(compareProfiles)

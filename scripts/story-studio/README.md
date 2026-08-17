@@ -20,7 +20,7 @@ The smoke does not read or write the user's ordinary DSH home. It currently exer
 
 `rich-file-reader-smoke.mjs` performs the plugin-specific behavior check with generated Chinese DOCX and PDF fixtures. Word and text-layer PDF parsing are required to pass. Chinese scanned-PDF OCR is intentionally separate because the current plugin does not bundle a fixed Simplified Chinese language pack; `--skip-ocr` runs the stable product gate.
 
-`install-profile.mjs` explicitly creates the dedicated `story-studio` Web Profile and installs the exact `dsh-drop-to-path` Git commit recorded in `config/story-studio/profile.json`. It does not select the Profile or modify another Profile. Pass `--home <temporary-home>` for an isolated installation check.
+`install-profile.mjs` is a developer-only repair tool for older DSH Homes. Normal packaged installs create the `story-studio` Profile and ship the pinned `dsh-drop-to-path` dependency from the Electron application tree; users do not run this command or download a plugin. Pass `--home <temporary-home>` for an isolated installation check.
 
 ## Lock changes
 

@@ -148,6 +148,7 @@ describe('packaged desktop runtime verification', () => {
     'lib/diagnostic-export-worker.js',
     'lib/update-download.js',
     'node_modules/@deepseek-ai/dsh/lib/bin.js',
+    'node_modules/@dsh-external/dsh-drop-to-path/lib/client.js',
     'node_modules/pnpm/bin/pnpm.mjs',
     'node_modules/node-pty/prebuilds/win32-x64/conpty.node',
   ])('fails loud when physical runtime entry %s is absent from app.asar.unpacked', (missing) => {

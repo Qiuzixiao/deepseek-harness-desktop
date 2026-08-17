@@ -71,6 +71,12 @@ describe('desktop profile discovery', () => {
     const before = readFileSync(join(webDir, 'package.json'), 'utf8')
 
     expect(listDesktopProfiles(home)).toEqual([
+      expect.objectContaining({
+        name: 'story-studio',
+        exists: false,
+        webCapable: true,
+        bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', 'dsh-product-story-studio'],
+      }),
       expect.objectContaining({ name: 'desktop', exists: false, webCapable: true }),
       expect.objectContaining({ name: 'web', exists: false, webCapable: true }),
       expect.objectContaining({ name: 'broken', exists: true, webCapable: false, problem: expect.any(String) }),
@@ -103,14 +109,14 @@ describe('desktop profile discovery', () => {
   it('treats an existing repairable desktop profile as managed but rejects malformed metadata', () => {
     const home = temporaryRoot()
     writeProfile(home, 'desktop', ['@deepseek-ai/dsh-base'])
-    expect(listDesktopProfiles(home)[0]).toEqual(expect.objectContaining({
+    expect(listDesktopProfiles(home).find(profile => profile.name === 'desktop')).toEqual(expect.objectContaining({
       name: 'desktop',
       exists: true,
       webCapable: true,
     }))
 
     writeProfile(home, 'desktop', 'broken')
-    expect(listDesktopProfiles(home)[0]).toEqual(expect.objectContaining({
+    expect(listDesktopProfiles(home).find(profile => profile.name === 'desktop')).toEqual(expect.objectContaining({
       name: 'desktop',
       webCapable: false,
       problem: expect.any(String),
@@ -119,7 +125,7 @@ describe('desktop profile discovery', () => {
 })
 
 describe('desktop profile selection state', () => {
-  it('defaults to desktop and queues only a directly Web-capable profile', () => {
+  it('defaults to Story Studio and queues only a directly Web-capable profile', () => {
     const root = temporaryRoot()
     const home = join(root, 'harness')
     const statePath = join(root, 'desktop-private', 'profile-selection', 'state.json')
@@ -134,14 +140,14 @@ describe('desktop profile selection state', () => {
 
     expect(readDesktopProfileState(statePath)).toEqual({
       version: 1,
-      active: 'desktop',
-      lastKnownGood: 'desktop',
+      active: 'story-studio',
+      lastKnownGood: 'story-studio',
     })
     expect(selectDesktopProfile(statePath, home, 'work')).toEqual({
       version: 1,
-      active: 'desktop',
+      active: 'story-studio',
       pending: 'work',
-      lastKnownGood: 'desktop',
+      lastKnownGood: 'story-studio',
     })
     expect(() => selectDesktopProfile(statePath, home, 'headless')).toThrow(
       'must directly include @deepseek-ai/dsh-base before @deepseek-ai/dsh-web-app',
@@ -166,12 +172,12 @@ describe('desktop profile selection state', () => {
 
     expect(beginDesktopProfileStartup(statePath, home)).toEqual({
       profileName: 'work',
-      state: { version: 1, active: 'work', lastKnownGood: 'desktop' },
+      state: { version: 1, active: 'work', lastKnownGood: 'story-studio' },
       recoveredState: false,
     })
     expect(beginDesktopProfileStartup(statePath, home)).toEqual({
-      profileName: 'desktop',
-      state: { version: 1, active: 'desktop', lastKnownGood: 'desktop' },
+      profileName: 'story-studio',
+      state: { version: 1, active: 'story-studio', lastKnownGood: 'story-studio' },
       recoveredState: true,
       rolledBackFrom: 'work',
     })
@@ -210,14 +216,14 @@ describe('desktop profile selection state', () => {
     writeFileSync(statePath, '{broken')
 
     expect(beginDesktopProfileStartup(statePath, home)).toEqual({
-      profileName: 'desktop',
-      state: { version: 1, active: 'desktop', lastKnownGood: 'desktop' },
+      profileName: 'story-studio',
+      state: { version: 1, active: 'story-studio', lastKnownGood: 'story-studio' },
       recoveredState: true,
     })
     expect(JSON.parse(readFileSync(statePath, 'utf8'))).toEqual({
       version: 1,
-      active: 'desktop',
-      lastKnownGood: 'desktop',
+      active: 'story-studio',
+      lastKnownGood: 'story-studio',
     })
     expect(lstatSync(statePath).isSymbolicLink()).toBe(false)
     expect(existsSync(join(home, 'profiles'))).toBe(false)
@@ -232,8 +238,8 @@ describe('desktop profile selection state', () => {
     rmSync(profileDir, { recursive: true })
 
     expect(beginDesktopProfileStartup(statePath, home)).toEqual({
-      profileName: 'desktop',
-      state: { version: 1, active: 'desktop', lastKnownGood: 'desktop' },
+      profileName: 'story-studio',
+      state: { version: 1, active: 'story-studio', lastKnownGood: 'story-studio' },
       recoveredState: true,
       rolledBackFrom: 'work',
     })

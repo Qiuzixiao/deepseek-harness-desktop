@@ -33,6 +33,12 @@ import type { DesktopShellMode } from './runtime.ts'
 /** Persistent profile managed by the desktop launcher and the ordinary dsh plugin command. */
 export const DESKTOP_PROFILE_NAME = 'desktop'
 
+/** Installation-owned Story Studio product profile. */
+export const STORY_STUDIO_PROFILE_NAME = 'story-studio'
+
+/** Product bundle shipped in the Electron dependency tree. */
+export const STORY_STUDIO_PACKAGE_NAME = 'dsh-product-story-studio'
+
 /** Standalone package name inserted through the launcher-owned desktop layer. */
 export const DESKTOP_PACKAGE_NAME = 'dsh-plugin-desktop'
 
@@ -42,6 +48,7 @@ export const DESKTOP_PROFILE_ROOT = 'cordis.yml'
 const BIN_NAME = DESKTOP_PACKAGE_NAME
 const REQUIRED_BUNDLES = requiredWebBundles()
 const REQUIRED_BUNDLE_SET = new Set(REQUIRED_BUNDLES)
+const STORY_STUDIO_BUNDLES = [...REQUIRED_BUNDLES, STORY_STUDIO_PACKAGE_NAME]
 const INSTALL_ANCHOR = unpackedAsarPath(fileURLToPath(new URL('../package.json', import.meta.url)))
 const DESKTOP_PATCH_PATH = fileURLToPath(new URL('../cordis.patch.yml', import.meta.url))
 const DIRECTORY_PICKER_ROW_ID = 'directory-picker'
@@ -195,6 +202,36 @@ export function ensureDesktopProfile(home: string = resolveDshHome()): string {
   return dir
 }
 
+/** Initialize or repair the installation-owned Story Studio profile. */
+export function ensureStoryStudioProfile(home: string = resolveDshHome()): string {
+  const dir = resolveProfileDir(STORY_STUDIO_PROFILE_NAME, home)
+  if (!existsSync(join(dir, 'package.json'))) initProfile(dir, STORY_STUDIO_BUNDLES)
+  const manifest = readProfileManifest(BIN_NAME, dir)
+  const rawBundles = (manifest.dsh?.profile as { bundles?: unknown } | undefined)?.bundles
+  if (rawBundles !== undefined
+    && (!Array.isArray(rawBundles) || rawBundles.some(value => typeof value !== 'string'))) {
+    throw new Error(`${BIN_NAME}: dsh.profile.bundles must be an array of package names`)
+  }
+  const current = rawBundles === undefined ? [] : rawBundles as string[]
+  const thirdParty = current.filter(name => !REQUIRED_BUNDLE_SET.has(name)
+    && name !== STORY_STUDIO_PACKAGE_NAME
+    && name !== '@dsh-external/dsh-drop-to-path')
+  const bundles = [...STORY_STUDIO_BUNDLES, ...thirdParty]
+  if (!sameList(current, bundles)) {
+    writeProfileManifest(dir, {
+      ...manifest,
+      dsh: {
+        ...manifest.dsh,
+        profile: {
+          ...manifest.dsh?.profile,
+          bundles,
+        },
+      },
+    })
+  }
+  return dir
+}
+
 /** Resolve the agent presets shipped by the matching dsh CLI dependency. */
 function shippedPresetRoot(): string {
   const require = createRequire(import.meta.url)
@@ -302,6 +339,8 @@ export function prepareDesktopProfile(
 ): PreparedDesktopProfile {
   const profileDir = profileName === DESKTOP_PROFILE_NAME
     ? ensureDesktopProfile(home)
+    : profileName === STORY_STUDIO_PROFILE_NAME
+      ? ensureStoryStudioProfile(home)
     : resolveProfileDir(profileName, home)
   healProfilesModuleFallback(INSTALL_ANCHOR, home)
   const profile = loadProfile(BIN_NAME, profileName, INSTALL_ANCHOR, home)

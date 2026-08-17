@@ -1,0 +1,5 @@
+# Story Studio's product layer. Third-party code is pinned in package.json and
+# shipped inside the desktop installer; no runtime download is performed.
+- insert:
+    - id: drop-to-path
+      name: '@dsh-external/dsh-drop-to-path'

@@ -1,0 +1,27 @@
+{
+  "name": "dsh-product-story-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bundled Story Studio product composition for DSH Desktop",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "cordis.patch.yml",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "@dsh-external/dsh-drop-to-path": "github:loudMore/dsh-drop-to-path#a00a5a2e18fd89e829b1c96f2f2e85af67366e10"
+  }
+}
