@@ -16,6 +16,7 @@ Story Studio 是基于 DSH Desktop 的内部 AI 编剧平台，面向短剧编�
 | [总体实施方案](implementation-plan.md) | 产品目标、架构分层、模块边界、阶段路线和交付物 |
 | [插件选型与复用矩阵](plugin-selection.md) | 官方能力、第三方插件逐项决策、版本、风险和生产准入门槛 |
 | [插件兼容性报告](plugin-compatibility-report.md) | 精确发布物、`rc.7` Profile smoke 结果、已知限制和下一门禁 |
+| [插件搜寻清单](plugin-search-backlog.md) | 还需要寻找的插件用途、优先级、搜索关键词和避免重复的边界 |
 | [Agent 与项目数据设计](agent-and-data-design.md) | 模糊需求处理、Preset/Skill 设计、创作流程和文件事实源 |
 | [验证与验收计划](verification-plan.md) | `rc.7` 组合试验、场景回归、打包验证和发布门禁 |
 
@@ -30,6 +31,13 @@ Story Studio 是基于 DSH Desktop 的内部 AI 编剧平台，面向短剧编�
 7. 社区市场只用于发现候选插件。任何候选进入产品 Profile 前都必须经过固定版本、代码审计、许可证、`rc.7` Loader、桌面模式和打包验证。
 8. MVP 不开发付费、账号、云同步、多人协同或开放插件市场安装器。
 9. MVP 使用 `dsh-drop-to-path` 作为拖拽/粘贴文件进入对话的统一入口；文件进入工作区后，再由文档读取工具按路径解析。
+
+## 当前实现
+
+- Desktop 交付一个可发现的 `story-studio` system Preset，并复用同版本 DSH `standard` Preset 的完整工具组合；
+- Preset 内置 `story-intake` 和 `story-project` 两个首批 Skills；
+- `corepack yarn story-studio:profile:install` 创建专用 Web Profile，并安装 `config/story-studio/profile.json` 固定 commit 的 `dsh-drop-to-path`；
+- 当前仍未实现短剧正文、小说正文、参考拆解和审校 Skills，也未把 Rich File Reader 加入产品 Profile。
 
 ## 证据边界
 

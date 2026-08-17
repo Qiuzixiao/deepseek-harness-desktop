@@ -113,9 +113,15 @@ describe('desktop profile composition', () => {
       id: 'webserver',
       config: { host: '127.0.0.1', port: 0 },
     }))
-    expect(patches).toContainEqual(expect.objectContaining({
+    const presetPatch = patches.find(patch => patch.id === 'agent-presets')
+    expect(presetPatch).toEqual(expect.objectContaining({
       id: 'agent-presets',
-      config: expect.objectContaining({ roots: [expect.objectContaining({ trust: 'system' })] }),
+      config: expect.objectContaining({
+        roots: [
+          expect.objectContaining({ path: expect.stringContaining('config/agent-presets'), trust: 'system' }),
+          expect.objectContaining({ path: expect.stringContaining('resources/agent-presets'), trust: 'system' }),
+        ],
+      }),
     }))
     expect(readFileSync(prepared.rootConfig, 'utf8')).toBe('[]\n')
     expect(prepared.homeDir).toBe(home)

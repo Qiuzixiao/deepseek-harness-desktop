@@ -9,6 +9,7 @@ corepack yarn story-studio:test
 corepack yarn story-studio:plugins:audit
 corepack yarn story-studio:plugins:smoke --plugin <id|all>
 corepack yarn story-studio:rich-file-reader:smoke --skip-ocr
+corepack yarn story-studio:profile:install
 ```
 
 `audit-plugins.mjs` downloads the HTTPS tarballs pinned by `config/story-studio/plugins.lock.json`, enforces size and SHA-256, and verifies package identity, license text, DSH bundle metadata, Cordis row, Client face, peer declarations, and native build allowlist.
@@ -18,6 +19,8 @@ corepack yarn story-studio:rich-file-reader:smoke --skip-ocr
 The smoke does not read or write the user's ordinary DSH home. It currently exercises the system-Node Web Host, not the packaged Electron native ABI, browser visual behavior, or plugin-specific mutations.
 
 `rich-file-reader-smoke.mjs` performs the plugin-specific behavior check with generated Chinese DOCX and PDF fixtures. Word and text-layer PDF parsing are required to pass. Chinese scanned-PDF OCR is intentionally separate because the current plugin does not bundle a fixed Simplified Chinese language pack; `--skip-ocr` runs the stable product gate.
+
+`install-profile.mjs` explicitly creates the dedicated `story-studio` Web Profile and installs the exact `dsh-drop-to-path` Git commit recorded in `config/story-studio/profile.json`. It does not select the Profile or modify another Profile. Pass `--home <temporary-home>` for an isolated installation check.
 
 ## Lock changes
 

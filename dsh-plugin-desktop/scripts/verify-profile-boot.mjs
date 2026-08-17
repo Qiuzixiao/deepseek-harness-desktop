@@ -152,6 +152,10 @@ try {
   if (ctx.get('desktopPnpm') === undefined) {
     throw new Error('assembled desktop profile is missing the desktop pnpm Host capability')
   }
+  const storyStudio = (await ctx.agentPresets.list()).find(preset => preset.id === 'story-studio')
+  if (storyStudio?.trust !== 'system' || storyStudio.name !== 'Story Studio') {
+    throw new Error(`assembled desktop profile is missing the Story Studio system preset: ${JSON.stringify(storyStudio)}`)
+  }
   if (ctx.desktopProfiles.current.name !== 'desktop'
     || ctx.desktopProfiles.current.dir !== prepared.profile.dir) {
     throw new Error('assembled desktop profile service has the wrong active identity')

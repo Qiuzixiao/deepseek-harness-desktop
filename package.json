@@ -53,6 +53,7 @@
     "story-studio:plugins:audit": "node scripts/story-studio/audit-plugins.mjs",
     "story-studio:plugins:smoke": "node scripts/story-studio/profile-smoke.mjs",
     "story-studio:rich-file-reader:smoke": "node scripts/story-studio/rich-file-reader-smoke.mjs",
+    "story-studio:profile:install": "node scripts/story-studio/install-profile.mjs",
     "check:layout": "node scripts/verify-layout.mjs",
     "check": "yarn check:layout && yarn story-studio:test && yarn workspace dsh-community-fabric check && yarn workspace dsh-community-market check && yarn workspace dsh-plugin-desktop check",
     "dev": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dev",

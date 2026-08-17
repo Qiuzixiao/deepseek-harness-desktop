@@ -175,6 +175,7 @@ describe('published package surface', () => {
       'cordis.patch.yml',
       'build/**',
       'lib/**',
+      'resources/**',
       'node_modules/**',
     ])
     expect(manifest.build?.electronFuses).toEqual({ runAsNode: true })
@@ -184,6 +185,7 @@ describe('published package surface', () => {
       'build/tray-icon.svg',
       'build/tray-icon*.png',
       'docs/**',
+      'resources/**',
     ]))
     expect(manifest.build?.files).toEqual([
       'build/app-icon.png',
@@ -193,6 +195,7 @@ describe('published package surface', () => {
       'cordis.patch.yml',
       'lib/**',
       'package.json',
+      'resources/**',
       '!node_modules/node-pty/build/**',
     ])
     expect(manifest.build?.mac?.icon).toBe('build/app-icon-mac.png')
@@ -222,6 +225,7 @@ describe('published package surface', () => {
     const packageDir = readFileSync(new URL('scripts/package-dir.mjs', packageRoot), 'utf8')
 
     expect(manifest.scripts?.build).toContain('node scripts/generate-mac-app-icon.mjs')
+    expect(manifest.scripts?.build).toContain('node scripts/generate-story-studio-preset.mjs')
     expect(manifest.scripts?.['package:dir']).toBe('yarn run build && node scripts/package-dir.mjs')
     expect(packageDir).toContain("CSC_IDENTITY_AUTO_DISCOVERY: 'false'")
     expect(manifest.scripts?.['dist:mac']).toBe('node scripts/release-mac.ts')

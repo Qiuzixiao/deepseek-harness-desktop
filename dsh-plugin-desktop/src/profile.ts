@@ -201,6 +201,11 @@ function shippedPresetRoot(): string {
   return join(dirname(require.resolve('@deepseek-ai/dsh/package.json')), 'config', 'agent-presets')
 }
 
+/** Resolve the product presets shipped with DSH Desktop. */
+function desktopPresetRoot(): string {
+  return fileURLToPath(new URL('../resources/agent-presets', import.meta.url))
+}
+
 /** Read a row's object config without trusting arbitrary YAML values. */
 function rowConfig(row: EntryOptions | undefined): Record<string, unknown> {
   const config = row?.config
@@ -366,7 +371,10 @@ export function prepareDesktopProfile(
       id: 'agent-presets',
       config: {
         ...rowConfig(presets),
-        roots: [{ path: shippedPresetRoot(), trust: 'system' }],
+        roots: [
+          { path: shippedPresetRoot(), trust: 'system' },
+          { path: desktopPresetRoot(), trust: 'system' },
+        ],
       },
     })
   }
