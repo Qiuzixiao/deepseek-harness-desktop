@@ -22,7 +22,7 @@ Story Studio 是基于 DSH Desktop 的内部 AI 编剧平台，面向短剧编�
 
 ## 核心决策摘要
 
-1. `product/story-studio` 是长期产品集成分支；具体工作从短期 `feat/*` 分支完成。
+1. `master` 只同步 Anywhere Labs 上游；旧 `product/story-studio` 和 `feat/story-studio-*` 只保留历史实现，V2 统一在 `codex/story-studio-workbench-v2` 开发并在每个逻辑提交后立即推送。
 2. `deepseek-harness/` 始终是只读上游子模块，不在产品分支中修改。
 3. 产品先以专用 Profile 组合能力，不复制 DSH 的 session、workspace、storage、attachment、tool、subagent、workflow、job、question 和 Web 服务。
 4. 首个 MVP 只交付一个 Story Studio Preset，通过 Skills 区分短剧、小说、参考拆解和审校，避免多个 Preset 复制后漂移。

@@ -182,8 +182,9 @@ Workflow 使用 DSH 动态 Workflow 引擎执行，不建立另一套任务编�
 ## 7. 分支与上游同步
 
 - `master` 继续作为 Anywhere Labs 上游的干净镜像；
-- `product/story-studio` 是长期产品集成分支；
-- 每个交付切片使用 `feat/*` 短分支，评审后合回产品分支；
+- `product/story-studio` 与旧 `feat/story-studio-*` 分支只保留历史实现，不再并行开发或继续堆叠；
+- Story Studio V2 统一在 `codex/story-studio-workbench-v2` 开发，完成前不再为普通交付切片创建新的叠加分支；
+- 每个可验证的逻辑提交完成后立即推送到同名远程分支，交付状态必须同时核对本地与远程提交；
 - 上游 submodule pin 和运行时版本升级使用独立提交；
 - 第三方插件锁更新和 Story Studio 行为变化分开提交；
 - 每次上游同步后重新执行 Profile Loader、插件组合和打包门禁。
