@@ -28,7 +28,7 @@ describe('Story Studio preset', () => {
     )
     expect(rows.find(row => row.id === 'persona')).toEqual(expect.objectContaining({
       name: '@deepseek-ai/dsh-persona',
-      config: expect.objectContaining({ text: expect.stringContaining('你是 Story Studio') }),
+      config: expect.objectContaining({ text: expect.stringContaining('你是 QNovel') }),
     }))
     expect(rows.find(row => row.id === 'skill-filesystem')).toEqual(expect.objectContaining({
       name: '@deepseek-ai/dsh-skill-filesystem',

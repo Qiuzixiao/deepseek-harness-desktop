@@ -1,9 +1,9 @@
-import { mkdtemp, readFile } from 'node:fs/promises'
+import { access, mkdtemp, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createStoryStudioRpcHandler } from '../src/index.ts'
-import { createStoryProject, normalizeProjectName, resolveProjectRoot } from '../src/project.ts'
+import { createStoryProject, ensureProjectRoot, normalizeProjectName, resolveProjectRoot } from '../src/project.ts'
 
 describe('Story Studio project creation', () => {
   it('creates a complete project below the configured global root from only a name', async () => {
@@ -12,9 +12,11 @@ describe('Story Studio project creation', () => {
     const result = await createStoryProject({ projectRoot: root }, '父子同心')
 
     expect(result).toEqual({ name: '父子同心', path: join(root, '父子同心'), projectRoot: root })
-    expect(await readFile(join(result.path, 'brief.md'), 'utf8')).toContain('## 原始需求')
-    expect(await readFile(join(result.path, 'story.yml'), 'utf8')).toContain('title: 父子同心')
-    expect(await readFile(join(result.path, 'bible', 'timeline.md'), 'utf8')).toContain('时间线')
+    expect(await readFile(join(result.path, '项目说明.md'), 'utf8')).toContain('## 原始需求')
+    expect(await readFile(join(result.path, '项目配置.yml'), 'utf8')).toContain('title: 父子同心')
+    expect(await readFile(join(result.path, '故事设定', '时间线.md'), 'utf8')).toContain('时间线')
+    await expect(access(join(result.path, '.qnovel', '缓存'))).resolves.toBeUndefined()
+    await expect(access(join(result.path, '.qnovel', '索引'))).resolves.toBeUndefined()
   })
 
   it('rejects duplicate and unsafe project names', async () => {
@@ -25,7 +27,8 @@ describe('Story Studio project creation', () => {
   })
 
   it('uses one stable global projects directory by default', () => {
-    expect(resolveProjectRoot({}, '/Users/writer', {})).toBe('/Users/writer/Documents/Story Studio')
+    expect(resolveProjectRoot({}, '/Users/writer', {})).toBe('/Users/writer/Documents/QNovel作品')
+    expect(resolveProjectRoot({}, '/Users/writer', { QNOVEL_PROJECTS_ROOT: '/Volumes/QNovel' })).toBe('/Volumes/QNovel')
     expect(resolveProjectRoot({}, '/Users/writer', { STORY_STUDIO_PROJECTS_ROOT: '/Volumes/Writing' }))
       .toBe('/Volumes/Writing')
   })
@@ -36,12 +39,31 @@ describe('Story Studio project RPC', () => {
     const root = await mkdtemp(join(tmpdir(), 'story-studio-rpc-'))
     const handle = createStoryStudioRpcHandler({ projectRoot: root })
 
-    await expect(handle('describe', {})).resolves.toEqual({ ok: true, value: { projectRoot: root } })
+    await expect(handle('describe', {})).resolves.toEqual({ ok: true, value: { projectRoot: root, configured: true } })
     await expect(handle('createProject', { name: '县城往事' })).resolves.toEqual({
       ok: true,
       value: { name: '县城往事', path: join(root, '县城往事'), projectRoot: root },
     })
-    expect(await readFile(join(root, '县城往事', 'story.yml'), 'utf8')).toContain('title: 县城往事')
+    expect(await readFile(join(root, '县城往事', '项目配置.yml'), 'utf8')).toContain('title: 县城往事')
+  })
+
+  it('requires a configured root and validates a selected absolute directory', async () => {
+    const handle = createStoryStudioRpcHandler()
+    await expect(handle('describe', {})).resolves.toEqual({ ok: true, value: { projectRoot: '', configured: false } })
+    await expect(handle('createProject', { name: '未选择目录' })).resolves.toMatchObject({
+      ok: false,
+      error: { message: '请先选择 QNovel 作品目录' },
+    })
+    await expect(handle('validateProjectRoot', { path: 'relative/path' })).resolves.toMatchObject({
+      ok: false,
+      error: { message: '作品目录必须是绝对路径' },
+    })
+    const selected = await mkdtemp(join(tmpdir(), 'qnovel-selected-'))
+    await expect(handle('validateProjectRoot', { path: selected })).resolves.toEqual({
+      ok: true,
+      value: { projectRoot: selected },
+    })
+    await expect(ensureProjectRoot(selected)).resolves.toBe(selected)
   })
 
   it('returns stable RPC failures for invalid and unknown operations', async () => {

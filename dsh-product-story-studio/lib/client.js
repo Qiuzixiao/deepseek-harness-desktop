@@ -32,12 +32,10 @@ window.__ModuleLoader__.load({
 		let react_jsx_runtime = require("react/jsx-runtime");
 		//#region src/client/styles.ts
 		const styles = `
-.storyStudioProductBadge{pointer-events:auto;position:fixed;z-index:35;top:10px;right:92px;display:flex;align-items:center;gap:8px;height:30px;padding:0 6px 0 9px;border:1px solid color-mix(in srgb,#287a5b 28%,var(--dsw-alias-border-l2));border-radius:8px;background:color-mix(in srgb,var(--dsw-alias-bg-base) 94%,#287a5b);box-shadow:0 2px 8px #0000000d;color:var(--dsw-alias-text-primary);font-size:12px}
-.storyStudioProductMark{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:5px;background:#287a5b;color:#fff;font-size:9px;font-weight:750;letter-spacing:.2px}
-.storyStudioProductName{font-weight:700;color:var(--dsw-alias-text-primary)}
-.storyStudioProductState{color:var(--dsw-alias-text-secondary);padding-right:3px}
-.storyStudioProductAction{display:inline-flex;align-items:center;gap:4px;height:24px;border:0;border-radius:5px;background:#287a5b;color:#fff;padding:0 8px;font:inherit;font-size:11px;cursor:pointer}
-.storyStudioProductAction:hover{background:#216447}
+.qNovelBrandOverlay{position:fixed;z-index:1001;top:37px;left:17px;display:flex;align-items:center;height:28px;color:var(--dsw-alias-label-primary);font-size:16px;line-height:24px;font-weight:740;letter-spacing:-.02em;pointer-events:none}
+/* The upstream brand button remains the New Session shortcut. Keep its behavior,
+   but let the product layer own the visible wordmark in the same slot. */
+[class*="logoRow"] [class*="brand"]{visibility:hidden!important}
 .storyStudioCreateAction{display:flex;align-items:center;justify-content:center;min-width:32px;height:32px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-text-secondary);cursor:pointer;transition:background-color 120ms ease,color 120ms ease}
 .storyStudioCreateAction:hover{background:var(--dsw-alias-fill-hover);color:var(--dsw-alias-text-primary)}
 .storyStudioCreateAction[data-wide=true]{width:100%;justify-content:flex-start;gap:9px;padding:0 10px;font-size:13px}
@@ -73,47 +71,152 @@ window.__ModuleLoader__.load({
 .storyStudioDialogSubmit:hover:not(:disabled){border-color:#216447;background:#216447}
 .storyStudioDialogSubmit:disabled,.storyStudioDialogCancel:disabled,.storyStudioDialogClose:disabled{opacity:.45;cursor:not-allowed}
 .storyStudioEmpty{padding:10px 12px;font-size:12px;color:var(--dsw-alias-text-tertiary)}
-@media (max-width:900px){.storyStudioProductState{display:none}.storyStudioProductBadge{right:76px}.storyStudioProductName{display:none}}
+ .qNovelSettingsRow{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:16px 0;border-bottom:1px solid var(--dsw-alias-border-l2)}
+.qNovelSettingsText{display:grid;gap:4px;min-width:0}
+.qNovelSettingsTitle{font-size:14px;line-height:22px;color:var(--dsw-alias-label-primary)}
+.qNovelSettingsDescription{font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}
+.qNovelSettingsPath{max-width:560px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px}
+.qNovelSettingsButton{flex:none;height:32px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:transparent;color:var(--dsw-alias-label-primary);padding:0 12px;font:inherit;font-size:12px;cursor:pointer}
+.qNovelSettingsButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}
+.qNovelSettingsButton:disabled{opacity:.5;cursor:not-allowed}
+.qNovelOnboarding{box-sizing:border-box;width:min(480px,calc(100vw - 32px));padding:0;border-radius:16px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);overflow:hidden}
+.qNovelOnboardingHeader{display:flex;align-items:center;gap:14px;padding:26px 26px 20px;border-bottom:1px solid var(--dsw-alias-border-l1)}
+.qNovelOnboardingMark{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:12px;background:#287a5b;color:#fff;font-size:18px;font-weight:760}
+.qNovelOnboardingHeader h2{margin:0;color:var(--dsw-alias-label-primary);font-size:18px;line-height:26px;font-weight:700}
+.qNovelOnboardingHeader p{margin:3px 0 0;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}
+.qNovelOnboardingBody{padding:22px 26px;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:21px}
+.qNovelOnboardingBody p{margin:0}
+.qNovelOnboardingBody .storyStudioError{margin-top:14px}
+.qNovelOnboardingFooter{display:flex;justify-content:flex-end;padding:16px 26px;background:var(--dsw-alias-bg-layer-1);border-top:1px solid var(--dsw-alias-border-l1)}
+@media (max-width:900px){.qNovelBrandOverlay{left:14px}}
 @media (max-width:560px){.storyStudioDialogHeader,.storyStudioDialogBody{padding-left:18px;padding-right:18px}.storyStudioDialogFooter{padding-left:18px;padding-right:18px}.storyStudioDialogSubtitle{display:none}.storyStudioLocationTag{display:none}.storyStudioLocation{grid-template-columns:36px minmax(0,1fr)}}
 `;
 		//#endregion
 		//#region src/client/index.tsx
 		const CHANNEL = "/story-studio";
 		const CREATE_ID = "story-studio:create";
-		function StoryStudioShellOverlay({ service, onCreated }) {
-			const [open, setOpen] = (0, react.useState)(false);
-			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: "storyStudioProductBadge",
-				"data-story-studio-overlay": true,
+		function QNovelSettingsRow({ readRoot, chooseRoot }) {
+			const [root, setRoot] = (0, react.useState)("");
+			const [busy, setBusy] = (0, react.useState)(false);
+			const [error, setError] = (0, react.useState)();
+			const load = (0, react.useCallback)(() => {
+				readRoot().then(setRoot).catch((reason) => {
+					setError(reason instanceof Error ? reason.message : String(reason));
+				});
+			}, [readRoot]);
+			(0, react.useEffect)(load, [load]);
+			const changeRoot = async () => {
+				if (busy) return;
+				setBusy(true);
+				setError(void 0);
+				try {
+					const selected = await chooseRoot();
+					if (selected !== null) setRoot(selected);
+				} catch (reason) {
+					setError(reason instanceof Error ? reason.message : String(reason));
+				} finally {
+					setBusy(false);
+				}
+			};
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				className: "qNovelSettingsRow",
+				"data-slot": "settings.general.item",
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: "qNovelSettingsText",
+					children: [
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+							className: "qNovelSettingsTitle",
+							children: "作品目录"
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+							className: "qNovelSettingsDescription",
+							children: error ?? "新建作品会保存到这个目录；已有作品不会自动搬迁。"
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+							className: "qNovelSettingsPath",
+							title: root,
+							children: root === "" ? "尚未选择" : root
+						})
+					]
+				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "qNovelSettingsButton",
+					disabled: busy,
+					onClick: () => {
+						changeRoot();
+					},
+					children: busy ? "选择中…" : "更改目录"
+				})]
+			});
+		}
+		function StoryStudioShellOverlay({ service }) {
+			const [configured, setConfigured] = (0, react.useState)(void 0);
+			const [busy, setBusy] = (0, react.useState)(false);
+			const [error, setError] = (0, react.useState)();
+			const refresh = (0, react.useCallback)(() => {
+				service.describe().then((value) => {
+					setConfigured(value.configured);
+				}).catch((reason) => {
+					setError(reason instanceof Error ? reason.message : String(reason));
+				});
+			}, [service]);
+			(0, react.useEffect)(refresh, [refresh]);
+			const chooseRoot = async () => {
+				if (busy) return;
+				setBusy(true);
+				setError(void 0);
+				try {
+					const selected = await service.pickRoot();
+					if (selected !== null) {
+						await service.configureRoot(selected);
+						setConfigured(true);
+					}
+				} catch (reason) {
+					setError(reason instanceof Error ? reason.message : String(reason));
+				} finally {
+					setBusy(false);
+				}
+			};
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+				className: "qNovelBrandOverlay",
+				"aria-hidden": "true",
+				children: "QNovel"
+			}), configured === false && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(_deepseek_ai_dsh_client_ui_primitives.Modal, {
+				open: true,
+				onClose: () => {},
+				title: "选择作品目录",
+				closeLabel: "关闭",
+				className: "qNovelOnboarding",
+				headless: true,
 				children: [
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-						className: "storyStudioProductMark",
-						children: "SS"
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						className: "qNovelOnboardingHeader",
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							className: "qNovelOnboardingMark",
+							children: "Q"
+						}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h2", { children: "先选择作品目录" }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: "QNovel 会把每个作品独立保存到这个目录中。" })] })]
 					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-						className: "storyStudioProductName",
-						children: "Story Studio"
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						className: "qNovelOnboardingBody",
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: "请选择一个专用文件夹，例如“文档 / QNovel作品”。取消选择不会进入完整创作界面。" }), error !== void 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+							className: "storyStudioError",
+							role: "alert",
+							children: error
+						})]
 					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-						className: "storyStudioProductState",
-						children: "作品工作台"
-					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
-						type: "button",
-						className: "storyStudioProductAction",
-						onClick: () => {
-							setOpen(true);
-						},
-						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconPlusOutline16, { size: 14 }), "新建作品"]
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+						className: "qNovelOnboardingFooter",
+						children: /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+							type: "button",
+							className: "storyStudioDialogSubmit",
+							disabled: busy,
+							onClick: () => {
+								chooseRoot();
+							},
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconFolderClose16, { size: 15 }), busy ? "正在验证…" : "选择作品目录"]
+						})
 					})
 				]
-			}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(CreateProjectDialog, {
-				open,
-				service,
-				onClose: () => {
-					setOpen(false);
-				},
-				onCreated
 			})] });
 		}
 		function installStyles() {
@@ -373,6 +476,14 @@ window.__ModuleLoader__.load({
 			if (response.value === void 0) throw new Error("Story Studio 服务没有返回结果");
 			return response.value;
 		}
+		async function readQNovelRoot(connection) {
+			const response = await connection.api.settings.describe({});
+			if (!response.result.ok) throw new Error(response.result.error.message);
+			const value = response.result.value.namespaces.find((item) => item.ns === "qnovel")?.value;
+			if (typeof value !== "object" || value === null || !("projectsRoot" in value)) return "";
+			const root = value.projectsRoot;
+			return typeof root === "string" ? root : "";
+		}
 		const name = "dsh-product-story-studio";
 		const inject = [
 			"slots",
@@ -413,6 +524,20 @@ window.__ModuleLoader__.load({
 			const service = {
 				describe: async () => unwrap(await ctx.connection.rpc.call(CHANNEL, "describe", {})),
 				create: async (projectName) => unwrap(await ctx.connection.rpc.call(CHANNEL, "createProject", { name: projectName })),
+				pickRoot: () => ctx.workspaces.pickDirectory(),
+				configureRoot: async (path) => {
+					const validated = unwrap(await ctx.connection.rpc.call(CHANNEL, "validateProjectRoot", { path }));
+					const response = await ctx.connection.api.settings.mutate({
+						ns: "qnovel",
+						ops: [{
+							op: "set",
+							path: ["projectsRoot"],
+							value: validated.projectRoot
+						}]
+					});
+					if (!response.result.ok) throw new Error(response.result.error.message);
+					return validated.projectRoot;
+				},
 				register: async (project) => {
 					let workspace = await ctx.workspaces.create({ path: project.path });
 					if (workspace.title !== project.name) workspace = await ctx.workspaces.rename(workspace.workspaceId, project.name);
@@ -437,16 +562,23 @@ window.__ModuleLoader__.load({
 					ctx.workspaces.startSession(id);
 				}
 			})));
+			ctx.slots.inject("settings.general.item", () => ctx.slots.register({
+				name: "settings.general.item",
+				id: "qnovel-projects-root",
+				order: -100
+			}, () => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(QNovelSettingsRow, {
+				readRoot: () => readQNovelRoot(ctx.connection),
+				chooseRoot: async () => {
+					const selected = await service.pickRoot();
+					if (selected !== null) await service.configureRoot(selected);
+					return selected;
+				}
+			})));
 			ctx.slots.inject("shell.overlay", () => ctx.slots.register({
 				name: "shell.overlay",
 				id: "story-studio-product-entry",
 				order: -100
-			}, () => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(StoryStudioShellOverlay, {
-				service,
-				onCreated: (workspace) => {
-					ctx.workspaces.startSession(workspace.workspaceId);
-				}
-			})));
+			}, () => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(StoryStudioShellOverlay, { service })));
 		}
 		//#endregion
 		exports.apply = apply;

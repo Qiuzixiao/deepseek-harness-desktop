@@ -1,25 +1,47 @@
 import Schema from "@deepseek-ai/schemastery";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { Service } from "@deepseek-ai/cordis";
+import { access, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
+import { constants } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, normalize, resolve, sep } from "node:path";
 import { stringify } from "yaml";
 import { fileURLToPath } from "node:url";
-const DEFAULT_PROJECTS_DIRECTORY = "Story Studio";
+/**
+* Service Definition for the user-settings capability seam (`ctx.settings`). Providers store one raw document of
+* per-namespace sections; plugins register a namespace schema and read the
+* resolved value, which layers schema defaults, the registrant's composition
+* `base`, and the user document section, in that order.
+* @module @deepseek-ai/dsh-settings
+*/
+const NAMESPACE_PATTERN = /^[a-z][a-z0-9-]*$/;
+/**
+* Brand a raw string as a {@link SettingsNamespace}.
+* @param value - candidate namespace; lowercase kebab-case, as in plugin short names.
+* @returns the branded namespace.
+*/
+function settingsNamespace(value) {
+	if (!NAMESPACE_PATTERN.test(value)) throw new TypeError(`settings namespace "${value}" must match ${String(NAMESPACE_PATTERN)}`);
+	return value;
+}
+Service.init;
+const DEFAULT_PROJECTS_DIRECTORY = "QNovel作品";
 const requiredDirectories = [
-	"bible/characters",
-	"references/source",
-	"references/analyses",
-	"outline/seasons",
-	"outline/volumes",
-	"drafts/scripts",
-	"drafts/chapters",
-	"reviews/revisions",
-	"exports",
-	".story-studio/cache",
-	".story-studio/indexes"
+	"故事设定/人物",
+	"参考资料/原始资料",
+	"参考资料/分析",
+	"故事大纲/季纲",
+	"故事大纲/分集大纲",
+	"故事大纲/卷纲",
+	"故事大纲/章节大纲",
+	"正文草稿/短剧",
+	"正文草稿/小说",
+	"审校记录/修订",
+	"导出",
+	".qnovel/缓存",
+	".qnovel/索引"
 ];
 const initialFiles = (name) => [
-	["story.yml", stringify({
+	["项目配置.yml", stringify({
 		schemaVersion: 1,
 		id: projectId(name),
 		title: name,
@@ -28,18 +50,28 @@ const initialFiles = (name) => [
 		status: "development",
 		currentDeliverable: "brief"
 	})],
-	["brief.md", `# ${name}\n\n## 原始需求\n\n## 已确认事实\n\n## Agent 假设\n\n## 待确认问题\n\n## 本轮交付\n\n## 参考材料边界\n`],
-	["bible/premise.md", "# 故事前提\n"],
-	["bible/world.md", "# 世界与规则\n"],
-	["bible/timeline.md", "# 时间线\n"],
-	["bible/style.md", "# 写法与调性\n"],
-	["references/index.md", "# 参考材料索引\n\n| 文件 | 路径 | 格式 | 用途 | 状态 |\n| --- | --- | --- | --- | --- |\n"]
+	["项目说明.md", `# ${name}\n\n## 原始需求\n\n## 已确认事实\n\n## Agent 假设\n\n## 待确认问题\n\n## 本轮交付\n\n## 参考材料边界\n`],
+	["故事设定/故事前提.md", "# 故事前提\n"],
+	["故事设定/世界规则.md", "# 世界规则\n"],
+	["故事设定/时间线.md", "# 时间线\n"],
+	["故事设定/写作风格.md", "# 写作风格\n"],
+	["参考资料/参考资料索引.md", "# 参考资料索引\n\n| 文件 | 路径 | 格式 | 用途 | 状态 |\n| --- | --- | --- | --- | --- |\n"]
 ];
 function resolveProjectRoot(config = {}, home = homedir(), environment = process.env) {
 	const configured = config.projectRoot?.trim();
-	const environmentRoot = environment.STORY_STUDIO_PROJECTS_ROOT?.trim();
+	const environmentRoot = environment.QNOVEL_PROJECTS_ROOT?.trim() || environment.STORY_STUDIO_PROJECTS_ROOT?.trim();
 	const root = configured === void 0 || configured === "" ? environmentRoot === void 0 || environmentRoot === "" ? join(home, "Documents", DEFAULT_PROJECTS_DIRECTORY) : environmentRoot : configured;
 	return resolve(root);
+}
+/** Ensure a selected global directory exists and is writable. */
+async function ensureProjectRoot(path) {
+	const candidate = path.trim();
+	if (candidate === "") throw new Error("请选择 QNovel 作品目录");
+	if (!isAbsolute(candidate)) throw new Error("作品目录必须是绝对路径");
+	const projectRoot = resolve(candidate);
+	await mkdir(projectRoot, { recursive: true });
+	await access(projectRoot, constants.R_OK | constants.W_OK);
+	return projectRoot;
 }
 function normalizeProjectName(value) {
 	if (typeof value !== "string") throw new Error("项目名称必须是文本");
@@ -100,6 +132,18 @@ const MIME = {
 	".html": "text/html; charset=utf-8",
 	".png": "image/png"
 };
+/** Resolve only a live session workspace; null is the deliberate empty state. */
+function resolveWorkbenchSessionRoot(sessionId, sessions, sandboxPolicy) {
+	if (sessionId === null || sessionId === void 0 || sessionId === "") return null;
+	try {
+		const session = sessions.get(sessionId);
+		if (session === void 0 || session.header === null || typeof session.header.cwd !== "string" || session.header.cwd === "") return null;
+		const policy = sandboxPolicy.resolve({ session });
+		return policy !== null && typeof policy.workspaceRoot === "string" && policy.workspaceRoot !== "" ? policy.workspaceRoot : null;
+	} catch (e) {
+		return null;
+	}
+}
 function apply$1(ctx) {
 	const fs = ctx.fs;
 	const sandboxPolicy = ctx.sandboxPolicy;
@@ -107,15 +151,12 @@ function apply$1(ctx) {
 	const webServer = ctx.webServer;
 	const assetsRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "assets", "workbench");
 	const policyOf = (sessionId) => {
-		if (sessionId !== null && sessionId !== void 0 && sessionId !== "") try {
-			const session = sessions.get(sessionId);
-			if (session !== void 0 && session.header !== null && typeof session.header.cwd === "string" && session.header.cwd !== "") return sandboxPolicy.resolve({ session });
-		} catch (e) {}
-		return sandboxPolicy.resolve({});
+		const root = resolveWorkbenchSessionRoot(sessionId, sessions, sandboxPolicy);
+		return root === null ? null : { workspaceRoot: root };
 	};
 	const rootFor = (sessionId) => {
 		const policy = policyOf(sessionId);
-		if (policy === null || typeof policy.workspaceRoot !== "string" || policy.workspaceRoot === "") throw new Error("dsh-workbench: no workspace root resolved");
+		if (policy === null || typeof policy.workspaceRoot !== "string" || policy.workspaceRoot === "") throw new Error("no-workspace-selected");
 		return policy.workspaceRoot;
 	};
 	const resolveInside = async (path, sessionId) => {
@@ -465,9 +506,12 @@ const inject = [
 	"webServer",
 	"fs",
 	"sandboxPolicy",
-	"sessions"
+	"sessions",
+	"settings"
 ];
-const Config = Schema.object({ projectRoot: Schema.string().default("").description("作品统一保存目录；留空时使用“文稿/Story Studio”") });
+const QNOVEL_SETTINGS_NAMESPACE = settingsNamespace("qnovel");
+const QNovelSettingsSchema = Schema.object({ projectsRoot: Schema.string().default("").description("QNovel 作品目录；首次启动时必须选择") });
+const Config = Schema.object({ projectRoot: Schema.string().default("").description("兼容用作品目录；QNovel 首次启动后以 qnovel.projectsRoot 为准") });
 function success(value) {
 	return {
 		ok: true,
@@ -484,11 +528,27 @@ function failure(error) {
 		}
 	};
 }
-function createStoryStudioRpcHandler(config = {}) {
+function createStoryStudioRpcHandler(config = {}, readConfig = () => config) {
 	return async (endpoint, payload) => {
 		try {
-			if (endpoint === "describe") return success({ projectRoot: resolveProjectRoot(config) });
-			if (endpoint === "createProject") return success(await createStoryProject(config, typeof payload === "object" && payload !== null && "name" in payload ? payload.name : void 0));
+			const currentConfig = readConfig();
+			if (endpoint === "describe") {
+				const configured = currentConfig.projectRoot?.trim() ?? "";
+				return success({
+					projectRoot: configured === "" ? "" : resolveProjectRoot(currentConfig),
+					configured: configured !== ""
+				});
+			}
+			if (endpoint === "validateProjectRoot") {
+				const path = typeof payload === "object" && payload !== null && "path" in payload ? payload.path : void 0;
+				if (typeof path !== "string") throw new Error("请选择 QNovel 作品目录");
+				return success({ projectRoot: await ensureProjectRoot(path) });
+			}
+			if (endpoint === "createProject") {
+				const name = typeof payload === "object" && payload !== null && "name" in payload ? payload.name : void 0;
+				if ((currentConfig.projectRoot?.trim() ?? "") === "") throw new Error("请先选择 QNovel 作品目录");
+				return success(await createStoryProject(currentConfig, name));
+			}
 			throw new Error(`未知的 Story Studio 操作：${endpoint}`);
 		} catch (error) {
 			return failure(error);
@@ -496,10 +556,15 @@ function createStoryStudioRpcHandler(config = {}) {
 	};
 }
 function apply(ctx, config = {}) {
+	const settings = ctx.settings.register(QNOVEL_SETTINGS_NAMESPACE, QNovelSettingsSchema);
+	const readConfig = () => {
+		const projectsRoot = settings.get().projectsRoot.trim();
+		return projectsRoot === "" ? config : { projectRoot: projectsRoot };
+	};
 	apply$1(ctx);
-	ctx.effect(() => ctx.connection.rpc.handle("/story-studio", createStoryStudioRpcHandler(config), { authority: "loopback" }), "story-studio: project rpc");
+	ctx.effect(() => ctx.connection.rpc.handle("/story-studio", createStoryStudioRpcHandler(config, readConfig), { authority: "loopback" }), "story-studio: project rpc");
 }
 //#endregion
-export { Config, apply, createStoryProject, createStoryStudioRpcHandler, inject, name, normalizeProjectName, projectDirectoryName, resolveProjectRoot };
+export { Config, QNOVEL_SETTINGS_NAMESPACE, QNovelSettingsSchema, apply, createStoryProject, createStoryStudioRpcHandler, ensureProjectRoot, inject, name, normalizeProjectName, projectDirectoryName, resolveProjectRoot };
 
 //# sourceMappingURL=index.js.map

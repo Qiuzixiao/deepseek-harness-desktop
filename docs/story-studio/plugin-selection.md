@@ -1,4 +1,4 @@
-# Story Studio 插件选型与复用矩阵
+# QNovel Beta 插件选型与复用矩阵
 
 ## 1. 选型原则
 
@@ -30,7 +30,7 @@
 | Session、Workspace、设置、附件 | DSH 官方 seam | 无需插件 | 采用官方能力 |
 | 文件读写与文本搜索 | `ctx.fs`、官方 fs tools | 无需插件 | 采用官方能力 |
 | 文件拖拽、粘贴与路径注入 | Workspace、composer | `dsh-drop-to-path` | **MVP 使用** |
-| 文件树、编辑器、Markdown 预览 | 官方没有完整编辑工作台 | `dsh-workbench` | 直接内置 Workbench；不再加载旧文件树 |
+| 文件树、编辑器、Markdown 预览 | 官方没有完整编辑工作台 | 当前项目内置 `dsh-workbench` | 继续使用 `src/workbench-host.ts` 与 `assets/workbench/`；不替换、不另装社区 Workbench |
 | DOCX/文本层 PDF 解析 | fs | `dsh-rich-file-reader` | 与 Drop to Path 组合验证；不再承担主要输入入口 |
 | Agent 变更回退 | Session fork、Git | `dsh-checkpoint-rewind` | 优先试验 |
 | Git 命令 | subprocess/shell | `dsh-plugin-git-workflow` | 暂不预装 |
@@ -80,8 +80,8 @@
 ### 3.3.1 项目 UI 候选结论
 
 - `WenhongPan/dsh-projects` 提供项目管理 UI，但新建流程仍以选择目录为核心，不符合“只输入作品名称、统一全局根目录”的产品要求，因此不直接引入。
-- `joejojoking-cloud/dsh-file-explorer`、`yu2025-luo/dsh-file-panel`、`ZrSiO4-y/dsh-explorer`、`ghbhiee/dsh-plugin-workbench` 和 `nirvanaslash/dsh-artifact-preview` 已作为文件树/预览候选检索；现阶段 Better Sidebar 已覆盖 Explorer、编辑、预览和 Git，继续增加同类插件只会造成 UI 入口冲突。
-- 最终方案是产品包只实现薄项目层，通用工作台继续复用 Better Sidebar。
+- `joejojoking-cloud/dsh-file-explorer`、`yu2025-luo/dsh-file-panel`、`ZrSiO4-y/dsh-explorer`、`ghbhiee/dsh-plugin-workbench` 和 `nirvanaslash/dsh-artifact-preview` 已作为文件树/预览候选检索；现阶段当前 `dsh-workbench` 已覆盖 Explorer、编辑和预览，继续增加同类插件只会造成 UI 入口冲突。
+- 最终方案是产品包只实现薄项目层，通用工作台继续复用当前 `dsh-workbench`。
 
 ### 3.4 `dsh-checkpoint-rewind`
 
@@ -134,7 +134,7 @@
 - 检查版本：`0.15.0`；npm registry 未发现同名包。
 - 许可证：MIT。
 - 能力：右侧上下文、文件浏览、只读 Git 图、注入文档和 session log 下载。
-- 决策：**只读 fallback**。它不提供完整编辑器，但权限小于 Better Sidebar，适合后者未通过安全/打包门禁时使用。
+- 决策：**只读 fallback**。它不提供完整编辑器，但权限小于当前 `dsh-workbench`，适合 Workbench 未通过安全/打包门禁时临时使用；第一阶段不启用。
 
 ### 5.2 `dsh-files`
 

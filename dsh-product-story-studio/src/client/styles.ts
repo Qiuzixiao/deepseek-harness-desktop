@@ -1,10 +1,8 @@
 export const styles = `
-.storyStudioProductBadge{pointer-events:auto;position:fixed;z-index:35;top:10px;right:92px;display:flex;align-items:center;gap:8px;height:30px;padding:0 6px 0 9px;border:1px solid color-mix(in srgb,#287a5b 28%,var(--dsw-alias-border-l2));border-radius:8px;background:color-mix(in srgb,var(--dsw-alias-bg-base) 94%,#287a5b);box-shadow:0 2px 8px #0000000d;color:var(--dsw-alias-text-primary);font-size:12px}
-.storyStudioProductMark{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:5px;background:#287a5b;color:#fff;font-size:9px;font-weight:750;letter-spacing:.2px}
-.storyStudioProductName{font-weight:700;color:var(--dsw-alias-text-primary)}
-.storyStudioProductState{color:var(--dsw-alias-text-secondary);padding-right:3px}
-.storyStudioProductAction{display:inline-flex;align-items:center;gap:4px;height:24px;border:0;border-radius:5px;background:#287a5b;color:#fff;padding:0 8px;font:inherit;font-size:11px;cursor:pointer}
-.storyStudioProductAction:hover{background:#216447}
+.qNovelBrandOverlay{position:fixed;z-index:1001;top:37px;left:17px;display:flex;align-items:center;height:28px;color:var(--dsw-alias-label-primary);font-size:16px;line-height:24px;font-weight:740;letter-spacing:-.02em;pointer-events:none}
+/* The upstream brand button remains the New Session shortcut. Keep its behavior,
+   but let the product layer own the visible wordmark in the same slot. */
+[class*="logoRow"] [class*="brand"]{visibility:hidden!important}
 .storyStudioCreateAction{display:flex;align-items:center;justify-content:center;min-width:32px;height:32px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-text-secondary);cursor:pointer;transition:background-color 120ms ease,color 120ms ease}
 .storyStudioCreateAction:hover{background:var(--dsw-alias-fill-hover);color:var(--dsw-alias-text-primary)}
 .storyStudioCreateAction[data-wide=true]{width:100%;justify-content:flex-start;gap:9px;padding:0 10px;font-size:13px}
@@ -40,6 +38,23 @@ export const styles = `
 .storyStudioDialogSubmit:hover:not(:disabled){border-color:#216447;background:#216447}
 .storyStudioDialogSubmit:disabled,.storyStudioDialogCancel:disabled,.storyStudioDialogClose:disabled{opacity:.45;cursor:not-allowed}
 .storyStudioEmpty{padding:10px 12px;font-size:12px;color:var(--dsw-alias-text-tertiary)}
-@media (max-width:900px){.storyStudioProductState{display:none}.storyStudioProductBadge{right:76px}.storyStudioProductName{display:none}}
+ .qNovelSettingsRow{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:16px 0;border-bottom:1px solid var(--dsw-alias-border-l2)}
+.qNovelSettingsText{display:grid;gap:4px;min-width:0}
+.qNovelSettingsTitle{font-size:14px;line-height:22px;color:var(--dsw-alias-label-primary)}
+.qNovelSettingsDescription{font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}
+.qNovelSettingsPath{max-width:560px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px}
+.qNovelSettingsButton{flex:none;height:32px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:transparent;color:var(--dsw-alias-label-primary);padding:0 12px;font:inherit;font-size:12px;cursor:pointer}
+.qNovelSettingsButton:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}
+.qNovelSettingsButton:disabled{opacity:.5;cursor:not-allowed}
+.qNovelOnboarding{box-sizing:border-box;width:min(480px,calc(100vw - 32px));padding:0;border-radius:16px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);overflow:hidden}
+.qNovelOnboardingHeader{display:flex;align-items:center;gap:14px;padding:26px 26px 20px;border-bottom:1px solid var(--dsw-alias-border-l1)}
+.qNovelOnboardingMark{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:12px;background:#287a5b;color:#fff;font-size:18px;font-weight:760}
+.qNovelOnboardingHeader h2{margin:0;color:var(--dsw-alias-label-primary);font-size:18px;line-height:26px;font-weight:700}
+.qNovelOnboardingHeader p{margin:3px 0 0;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}
+.qNovelOnboardingBody{padding:22px 26px;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:21px}
+.qNovelOnboardingBody p{margin:0}
+.qNovelOnboardingBody .storyStudioError{margin-top:14px}
+.qNovelOnboardingFooter{display:flex;justify-content:flex-end;padding:16px 26px;background:var(--dsw-alias-bg-layer-1);border-top:1px solid var(--dsw-alias-border-l1)}
+@media (max-width:900px){.qNovelBrandOverlay{left:14px}}
 @media (max-width:560px){.storyStudioDialogHeader,.storyStudioDialogBody{padding-left:18px;padding-right:18px}.storyStudioDialogFooter{padding-left:18px;padding-right:18px}.storyStudioDialogSubtitle{display:none}.storyStudioLocationTag{display:none}.storyStudioLocation{grid-template-columns:36px minmax(0,1fr)}}
 `

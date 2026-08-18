@@ -28,7 +28,8 @@
         const op = String(method).indexOf('wb.') === 0 ? String(method).slice(3) : String(method)
         // Every op rides the currently active session: the server fences to
         // that session's workspace, so the explorer follows the workspace the
-        // user is working in (deployment root when no session is active).
+        // user is working in. The host deliberately returns an empty state when
+        // no session is active instead of exposing its process directory.
         const inner = args === undefined || args === null ? {} : { ...args }
         if (ui.sessionId !== null && ui.sessionId !== undefined) inner.sessionId = ui.sessionId
         return fetch('/wb/api/' + op, {
@@ -63,6 +64,7 @@
       'error.too-large': '文件超过 5 MB 限制',
       'error.not-text': '无法打开二进制文件',
       'error.not-found': '文件不存在',
+      'error.no-workspace': '请先选择或打开一个作品',
       'error.loading': '无法打开文件',
       'loading': '正在加载编辑器…',
       'tab.close': '关闭标签页',
@@ -92,6 +94,7 @@
       'error.too-large': 'File exceeds the 5 MB limit',
       'error.not-text': 'Cannot open binary files',
       'error.not-found': 'File not found',
+      'error.no-workspace': 'Select or open a work first',
       'error.loading': 'Cannot open file',
       'loading': 'Loading editor…',
       'tab.close': 'Close tab',
@@ -117,6 +120,7 @@
       '.wbx-title{flex:1;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--dsw-alias-label-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
       '.wb-icon-btn{cursor:pointer;border:none;background:transparent;color:var(--dsw-alias-label-secondary);width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:15px;flex:none}' +
       '.wb-icon-btn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}' +
+      '.wb-icon-btn:disabled{opacity:.35;cursor:default}.wb-icon-btn:disabled:hover{background:transparent;color:var(--dsw-alias-label-secondary)}' +
       '.wbx-tree{flex:1;overflow:auto;padding:2px 0 8px;min-height:0}' +
       '.wbx-tree::-webkit-scrollbar{width:10px}.wbx-tree::-webkit-scrollbar-thumb{background:rgba(121,121,121,.4)}' +
       '.wbx-tree::-webkit-scrollbar-thumb:hover{background:rgba(121,121,121,.7)}' +
@@ -127,6 +131,8 @@
       '.wb-row-icon{flex:none;width:18px;height:22px;display:flex;align-items:center;justify-content:center;font-size:15px}' +
       '.wb-row-name{flex:1;overflow:hidden;text-overflow:ellipsis;padding-right:6px}' +
       '.wb-row-loading{color:var(--dsw-alias-label-tertiary);font-style:italic}' +
+      '.wbx-empty{display:flex;flex-direction:column;gap:7px;padding:28px 16px;color:var(--dsw-alias-label-tertiary);line-height:1.5}' +
+      '.wbx-empty-title{color:var(--dsw-alias-label-secondary);font-size:12px}.wbx-empty-hint{font-size:11px}' +
       '.wbx-create-row{display:flex;align-items:center;height:24px;margin:2px 0;padding-left:20px;gap:6px}' +
       '.wbx-create-input{flex:1;background:var(--dsw-alias-bg-base);border:1px solid #007fd4;color:var(--dsw-alias-label-primary);outline:none;height:20px;line-height:20px;padding:0 6px;font-size:13px;font-family:inherit;border-radius:2px}' +
       '.wbx-editor{height:100%;display:flex;flex-direction:column;min-width:0;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary)}' +
@@ -483,6 +489,7 @@
 
     // ---- file operations ----
     const openFile = async (path, name) => {
+      const sessionAtStart = ui.sessionId
       if (!ui.tabs.some((tb) => tb.path === path)) {
         ui.tabs = [...ui.tabs, { path, name, lang: languageFor(name), status: 'loading', error: null }]
       }
@@ -494,6 +501,7 @@
       if (ui.contents.has(path) || ui.models.has(path)) return
       try {
         const res = await host.call('wb.readFile', { path })
+        if (ui.sessionId !== sessionAtStart) return
         if (res !== null && typeof res === 'object' && res.ok === true) {
           ui.contents.set(path, res.content)
           ui.savedVersions.set(path, res.version)
@@ -593,11 +601,13 @@
 
     const refreshTree = async () => {
       const tr = ui.tree
-      if (tr === null) return
+      if (tr === null || tr.empty === true) return
+      const sessionAtStart = ui.sessionId
       const paths = [tr.root, ...Array.from(tr.expanded)]
       for (const p of paths) {
         try {
           const res = await host.call('wb.listDir', { path: p })
+          if (ui.sessionId !== sessionAtStart || ui.tree === null || ui.tree.empty === true) return
           if (res !== null && typeof res === 'object' && res.ok === true) {
             ui.tree = { ...ui.tree, dirs: { ...ui.tree.dirs, [p]: res.entries } }
             emit()
@@ -642,7 +652,12 @@
         if (u.tree !== null) return
         let disposed = false
         host.call('wb.describe', null).then((d) => {
-          if (disposed || d === null || typeof d !== 'object' || d.ok !== true) return
+          if (disposed || d === null || typeof d !== 'object') return
+          if (d.ok !== true) {
+            ui.tree = { empty: true, error: typeof d.error === 'string' ? d.error : 'no-workspace-selected' }
+            emit()
+            return
+          }
           host.call('wb.listDir', { path: d.root }).then((res) => {
             if (disposed) return
             const entries = (res !== null && typeof res === 'object' && res.ok === true) ? res.entries : []
@@ -663,7 +678,7 @@
 
       const toggleDir = (path) => {
         const trr = ui.tree
-        if (trr === null) return
+        if (trr === null || trr.empty === true) return
         const expanded = new Set(trr.expanded)
         if (expanded.has(path)) {
           expanded.delete(path)
@@ -679,7 +694,9 @@
         }
         ui.tree = { ...trr, expanded, dirs: { ...trr.dirs, [path]: null } }
         emit()
+        const sessionAtStart = ui.sessionId
         host.call('wb.listDir', { path }).then((res) => {
+          if (ui.sessionId !== sessionAtStart || ui.tree === null || ui.tree.empty === true) return
           const entries = (res !== null && typeof res === 'object' && res.ok === true) ? res.entries : []
           ui.tree = { ...ui.tree, dirs: { ...ui.tree.dirs, [path]: entries } }
           emit()
@@ -687,7 +704,7 @@
       }
 
       const collapseAll = () => {
-        if (ui.tree === null) return
+        if (ui.tree === null || ui.tree.empty === true) return
         ui.tree = { ...ui.tree, expanded: new Set() }
         emit()
       }
@@ -751,19 +768,20 @@
         ]
       })
 
-      const rootChildren = tr !== null ? (tr.dirs[tr.root] || []) : []
-      const newFile = () => setCreate({ kind: 'file', parent: tr !== null ? tr.root : '', value: '' })
-      const newFolder = () => setCreate({ kind: 'folder', parent: tr !== null ? tr.root : '', value: '' })
+      const rootChildren = tr !== null && tr.empty !== true ? (tr.dirs[tr.root] || []) : []
+      const newFile = () => { if (tr !== null && tr.empty !== true) setCreate({ kind: 'file', parent: tr.root, value: '' }) }
+      const newFolder = () => { if (tr !== null && tr.empty !== true) setCreate({ kind: 'folder', parent: tr.root, value: '' }) }
+      const treeReady = tr !== null && tr.empty !== true
 
       return React.createElement('div', {
         className: 'wbx-explorer',
         children: [
           React.createElement('div', { className: 'wbx-header', children: [
             React.createElement('span', { className: 'wbx-title', children: t('explorer') }),
-            React.createElement('button', { type: 'button', className: 'wb-icon-btn', title: t('action.newFile'), onClick: newFile, children: React.createElement('span', { className: 'wb-codicon wb-codicon-new-file' }) }),
-            React.createElement('button', { type: 'button', className: 'wb-icon-btn', title: t('action.newFolder'), onClick: newFolder, children: React.createElement('span', { className: 'wb-codicon wb-codicon-new-folder' }) }),
-            React.createElement('button', { type: 'button', className: 'wb-icon-btn', title: t('action.refresh'), onClick: () => { refreshTree() }, children: React.createElement('span', { className: 'wb-codicon wb-codicon-refresh' }) }),
-            React.createElement('button', { type: 'button', className: 'wb-icon-btn', title: t('action.collapseAll'), onClick: collapseAll, children: React.createElement('span', { className: 'wb-codicon wb-codicon-collapse-all' }) }),
+            React.createElement('button', { type: 'button', className: 'wb-icon-btn', disabled: !treeReady, title: t('action.newFile'), onClick: newFile, children: React.createElement('span', { className: 'wb-codicon wb-codicon-new-file' }) }),
+            React.createElement('button', { type: 'button', className: 'wb-icon-btn', disabled: !treeReady, title: t('action.newFolder'), onClick: newFolder, children: React.createElement('span', { className: 'wb-codicon wb-codicon-new-folder' }) }),
+            React.createElement('button', { type: 'button', className: 'wb-icon-btn', disabled: !treeReady, title: t('action.refresh'), onClick: () => { refreshTree() }, children: React.createElement('span', { className: 'wb-codicon wb-codicon-refresh' }) }),
+            React.createElement('button', { type: 'button', className: 'wb-icon-btn', disabled: !treeReady, title: t('action.collapseAll'), onClick: collapseAll, children: React.createElement('span', { className: 'wb-codicon wb-codicon-collapse-all' }) }),
             layout !== undefined && typeof layout.toggleExplorer === 'function'
               ? React.createElement('button', { type: 'button', className: 'wb-icon-btn', title: t('action.collapsePanel'), onClick: () => layout.toggleExplorer(), children: React.createElement('span', { className: 'wb-codicon wb-codicon-chevron-left' }) })
               : null
@@ -786,7 +804,7 @@
                   })
                 ] })
               : null,
-            tr !== null
+            tr !== null && tr.empty !== true
               ? React.createElement('div', {
                   className: 'wb-row',
                   style: { paddingLeft: 6 },
@@ -799,7 +817,13 @@
                   ]
                 })
               : null,
-            tr !== null && tr.expanded.has(tr.root) ? renderRows(rootChildren, 1, tr.root) : null
+            tr !== null && tr.empty === true
+              ? React.createElement('div', { className: 'wbx-empty', children: [
+                  React.createElement('span', { className: 'wbx-empty-title', children: tr.error === 'no-workspace-selected' ? t('error.no-workspace') : t('error.loading') }),
+                  React.createElement('span', { className: 'wbx-empty-hint', children: tr.error === 'no-workspace-selected' ? '新建作品或打开已有作品后，资源会显示在这里。' : String(tr.error || '') })
+                ] })
+              : null,
+            tr !== null && tr.empty !== true && tr.expanded.has(tr.root) ? renderRows(rootChildren, 1, tr.root) : null
           ] })
         ]
       })

@@ -1,10 +1,11 @@
-import { mkdir, readdir, writeFile } from 'node:fs/promises'
+import { access, mkdir, readdir, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
+import { constants } from 'node:fs'
 import { isAbsolute, join, resolve } from 'node:path'
 import { stringify } from 'yaml'
 
 export const PROJECT_SCHEMA_VERSION = 1
-export const DEFAULT_PROJECTS_DIRECTORY = 'Story Studio'
+export const DEFAULT_PROJECTS_DIRECTORY = 'QNovel作品'
 
 export interface StoryProjectConfig {
   projectRoot?: string
@@ -20,21 +21,23 @@ export interface CreatedStoryProject extends StoryProjectDescription {
 }
 
 const requiredDirectories = [
-  'bible/characters',
-  'references/source',
-  'references/analyses',
-  'outline/seasons',
-  'outline/volumes',
-  'drafts/scripts',
-  'drafts/chapters',
-  'reviews/revisions',
-  'exports',
-  '.story-studio/cache',
-  '.story-studio/indexes',
+  '故事设定/人物',
+  '参考资料/原始资料',
+  '参考资料/分析',
+  '故事大纲/季纲',
+  '故事大纲/分集大纲',
+  '故事大纲/卷纲',
+  '故事大纲/章节大纲',
+  '正文草稿/短剧',
+  '正文草稿/小说',
+  '审校记录/修订',
+  '导出',
+  '.qnovel/缓存',
+  '.qnovel/索引',
 ] as const
 
 const initialFiles = (name: string): ReadonlyArray<readonly [string, string]> => [
-  ['story.yml', stringify({
+  ['项目配置.yml', stringify({
     schemaVersion: PROJECT_SCHEMA_VERSION,
     id: projectId(name),
     title: name,
@@ -43,12 +46,12 @@ const initialFiles = (name: string): ReadonlyArray<readonly [string, string]> =>
     status: 'development',
     currentDeliverable: 'brief',
   })],
-  ['brief.md', `# ${name}\n\n## 原始需求\n\n## 已确认事实\n\n## Agent 假设\n\n## 待确认问题\n\n## 本轮交付\n\n## 参考材料边界\n`],
-  ['bible/premise.md', '# 故事前提\n'],
-  ['bible/world.md', '# 世界与规则\n'],
-  ['bible/timeline.md', '# 时间线\n'],
-  ['bible/style.md', '# 写法与调性\n'],
-  ['references/index.md', '# 参考材料索引\n\n| 文件 | 路径 | 格式 | 用途 | 状态 |\n| --- | --- | --- | --- | --- |\n'],
+  ['项目说明.md', `# ${name}\n\n## 原始需求\n\n## 已确认事实\n\n## Agent 假设\n\n## 待确认问题\n\n## 本轮交付\n\n## 参考材料边界\n`],
+  ['故事设定/故事前提.md', '# 故事前提\n'],
+  ['故事设定/世界规则.md', '# 世界规则\n'],
+  ['故事设定/时间线.md', '# 时间线\n'],
+  ['故事设定/写作风格.md', '# 写作风格\n'],
+  ['参考资料/参考资料索引.md', '# 参考资料索引\n\n| 文件 | 路径 | 格式 | 用途 | 状态 |\n| --- | --- | --- | --- | --- |\n'],
 ]
 
 export function resolveProjectRoot(
@@ -57,13 +60,25 @@ export function resolveProjectRoot(
   environment: NodeJS.ProcessEnv = process.env,
 ): string {
   const configured = config.projectRoot?.trim()
-  const environmentRoot = environment.STORY_STUDIO_PROJECTS_ROOT?.trim()
+  const environmentRoot = environment.QNOVEL_PROJECTS_ROOT?.trim()
+    || environment.STORY_STUDIO_PROJECTS_ROOT?.trim()
   const root = configured === undefined || configured === ''
     ? environmentRoot === undefined || environmentRoot === ''
       ? join(home, 'Documents', DEFAULT_PROJECTS_DIRECTORY)
       : environmentRoot
     : configured
   return resolve(root)
+}
+
+/** Ensure a selected global directory exists and is writable. */
+export async function ensureProjectRoot(path: string): Promise<string> {
+  const candidate = path.trim()
+  if (candidate === '') throw new Error('请选择 QNovel 作品目录')
+  if (!isAbsolute(candidate)) throw new Error('作品目录必须是绝对路径')
+  const projectRoot = resolve(candidate)
+  await mkdir(projectRoot, { recursive: true })
+  await access(projectRoot, constants.R_OK | constants.W_OK)
+  return projectRoot
 }
 
 export function normalizeProjectName(value: unknown): string {

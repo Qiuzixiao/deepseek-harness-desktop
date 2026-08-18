@@ -1,4 +1,4 @@
-# Story Studio 总体实施方案
+# QNovel Beta 总体实施方案
 
 ## 1. 问题与目标
 
@@ -14,7 +14,7 @@
 
 ## 2. 架构结论
 
-Story Studio 采用六层组合：
+QNovel 采用六层组合（内部包和 Preset 仍保留 Story Studio 标识）：
 
 ```mermaid
 flowchart TB
@@ -114,7 +114,7 @@ Workflow 使用 DSH 动态 Workflow 引擎执行，不建立另一套任务编�
 
 ### 3.4 项目工作台
 
-产品 Client Slot 覆盖空白会话的 Workspace 选择器并增加“新建作品”入口。创建弹窗只接收作品名称，Host 在统一全局根目录中建立项目合同，再通过官方 Workspace API 注册、重命名并切换作品。
+产品 Client Slot 覆盖空白会话的 Workspace 选择器并增加“新建作品”入口。首次启动必须选择全局作品目录，Settings 可更改；创建弹窗只接收作品名称，Host 在当前配置根目录中建立中文项目合同，再通过官方 Workspace API 注册、重命名并切换作品。右侧继续使用当前 `dsh-workbench`，不替换 Workbench。
 
 中间继续使用官方 conversation；右侧直接使用内置 `dsh-workbench` 的 Explorer、Monaco 多标签编辑器和 Markdown 预览。产品层不重新实现通用文件树、编辑器或聊天界面。
 
@@ -126,14 +126,14 @@ Workflow 使用 DSH 动态 Workflow 引擎执行，不建立另一套任务编�
 2. 输入故事想法、专业需求或导入参考材料；
 3. Agent 识别本轮交付物和结构性冲突；
 4. 必要时一次询问不超过三个高影响问题；
-5. 生成 `brief.md` 和 `story.yml`，记录事实、假设和待决项；
+5. 生成 `项目说明.md` 和 `项目配置.yml`，记录事实、假设和待决项；
 6. 根据任务规模直接创作或调度子智能体；
 7. 终审后落盘，官方 deliverables 和文件工作台展示产物；
 8. 修改前建立 checkpoint，用户可查看 diff、继续修改或回退。
 
 ### 4.2 已有作品续写
 
-1. Agent 先读取 `story.yml`、brief、相关设定、最近大纲和正文；
+1. Agent 先读取 `项目配置.yml`、项目说明、相关设定、最近大纲和正文；旧项目再按 `story.yml`、`brief.md` 等英文路径兼容读取；
 2. 只加载本轮必要上下文，不把全部世界书和所有章节塞入请求；
 3. 必要时搜索项目文件或知识索引；
 4. 生成草稿、审校前文冲突并更新人物/时间线/伏笔记录；
@@ -188,3 +188,11 @@ Workflow 使用 DSH 动态 Workflow 引擎执行，不建立另一套任务编�
 - 上游 submodule pin 和运行时版本升级使用独立提交；
 - 第三方插件锁更新和 Story Studio 行为变化分开提交；
 - 每次上游同步后重新执行 Profile Loader、插件组合和打包门禁。
+
+## 8. QNovel Beta 第一阶段修订落地
+
+1. 首次启动读取 `qnovel.projectsRoot`；未配置时只显示目录选择引导，取消不进入完整创作界面。
+2. Settings 的 `settings.general.item` 提供“作品目录”和“更改目录”，与首次启动使用同一个目录选择与校验 RPC。
+3. QNovel 只在左侧官方 Logo 位置显示；左侧保留唯一“新建作品”，右上角重复入口删除。
+4. 当前 `dsh-product-story-studio/src/workbench-host.ts` 和 `/wb` 资源继续使用；无活动 Session 时 Workbench 显示空状态，禁止回退到仓库或进程目录。
+5. 新项目使用中文路径合同；已有英文项目按原路径读取，不做自动迁移。

@@ -254,7 +254,7 @@
   },
   "build": {
     "appId": "ai.deepseek.dsh.desktop",
-    "productName": "DSH Desktop",
+    "productName": "QNovel",
     "asar": true,
     "asarUnpack": [
       "package.json",

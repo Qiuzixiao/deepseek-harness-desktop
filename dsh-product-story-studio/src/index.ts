@@ -1,14 +1,31 @@
 import type { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-client-connection'
-import { createStoryProject, resolveProjectRoot, type StoryProjectConfig } from './project.ts'
+import { settingsNamespace } from '@deepseek-ai/dsh-settings'
+import {
+  createStoryProject,
+  ensureProjectRoot,
+  resolveProjectRoot,
+  type StoryProjectConfig,
+} from './project.ts'
 import * as workbench from './workbench-host.ts'
 
 export const name = 'dsh-product-story-studio'
-export const inject = ['connection', 'webServer', 'fs', 'sandboxPolicy', 'sessions']
+export const inject = ['connection', 'webServer', 'fs', 'sandboxPolicy', 'sessions', 'settings']
+
+export const QNOVEL_SETTINGS_NAMESPACE = settingsNamespace('qnovel')
+
+export interface QNovelSettings {
+  /** User-selected parent directory containing all QNovel works. */
+  projectsRoot: string
+}
+
+export const QNovelSettingsSchema: Schema<QNovelSettings> = Schema.object({
+  projectsRoot: Schema.string().default('').description('QNovel 作品目录；首次启动时必须选择'),
+})
 
 export const Config: Schema<StoryProjectConfig> = Schema.object({
-  projectRoot: Schema.string().default('').description('作品统一保存目录；留空时使用“文稿/Story Studio”'),
+  projectRoot: Schema.string().default('').description('兼容用作品目录；QNovel 首次启动后以 qnovel.projectsRoot 为准'),
 })
 
 interface RpcSuccess<T> {
@@ -38,15 +55,33 @@ function failure(error: unknown): RpcFailure {
   }
 }
 
-export function createStoryStudioRpcHandler(config: StoryProjectConfig = {}): StoryStudioRpcHandler {
+export function createStoryStudioRpcHandler(
+  config: StoryProjectConfig = {},
+  readConfig: () => StoryProjectConfig = () => config,
+): StoryStudioRpcHandler {
   return async (endpoint, payload) => {
     try {
-      if (endpoint === 'describe') return success({ projectRoot: resolveProjectRoot(config) })
+      const currentConfig = readConfig()
+      if (endpoint === 'describe') {
+        const configured = currentConfig.projectRoot?.trim() ?? ''
+        return success({
+          projectRoot: configured === '' ? '' : resolveProjectRoot(currentConfig),
+          configured: configured !== '',
+        })
+      }
+      if (endpoint === 'validateProjectRoot') {
+        const path = typeof payload === 'object' && payload !== null && 'path' in payload
+          ? (payload as { path?: unknown }).path
+          : undefined
+        if (typeof path !== 'string') throw new Error('请选择 QNovel 作品目录')
+        return success({ projectRoot: await ensureProjectRoot(path) })
+      }
       if (endpoint === 'createProject') {
         const name = typeof payload === 'object' && payload !== null && 'name' in payload
           ? (payload as { name?: unknown }).name
           : undefined
-        return success(await createStoryProject(config, name))
+        if ((currentConfig.projectRoot?.trim() ?? '') === '') throw new Error('请先选择 QNovel 作品目录')
+        return success(await createStoryProject(currentConfig, name))
       }
       throw new Error(`未知的 Story Studio 操作：${endpoint}`)
     } catch (error: unknown) {
@@ -56,12 +91,25 @@ export function createStoryStudioRpcHandler(config: StoryProjectConfig = {}): St
 }
 
 export function apply(ctx: Context, config: StoryProjectConfig = {}): void {
+  const settings = ctx.settings.register(QNOVEL_SETTINGS_NAMESPACE, QNovelSettingsSchema)
+  const readConfig = (): StoryProjectConfig => {
+    const projectsRoot = settings.get().projectsRoot.trim()
+    return projectsRoot === ''
+      ? config
+      : { projectRoot: projectsRoot }
+  }
   workbench.apply(ctx)
   ctx.effect(
-    () => ctx.connection.rpc.handle('/story-studio', createStoryStudioRpcHandler(config), { authority: 'loopback' }),
+    () => ctx.connection.rpc.handle('/story-studio', createStoryStudioRpcHandler(config, readConfig), { authority: 'loopback' }),
     'story-studio: project rpc',
   )
 }
 
-export { createStoryProject, normalizeProjectName, projectDirectoryName, resolveProjectRoot } from './project.ts'
+export {
+  createStoryProject,
+  ensureProjectRoot,
+  normalizeProjectName,
+  projectDirectoryName,
+  resolveProjectRoot,
+} from './project.ts'
 export type { CreatedStoryProject, StoryProjectConfig, StoryProjectDescription } from './project.ts'

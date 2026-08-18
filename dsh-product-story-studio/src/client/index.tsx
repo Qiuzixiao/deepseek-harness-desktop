@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import type { ClientContext, WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import {
   IconCloseOutline16, IconFolderClose16, IconPlusOutline16, Menu, Modal,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -14,6 +15,7 @@ const CREATE_ID = 'story-studio:create'
 
 interface StoryStudioDescription {
   projectRoot: string
+  configured: boolean
 }
 
 interface CreatedProject extends StoryStudioDescription {
@@ -25,6 +27,8 @@ interface ProjectService {
   describe(): Promise<StoryStudioDescription>
   create(name: string): Promise<CreatedProject>
   register(project: CreatedProject): Promise<WorkspaceView>
+  pickRoot(): Promise<string | null>
+  configureRoot(path: string): Promise<string>
 }
 
 type StoryStudioClientContext = ClientContext & { connection: ConnectionHandle }
@@ -57,28 +61,104 @@ declare global {
   }
 }
 
-function StoryStudioShellOverlay({ service, onCreated }: {
-  service: ProjectService
-  onCreated: (workspace: WorkspaceView) => void
-}) {
-  const [open, setOpen] = useState(false)
+interface QNovelSettingsRowInjected {
+  readRoot: () => Promise<string>
+  chooseRoot: () => Promise<string | null>
+}
+
+function QNovelSettingsRow({ readRoot, chooseRoot }: QNovelSettingsRowInjected) {
+  const [root, setRoot] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string>()
+  const load = useCallback(() => {
+    void readRoot().then(setRoot).catch((reason: unknown) => {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    })
+  }, [readRoot])
+  useEffect(load, [load])
+
+  const changeRoot = async () => {
+    if (busy) return
+    setBusy(true)
+    setError(undefined)
+    try {
+      const selected = await chooseRoot()
+      if (selected !== null) setRoot(selected)
+    } catch (reason: unknown) {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="qNovelSettingsRow" data-slot="settings.general.item">
+      <div className="qNovelSettingsText">
+        <div className="qNovelSettingsTitle">作品目录</div>
+        <div className="qNovelSettingsDescription">
+          {error ?? '新建作品会保存到这个目录；已有作品不会自动搬迁。'}
+        </div>
+        <div className="qNovelSettingsPath" title={root}>{root === '' ? '尚未选择' : root}</div>
+      </div>
+      <button type="button" className="qNovelSettingsButton" disabled={busy} onClick={() => { void changeRoot() }}>
+        {busy ? '选择中…' : '更改目录'}
+      </button>
+    </div>
+  )
+}
+
+function StoryStudioShellOverlay({ service }: { service: ProjectService }) {
+  const [configured, setConfigured] = useState<boolean | undefined>(undefined)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string>()
+  const refresh = useCallback(() => {
+    void service.describe().then(value => { setConfigured(value.configured) }).catch((reason: unknown) => {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    })
+  }, [service])
+  useEffect(refresh, [refresh])
+
+  const chooseRoot = async () => {
+    if (busy) return
+    setBusy(true)
+    setError(undefined)
+    try {
+      const selected = await service.pickRoot()
+      if (selected !== null) {
+        await service.configureRoot(selected)
+        setConfigured(true)
+      }
+    } catch (reason: unknown) {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <>
-      <div className="storyStudioProductBadge" data-story-studio-overlay>
-        <span className="storyStudioProductMark">SS</span>
-        <span className="storyStudioProductName">Story Studio</span>
-        <span className="storyStudioProductState">作品工作台</span>
-        <button type="button" className="storyStudioProductAction" onClick={() => { setOpen(true) }}>
-          <IconPlusOutline16 size={14} />
-          新建作品
-        </button>
-      </div>
-      <CreateProjectDialog
-        open={open}
-        service={service}
-        onClose={() => { setOpen(false) }}
-        onCreated={onCreated}
-      />
+      <div className="qNovelBrandOverlay" aria-hidden="true">QNovel</div>
+      {configured === false && (
+        <Modal open onClose={() => {}} title="选择作品目录" closeLabel="关闭" className="qNovelOnboarding" headless>
+          <div className="qNovelOnboardingHeader">
+            <span className="qNovelOnboardingMark">Q</span>
+            <div>
+              <h2>先选择作品目录</h2>
+              <p>QNovel 会把每个作品独立保存到这个目录中。</p>
+            </div>
+          </div>
+          <div className="qNovelOnboardingBody">
+            <p>请选择一个专用文件夹，例如“文档 / QNovel作品”。取消选择不会进入完整创作界面。</p>
+            {error !== undefined && <p className="storyStudioError" role="alert">{error}</p>}
+          </div>
+          <div className="qNovelOnboardingFooter">
+            <button type="button" className="storyStudioDialogSubmit" disabled={busy} onClick={() => { void chooseRoot() }}>
+              <IconFolderClose16 size={15} />
+              {busy ? '正在验证…' : '选择作品目录'}
+            </button>
+          </div>
+        </Modal>
+      )}
     </>
   )
 }
@@ -301,6 +381,16 @@ function unwrap<T>(result: unknown): T {
   return response.value
 }
 
+async function readQNovelRoot(connection: ConnectionHandle): Promise<string> {
+  const response = await connection.api.settings.describe({})
+  if (!response.result.ok) throw new Error(response.result.error.message)
+  const namespace = response.result.value.namespaces.find(item => item.ns === 'qnovel')
+  const value = namespace?.value
+  if (typeof value !== 'object' || value === null || !('projectsRoot' in value)) return ''
+  const root = (value as { projectsRoot?: unknown }).projectsRoot
+  return typeof root === 'string' ? root : ''
+}
+
 export const name = 'dsh-product-story-studio'
 export const inject = ['slots', 'workspaces', 'connection']
 
@@ -338,6 +428,16 @@ export function apply(ctx: StoryStudioClientContext): void {
   const service: ProjectService = {
     describe: async () => unwrap<StoryStudioDescription>(await ctx.connection.rpc.call(CHANNEL, 'describe', {})),
     create: async projectName => unwrap<CreatedProject>(await ctx.connection.rpc.call(CHANNEL, 'createProject', { name: projectName })),
+    pickRoot: () => ctx.workspaces.pickDirectory(),
+    configureRoot: async path => {
+      const validated = unwrap<{ projectRoot: string }>(await ctx.connection.rpc.call(CHANNEL, 'validateProjectRoot', { path }))
+      const response = await ctx.connection.api.settings.mutate({
+        ns: 'qnovel',
+        ops: [{ op: 'set', path: ['projectsRoot'], value: validated.projectRoot }],
+      })
+      if (!response.result.ok) throw new Error(response.result.error.message)
+      return validated.projectRoot
+    },
     register: async project => {
       let workspace = await ctx.workspaces.create({ path: project.path })
       if (workspace.title !== project.name) workspace = await ctx.workspaces.rename(workspace.workspaceId, project.name)
@@ -355,8 +455,20 @@ export function apply(ctx: StoryStudioClientContext): void {
     props => <CreateProjectAction {...props} service={service} start={id => { ctx.workspaces.startSession(id) }} />,
   ))
 
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register(
+    { name: 'settings.general.item', id: 'qnovel-projects-root', order: -100 },
+    () => <QNovelSettingsRow
+      readRoot={() => readQNovelRoot(ctx.connection)}
+      chooseRoot={async () => {
+        const selected = await service.pickRoot()
+        if (selected !== null) await service.configureRoot(selected)
+        return selected
+      }}
+    />,
+  ))
+
   ctx.slots.inject('shell.overlay', () => ctx.slots.register(
     { name: 'shell.overlay', id: 'story-studio-product-entry', order: -100 },
-    () => <StoryStudioShellOverlay service={service} onCreated={workspace => { ctx.workspaces.startSession(workspace.workspaceId) }} />,
+    () => <StoryStudioShellOverlay service={service} />,
   ))
 }

@@ -1,4 +1,4 @@
-# Story Studio 产品需求文档
+# QNovel Beta 产品需求文档
 
 状态：**方案评审稿**  
 目标用户：内部短剧编剧、小说编剧、编导和内容负责人
@@ -13,9 +13,9 @@
 
 ## Solution
 
-Story Studio 以专用 DSH Profile 交付，组合官方 Workspace、Session、Agent、Skills、Subagents、Workflow、文件、附件、Web 和 Client Slots，并引入经过审核、固定版本的第三方插件解决文档导入、文件编辑、Git 和修改回退。
+QNovel 以专用 DSH Profile 交付，组合官方 Workspace、Session、Agent、Skills、Subagents、Workflow、文件、附件、Web 和 Client Slots，并引入经过审核、固定版本的第三方插件解决文档导入、文件编辑、Git 和修改回退。
 
-产品提供一个 Story Studio Preset 和一组领域 Skills。Agent 将需求、假设和待决问题写入 brief，按作品形态生成公共 Bible、短剧季/集文件或小说卷/章文件，并在写入后执行一致性审校。工作区 Markdown/YAML 是作品事实源，Git 保存长期版本，Checkpoint 保护 Agent 操作，DSH Session 保存创作过程。
+产品提供一个 Story Studio Preset 和一组领域 Skills。Agent 将需求、假设和待决问题写入 `项目说明.md`，按作品形态生成公共故事设定、短剧季/集文件或小说卷/章文件，并在写入后执行一致性审校。工作区 Markdown/YAML 是作品事实源，Git 保存长期版本，Checkpoint 保护 Agent 操作，DSH Session 保存创作过程。
 
 ## User Stories
 
@@ -66,7 +66,9 @@ Story Studio 以专用 DSH Profile 交付，组合官方 Workspace、Session、A
 - 文档导入、文件编辑/Git 和回退先评估现有插件，未通过 `rc.7` 与桌面发行门禁前不预装。
 - 项目合同解析、验证、迁移和状态推导设计为可独立测试的深模块。
 - 项目工作台使用产品 Client Slot 实现名称创建与作品选择，并复用 Better Sidebar 的文件树、编辑器和预览。
-- 新建作品只输入名称，统一写入全局作品根目录，不调用目录选择器。
+- 首次启动必须选择全局作品目录；Settings 可以更改该目录；新建作品只输入名称并写入当前配置根目录，不自动搬迁已有作品。
+- 产品可见名是 `QNovel Beta`；QNovel 替换左侧官方 Logo 位置，右上角重复“新建作品”入口删除，官方 Conversation、Session、Workspace 和当前 Workbench 保留。
+- 新建作品统一使用中文物理路径和文件名；旧的 `story.yml`、`brief.md`、`bible/`、`outline/`、`drafts/` 仅兼容读取，不自动重命名。
 - RAG 必须经过统一中文语料基准，只选择一个实现进入产品 Profile。
 - 第三方依赖锁记录版本/commit、来源、hash、许可证、权限、原生依赖和兼容证据。
 

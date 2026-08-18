@@ -305,7 +305,7 @@ describe('published package surface', () => {
   it('fixes the installed application identity', () => {
     expect(manifest.version).toBe(workspaceManifest.version)
     expect(manifest.dependencies?.['dsh-product-story-studio']).toBe('0.1.0')
-    expect(manifest.build?.productName).toBe('DSH Desktop')
+    expect(manifest.build?.productName).toBe('QNovel')
     expect(manifest.build?.appId).toBe('ai.deepseek.dsh.desktop')
     expect(manifest.build?.asarUnpack).toEqual([
       'package.json',

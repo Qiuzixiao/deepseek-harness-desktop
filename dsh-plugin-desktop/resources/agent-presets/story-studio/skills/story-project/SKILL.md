@@ -1,6 +1,6 @@
 ---
 name: story-project
-description: 创建、读取和维护 Story Studio 作品目录、story.yml、brief.md、人物设定、参考材料、大纲、正文与审校文件；用于需要长期落盘或继续已有作品的任务。
+description: 创建、读取和维护 QNovel 作品目录、项目配置.yml、项目说明.md、人物设定、参考材料、大纲、正文与审校文件；用于需要长期落盘或继续已有作品的任务。
 ---
 
 # Story Project
@@ -13,38 +13,41 @@ description: 创建、读取和维护 Story Studio 作品目录、story.yml、br
 
 ```text
 <作品目录>/
-  story.yml
-  brief.md
-  bible/
-    premise.md
-    world.md
-    timeline.md
-    style.md
-    characters/
-  references/
-    index.md
-    source/
-    analyses/
-  outline/
-    master.md
-    seasons/
-    volumes/
-  drafts/
-    scripts/
-    chapters/
-  reviews/
-    revisions/
-  exports/
-  .story-studio/
-    cache/
-    indexes/
+  项目配置.yml
+  项目说明.md
+  故事设定/
+    故事前提.md
+    世界规则.md
+    时间线.md
+    写作风格.md
+    人物/
+  参考资料/
+    参考资料索引.md
+    原始资料/
+    分析/
+  故事大纲/
+    季纲/
+    分集大纲/
+    卷纲/
+    章节大纲/
+  正文草稿/
+    短剧/
+    小说/
+  审校记录/
+    修订/
+  导出/
+  .qnovel/
+    缓存/
+    索引/
 ```
 
-短剧只需要使用 `outline/seasons` 和 `drafts/scripts`；小说只需要使用 `outline/volumes` 和 `drafts/chapters`。不要复制公共 Bible。
+短剧只需要使用 `故事大纲/季纲`、`故事大纲/分集大纲` 和 `正文草稿/短剧`；小说只需要使用 `故事大纲/卷纲`、`故事大纲/章节大纲` 和 `正文草稿/小说`。不要复制公共故事设定。
+
+已有旧项目如果仍然使用 `story.yml`、`brief.md`、`bible/`、`outline/`、`drafts/`，先按旧合同读取，不要自动重命名；新项目和新生成文件统一使用上面的中文合同。
 
 ## 2. 最小项目文件
 
-`story.yml` 至少保存：
+`项目配置.yml` 至少保存：
 
 ```yaml
 schemaVersion: 1
@@ -58,7 +61,7 @@ currentDeliverable: brief
 
 `medium` 只能是 `short-drama`、`novel` 或 `undecided`。只保存稳定事实和状态，长段创作内容写入 Markdown。
 
-`brief.md` 必须包含：原始需求摘要、已确认事实、Agent 假设、待确认问题、冲突、必须保留/禁止内容、本轮交付和参考材料使用边界。
+`项目说明.md` 必须包含：原始需求摘要、已确认事实、Agent 假设、待确认问题、冲突、必须保留/禁止内容、本轮交付和参考材料使用边界。
 
 ## 3. 创建和继续
 
@@ -70,13 +73,13 @@ node <story-project skill root>/scripts/story-project.mjs validate <作品目录
 node <story-project skill root>/scripts/story-project.mjs status <作品目录>
 ```
 
-`init` 发现已有 `story.yml` 会失败，禁止覆盖既有作品。`validate` 和 `status` 的 JSON 输出是项目状态的确定性来源；长段内容仍由 Agent 写入 Markdown。
+`init` 发现已有 `项目配置.yml` 或旧的 `story.yml` 会失败，禁止覆盖既有作品。`validate` 和 `status` 的 JSON 输出是项目状态的确定性来源；长段内容仍由 Agent 写入 Markdown。
 
 创建项目前先确认用户确实需要长期落盘，并检查目标目录是否已存在。不得覆盖现有 `story.yml` 或正文。目录存在时先读取并继续，不另建同名项目。
 
 继续项目时按本轮任务最小读取：
 
-1. `story.yml` 和 `brief.md`；
+1. `项目配置.yml` 和 `项目说明.md`；如果不存在，再读取旧项目的 `story.yml` 和 `brief.md`；
 2. 与任务相关的 Bible、人物、大纲；
 3. 相邻集/章和相关审校记录；
 4. 必要时搜索其他事实，不把全项目一次塞入上下文。

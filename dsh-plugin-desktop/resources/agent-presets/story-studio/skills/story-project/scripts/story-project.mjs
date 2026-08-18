@@ -26,21 +26,24 @@ const option = (name, fallback) => {
 }
 
 const root = resolve(directory)
-const storyPath = join(root, 'story.yml')
+const projectConfigPath = join(root, '项目配置.yml')
+const legacyStoryPath = join(root, 'story.yml')
 const mediumValues = new Set(['short-drama', 'novel', 'undecided'])
 
 const requiredDirectories = [
-  'bible/characters',
-  'references/source',
-  'references/analyses',
-  'outline/seasons',
-  'outline/volumes',
-  'drafts/scripts',
-  'drafts/chapters',
-  'reviews/revisions',
-  'exports',
-  '.story-studio/cache',
-  '.story-studio/indexes',
+  '故事设定/人物',
+  '参考资料/原始资料',
+  '参考资料/分析',
+  '故事大纲/季纲',
+  '故事大纲/分集大纲',
+  '故事大纲/卷纲',
+  '故事大纲/章节大纲',
+  '正文草稿/短剧',
+  '正文草稿/小说',
+  '审校记录/修订',
+  '导出',
+  '.qnovel/缓存',
+  '.qnovel/索引',
 ]
 
 const writeIfMissing = (filename, content) => {
@@ -48,7 +51,7 @@ const writeIfMissing = (filename, content) => {
 }
 
 function init() {
-  if (existsSync(storyPath)) throw new Error(`project already exists: ${storyPath}`)
+  if (existsSync(projectConfigPath) || existsSync(legacyStoryPath)) throw new Error(`project already exists: ${root}`)
   const title = option('--title')
   if (!title) throw new Error('--title is required')
   const medium = option('--medium', 'undecided')
@@ -56,7 +59,7 @@ function init() {
   mkdirSync(root, { recursive: true })
   for (const relative of requiredDirectories) mkdirSync(join(root, relative), { recursive: true })
   const id = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `story-${Date.now()}`
-  writeFileSync(storyPath, stringify({
+  writeFileSync(projectConfigPath, stringify({
     schemaVersion: 1,
     id,
     title,
@@ -65,29 +68,35 @@ function init() {
     status: 'development',
     currentDeliverable: 'brief',
   }))
-  writeIfMissing(join(root, 'brief.md'), `# ${title}\n\n## 原始需求\n\n## 已确认事实\n\n## Agent 假设\n\n## 待确认问题\n\n## 本轮交付\n\n## 参考材料边界\n`)
-  writeIfMissing(join(root, 'bible/premise.md'), '# 故事前提\n')
-  writeIfMissing(join(root, 'bible/world.md'), '# 世界与规则\n')
-  writeIfMissing(join(root, 'bible/timeline.md'), '# 时间线\n')
-  writeIfMissing(join(root, 'bible/style.md'), '# 写法与调性\n')
-  writeIfMissing(join(root, 'references/index.md'), '# 参考材料索引\n\n| 文件 | 路径 | 格式 | 用途 | 状态 |\n| --- | --- | --- | --- | --- |\n')
+  writeIfMissing(join(root, '项目说明.md'), `# ${title}\n\n## 原始需求\n\n## 已确认事实\n\n## Agent 假设\n\n## 待确认问题\n\n## 本轮交付\n\n## 参考材料边界\n`)
+  writeIfMissing(join(root, '故事设定/故事前提.md'), '# 故事前提\n')
+  writeIfMissing(join(root, '故事设定/世界规则.md'), '# 世界规则\n')
+  writeIfMissing(join(root, '故事设定/时间线.md'), '# 时间线\n')
+  writeIfMissing(join(root, '故事设定/写作风格.md'), '# 写作风格\n')
+  writeIfMissing(join(root, '参考资料/参考资料索引.md'), '# 参考资料索引\n\n| 文件 | 路径 | 格式 | 用途 | 状态 |\n| --- | --- | --- | --- | --- |\n')
   process.stdout.write(JSON.stringify({ ok: true, command: 'init', path: root, id, medium }) + '\n')
 }
 
 function readStory() {
-  if (!existsSync(storyPath)) throw new Error(`missing story.yml: ${storyPath}`)
-  const story = parse(readFileSync(storyPath, 'utf8'))
-  if (!story || typeof story !== 'object' || Array.isArray(story)) throw new Error('story.yml must contain a map')
-  if (story.schemaVersion !== 1) throw new Error('story.yml schemaVersion must be 1')
-  if (typeof story.id !== 'string' || typeof story.title !== 'string') throw new Error('story.yml requires id and title')
-  if (!mediumValues.has(story.medium)) throw new Error('story.yml medium is invalid')
-  return story
+  const path = existsSync(projectConfigPath) ? projectConfigPath : legacyStoryPath
+  if (!existsSync(path)) throw new Error(`missing 项目配置.yml (or legacy story.yml): ${root}`)
+  const story = parse(readFileSync(path, 'utf8'))
+  if (!story || typeof story !== 'object' || Array.isArray(story)) throw new Error('项目配置.yml must contain a map')
+  if (story.schemaVersion !== 1) throw new Error('项目配置.yml schemaVersion must be 1')
+  if (typeof story.id !== 'string' || typeof story.title !== 'string') throw new Error('项目配置.yml requires id and title')
+  if (!mediumValues.has(story.medium)) throw new Error('项目配置.yml medium is invalid')
+  return { story, legacy: path === legacyStoryPath }
 }
 
 function validate() {
-  const story = readStory()
-  const missing = requiredDirectories.filter(relative => !existsSync(join(root, relative)))
-  for (const filename of ['brief.md', 'bible/premise.md', 'bible/world.md', 'bible/timeline.md', 'bible/style.md', 'references/index.md']) {
+  const { story, legacy } = readStory()
+  const legacyDirectories = ['bible/characters', 'references/source', 'references/analyses', 'outline/seasons', 'outline/volumes', 'drafts/scripts', 'drafts/chapters', 'reviews/revisions', 'exports', '.story-studio/cache', '.story-studio/indexes']
+  const directories = legacy ? legacyDirectories : requiredDirectories
+  const missing = directories.filter(relative => !existsSync(join(root, relative)))
+  const files = legacy
+    ? ['brief.md', 'bible/premise.md', 'bible/world.md', 'bible/timeline.md', 'bible/style.md', 'references/index.md']
+    : ['项目说明.md', '故事设定/故事前提.md', '故事设定/世界规则.md', '故事设定/时间线.md', '故事设定/写作风格.md', '参考资料/参考资料索引.md']
+  for (const filename of files) {
     if (!existsSync(join(root, filename))) missing.push(filename)
   }
   if (missing.length > 0) throw new Error(`project is missing: ${missing.join(', ')}`)
@@ -101,20 +110,23 @@ function countFiles(relative) {
 }
 
 function status() {
-  const story = readStory()
+  const { story, legacy } = readStory()
+  const base = legacy
+    ? { characters: 'bible/characters', seasonOutlines: 'outline/seasons', volumeOutlines: 'outline/volumes', scriptDrafts: 'drafts/scripts', chapterDrafts: 'drafts/chapters', references: 'references/analyses', reviews: 'reviews' }
+    : { characters: '故事设定/人物', seasonOutlines: '故事大纲/季纲', volumeOutlines: '故事大纲/卷纲', scriptDrafts: '正文草稿/短剧', chapterDrafts: '正文草稿/小说', references: '参考资料/分析', reviews: '审校记录' }
   process.stdout.write(JSON.stringify({
     ok: true,
     command: 'status',
     path: root,
     project: story,
     files: {
-      characters: countFiles('bible/characters'),
-      seasonOutlines: countFiles('outline/seasons'),
-      volumeOutlines: countFiles('outline/volumes'),
-      scriptDrafts: countFiles('drafts/scripts'),
-      chapterDrafts: countFiles('drafts/chapters'),
-      references: countFiles('references/analyses'),
-      reviews: countFiles('reviews'),
+      characters: countFiles(base.characters),
+      seasonOutlines: countFiles(base.seasonOutlines),
+      volumeOutlines: countFiles(base.volumeOutlines),
+      scriptDrafts: countFiles(base.scriptDrafts),
+      chapterDrafts: countFiles(base.chapterDrafts),
+      references: countFiles(base.references),
+      reviews: countFiles(base.reviews),
     },
   }) + '\n')
 }

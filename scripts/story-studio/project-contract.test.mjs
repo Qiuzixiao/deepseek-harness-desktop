@@ -23,5 +23,6 @@ test('Story Studio project contract initializes and reports a short-drama projec
   const status = JSON.parse((await run('status', project)).stdout)
   assert.equal(status.project.title, '1998父子局')
   assert.equal(status.files.characters, 0)
-  assert.match(await readFile(join(project, 'brief.md'), 'utf8'), /原始需求/u)
+  assert.match(await readFile(join(project, '项目说明.md'), 'utf8'), /原始需求/u)
+  assert.match(await readFile(join(project, '项目配置.yml'), 'utf8'), /title: 1998父子局/u)
 })

@@ -8,10 +8,8 @@
 //
 // Workspace follow: every op accepts an optional `sessionId`. When it is given
 // and resolves to a live session with a `header.cwd`, the fence root becomes
-// THAT session's workspace (its own sandbox boundary); otherwise the
-// deployment fallback root applies. The web client passes the currently active
-// session id, so the explorer always shows the workspace the user is working
-// in.
+// THAT session's workspace (its own sandbox boundary). Without a live session
+// the explorer is empty; it never falls back to the Host process directory.
 import { basename, dirname, extname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { mkdir, readFile } from 'node:fs/promises'
@@ -33,6 +31,21 @@ const MIME = {
   '.png': 'image/png'
 }
 
+/** Resolve only a live session workspace; null is the deliberate empty state. */
+export function resolveWorkbenchSessionRoot(sessionId, sessions, sandboxPolicy) {
+  if (sessionId === null || sessionId === undefined || sessionId === '') return null
+  try {
+    const session = sessions.get(sessionId)
+    if (session === undefined || session.header === null || typeof session.header.cwd !== 'string' || session.header.cwd === '') return null
+    const policy = sandboxPolicy.resolve({ session })
+    return policy !== null && typeof policy.workspaceRoot === 'string' && policy.workspaceRoot !== ''
+      ? policy.workspaceRoot
+      : null
+  } catch (e) {
+    return null
+  }
+}
+
 export function apply(ctx) {
   const fs = ctx.fs
   const sandboxPolicy = ctx.sandboxPolicy
@@ -40,23 +53,18 @@ export function apply(ctx) {
   const webServer = ctx.webServer
   const assetsRoot = join(dirname(fileURLToPath(import.meta.url)), '..', 'assets', 'workbench')
 
-  // Per-call policy: the owning session's sandbox boundary wins (its cwd is
-  // the workspace-write root), otherwise the deployment fallback.
+  // Per-call policy: only the owning session's sandbox boundary is valid. A
+  // missing session is an intentionally empty Workbench state; falling back to
+  // sandboxPolicy.resolve({}) exposes the Host process/repository directory and
+  // makes the explorer appear to be rooted at dsh-plugin-desktop.
   const policyOf = (sessionId) => {
-    if (sessionId !== null && sessionId !== undefined && sessionId !== '') {
-      try {
-        const session = sessions.get(sessionId)
-        if (session !== undefined && session.header !== null && typeof session.header.cwd === 'string' && session.header.cwd !== '') {
-          return sandboxPolicy.resolve({ session })
-        }
-      } catch (e) { /* session store read failed — fall through to deployment root */ }
-    }
-    return sandboxPolicy.resolve({})
+    const root = resolveWorkbenchSessionRoot(sessionId, sessions, sandboxPolicy)
+    return root === null ? null : { workspaceRoot: root }
   }
   const rootFor = (sessionId) => {
     const policy = policyOf(sessionId)
     if (policy === null || typeof policy.workspaceRoot !== 'string' || policy.workspaceRoot === '') {
-      throw new Error('dsh-workbench: no workspace root resolved')
+      throw new Error('no-workspace-selected')
     }
     return policy.workspaceRoot
   }

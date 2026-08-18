@@ -1,6 +1,8 @@
-# Story Studio Product Bundle
+# QNovel Product Bundle
 
-This private workspace owns the install-time Story Studio Profile composition.
+This private workspace owns the install-time QNovel Beta composition. Internal
+package, profile, and preset identifiers retain Story Studio names for
+compatibility.
 Its production dependencies are packaged with DSH Desktop and resolved through
 the installation fallback, so end users do not run plugin installation commands
 or contact GitHub when the Profile starts.
@@ -16,7 +18,9 @@ Every dependency retains its upstream license in the packaged application. The
 desktop package gate verifies the Host and Client entries, Story Studio Skills,
 and architecture-specific native assets before an installer is accepted.
 
-The current MVP creates every work under one configurable global root, registers
+The current MVP requires a first-run choice of one configurable global root,
+stores that setting in the official Settings document, and creates every work
+under it. It registers
 the directory as a DSH Workspace, keeps the official conversation in the center,
 and reuses Better Sidebar for the right-hand file tree and preview. Professional
 DOCX/PDF layout export is intentionally out of scope.

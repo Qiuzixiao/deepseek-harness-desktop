@@ -7689,6 +7689,7 @@ __metadata:
     "@deepseek-ai/dsh-client-ui-conversation": "npm:0.1.0-rc.7"
     "@deepseek-ai/dsh-client-ui-layout": "npm:0.1.0-rc.7"
     "@deepseek-ai/dsh-client-ui-primitives": "npm:0.1.0-rc.7"
+    "@deepseek-ai/dsh-client-ui-settings": "npm:0.1.0-rc.7"
     "@deepseek-ai/dsh-client-ui-sidebar": "npm:0.1.0-rc.7"
     "@deepseek-ai/dsh-client-ui-slots": "npm:0.1.0-rc.7"
     "@deepseek-ai/schemastery": "npm:^3.18.1"
@@ -7714,6 +7715,7 @@ __metadata:
     "@deepseek-ai/dsh-client-ui-conversation": 0.1.0-rc.7
     "@deepseek-ai/dsh-client-ui-layout": 0.1.0-rc.7
     "@deepseek-ai/dsh-client-ui-primitives": 0.1.0-rc.7
+    "@deepseek-ai/dsh-client-ui-settings": 0.1.0-rc.7
     "@deepseek-ai/dsh-client-ui-sidebar": 0.1.0-rc.7
     "@deepseek-ai/dsh-client-ui-slots": 0.1.0-rc.7
     "@deepseek-ai/dsh-fs": 0.1.0-rc.7
