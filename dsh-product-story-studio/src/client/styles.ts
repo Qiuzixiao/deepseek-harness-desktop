@@ -5,12 +5,16 @@ export const styles = `
 [class*="logoRow"] [class*="brand"]{visibility:visible!important;justify-content:flex-start;font-size:0!important;letter-spacing:-.02em}
 [class*="logoRow"] [class*="brand"]>*{visibility:hidden!important}
 [class*="logoRow"] [class*="brand"]::after{content:"QNovel";visibility:visible;display:block;color:var(--dsw-alias-label-primary);font-size:16px;line-height:24px;font-weight:740;letter-spacing:-.02em}
-/* Keep the official sidebar shell and its New Session action, but use the
-   product footer slot as a positioned sibling beside it. The action remains
-   owned by React and is not moved out of the upstream tree. */
+/* The upstream slot is technically rendered in the footer, but QNovel's
+   product contract is explicit: New Session and New Work are one top action
+   row directly below the wordmark. Position the slot's wrapper (rather than
+   only its button) against the official sidebar geometry, so the footer
+   cannot leave a second visible copy at the bottom. The 74px offset is the
+   upstream sidebar's 6px top padding + 60px logo row + 8px logo margin. */
 [class~="hHd-Xa_root"]{position:relative}
-[class~="hHd-Xa_root"] [class~="hHd-Xa_newSession"]{width:calc(50% - 6px);margin-right:auto}
-.qNovelCreateSlotHost{position:absolute;z-index:4;top:74px;right:14px;width:calc(50% - 6px);height:38px}
+[class~="hHd-Xa_root"]:not([class~="hHd-Xa_collapsed"]) [class~="hHd-Xa_newSession"]{width:calc(50% - 6px);margin-right:auto}
+[class~="hHd-Xa_root"]:not([class~="hHd-Xa_collapsed"]) [class~="hHd-Xa_footerActions"]{position:absolute;z-index:4;top:74px;left:calc(50% + 2px);right:14px;width:auto;height:38px;display:flex}
+.qNovelCreateSlotHost{position:static;width:100%;height:38px}
 .qNovelCreateSlotHost[data-wide=true]{display:block}
 .qNovelCreateSlotHost:not([data-wide=true]){display:none}
 .storyStudioCreateAction{box-sizing:border-box;display:flex;align-items:center;justify-content:center;width:100%;height:38px;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);cursor:pointer;transition:background-color 120ms ease,color 120ms ease,border-color 120ms ease}
