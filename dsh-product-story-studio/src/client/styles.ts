@@ -1,11 +1,34 @@
 export const styles = `
-.qNovelBrandOverlay{position:fixed;z-index:1001;top:37px;left:17px;display:flex;align-items:center;height:28px;color:var(--dsw-alias-label-primary);font-size:16px;line-height:24px;font-weight:740;letter-spacing:-.02em;pointer-events:none}
+.qNovelBrandOverlay{display:none}
 /* The upstream brand button remains the New Session shortcut. Keep its behavior,
    but let the product layer own the visible wordmark in the same slot. */
-[class*="logoRow"] [class*="brand"]{visibility:hidden!important}
-.storyStudioCreateAction{display:flex;align-items:center;justify-content:center;min-width:32px;height:32px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-text-secondary);cursor:pointer;transition:background-color 120ms ease,color 120ms ease}
-.storyStudioCreateAction:hover{background:var(--dsw-alias-fill-hover);color:var(--dsw-alias-text-primary)}
-.storyStudioCreateAction[data-wide=true]{width:100%;justify-content:flex-start;gap:9px;padding:0 10px;font-size:13px}
+[class*="logoRow"] [class*="brand"]{visibility:visible!important;justify-content:flex-start;font-size:0!important;letter-spacing:-.02em}
+[class*="logoRow"] [class*="brand"]>*{visibility:hidden!important}
+[class*="logoRow"] [class*="brand"]::after{content:"QNovel";visibility:visible;display:block;color:var(--dsw-alias-label-primary);font-size:16px;line-height:24px;font-weight:740;letter-spacing:-.02em}
+/* Keep the official sidebar shell and its New Session action, but use the
+   product footer slot as a positioned sibling beside it. The action remains
+   owned by React and is not moved out of the upstream tree. */
+[class~="hHd-Xa_root"]{position:relative}
+[class~="hHd-Xa_root"] [class~="hHd-Xa_newSession"]{width:calc(50% - 6px);margin-right:auto}
+.qNovelCreateSlotHost{position:absolute;z-index:4;top:74px;right:14px;width:calc(50% - 6px);height:38px}
+.qNovelCreateSlotHost[data-wide=true]{display:block}
+.qNovelCreateSlotHost:not([data-wide=true]){display:none}
+.storyStudioCreateAction{box-sizing:border-box;display:flex;align-items:center;justify-content:center;width:100%;height:38px;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);cursor:pointer;transition:background-color 120ms ease,color 120ms ease,border-color 120ms ease}
+.storyStudioCreateAction:hover{background:var(--dsw-alias-button-floating-hover);border-color:var(--dsw-alias-border-l2);color:var(--dsw-alias-label-primary)}
+.storyStudioCreateAction:active{background:var(--dsw-alias-interactive-bg-active)}
+.storyStudioCreateAction span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px;font-weight:500;line-height:22px}
+.storyStudioCreateAction svg{flex:none}
+/* The product identity replaces the upstream empty-state fish headline. The
+   original hero stays mounted for layout and accessibility, while its visible
+   labels are given QNovel's own mark, headline, and Beta badge. */
+[class*="_headlineText"]{font-size:0!important}
+[class*="_headlineText"]::after{content:"把故事，写成作品";font-size:26px;line-height:32px;font-weight:600;letter-spacing:-.035em}
+[class*="_previewBadge"]{font-size:0!important;border-color:color-mix(in srgb,#287a5b 28%,var(--dsw-alias-interactive-bg-hover));background:color-mix(in srgb,#287a5b 12%,transparent);color:#70c49c}
+[class*="_previewBadge"]::after{content:"Beta";font-family:var(--ds-font-family-code);font-size:12px;line-height:18px;font-weight:600}
+[class*="_fishHitbox"]{position:relative}
+[class*="_fishHitbox"] [class*="_fish"]{visibility:hidden}
+[class*="_fishHitbox"]::after{content:"Q";box-sizing:border-box;display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:11px;background:linear-gradient(145deg,#3c9a72,#206044);box-shadow:0 5px 14px color-mix(in srgb,#287a5b 28%,transparent);color:#fff;font-size:19px;font-weight:780;line-height:34px;letter-spacing:-.06em}
+[class*="_headline"]{column-gap:11px}
 .storyStudioDialog{box-sizing:border-box;width:min(520px,calc(100vw - 32px));gap:0;padding:0;border-radius:12px;border-color:var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);overflow:hidden}
 .storyStudioDialogHeader{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:22px 24px 18px;border-bottom:1px solid var(--dsw-alias-border-l1)}
 .storyStudioDialogIdentity{display:flex;align-items:center;gap:12px;min-width:0}
@@ -55,6 +78,6 @@ export const styles = `
 .qNovelOnboardingBody p{margin:0}
 .qNovelOnboardingBody .storyStudioError{margin-top:14px}
 .qNovelOnboardingFooter{display:flex;justify-content:flex-end;padding:16px 26px;background:var(--dsw-alias-bg-layer-1);border-top:1px solid var(--dsw-alias-border-l1)}
-@media (max-width:900px){.qNovelBrandOverlay{left:14px}}
+@media (max-width:900px){.qNovelBrandOverlay{left:14px}.qNovelCreateSlotHost{right:12px}}
 @media (max-width:560px){.storyStudioDialogHeader,.storyStudioDialogBody{padding-left:18px;padding-right:18px}.storyStudioDialogFooter{padding-left:18px;padding-right:18px}.storyStudioDialogSubtitle{display:none}.storyStudioLocationTag{display:none}.storyStudioLocation{grid-template-columns:36px minmax(0,1fr)}}
 `

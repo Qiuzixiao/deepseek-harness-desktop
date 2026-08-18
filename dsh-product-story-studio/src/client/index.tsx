@@ -111,6 +111,11 @@ function StoryStudioShellOverlay({ service }: { service: ProjectService }) {
   const [configured, setConfigured] = useState<boolean | undefined>(undefined)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
+  useEffect(() => {
+    const previousTitle = document.title
+    document.title = 'QNovel Beta'
+    return () => { document.title = previousTitle }
+  }, [])
   const refresh = useCallback(() => {
     void service.describe().then(value => { setConfigured(value.configured) }).catch((reason: unknown) => {
       setError(reason instanceof Error ? reason.message : String(reason))
@@ -352,17 +357,18 @@ function CreateProjectAction(props: CreateActionProps & { service: ProjectServic
   const [open, setOpen] = useState(false)
   return (
     <>
-      <button
-        type="button"
-        className="storyStudioCreateAction"
-        data-wide={props.wide || undefined}
-        aria-label="新建作品"
-        title="新建作品"
-        onClick={() => { setOpen(true) }}
-      >
-        <IconPlusOutline16 size={16} />
-        {props.wide && <span>新建作品</span>}
-      </button>
+      <div className="qNovelCreateSlotHost" data-wide={props.wide || undefined}>
+        <button
+          type="button"
+          className="storyStudioCreateAction"
+          aria-label="新建作品"
+          title="新建作品"
+          onClick={() => { setOpen(true) }}
+        >
+          <IconPlusOutline16 size={16} />
+          {props.wide && <span>新建作品</span>}
+        </button>
+      </div>
       <CreateProjectDialog
         open={open}
         service={props.service}
