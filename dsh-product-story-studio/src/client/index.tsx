@@ -11,7 +11,6 @@ import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { styles } from './styles.ts'
 
 const CHANNEL = '/story-studio'
-const CREATE_ID = 'story-studio:create'
 
 interface StoryStudioDescription {
   projectRoot: string
@@ -234,7 +233,7 @@ function CreateProjectDialog({ open, service, onClose, onCreated }: {
     >
       <div className="storyStudioDialogHeader">
         <div className="storyStudioDialogIdentity">
-          <span className="storyStudioDialogMark">SS</span>
+          <span className="storyStudioDialogMark">Q</span>
           <div>
             <h2 className="storyStudioDialogTitle">新建作品</h2>
             <p className="storyStudioDialogSubtitle">从一个名字开始，自动建立完整的创作空间</p>
@@ -305,7 +304,6 @@ function CreateProjectDialog({ open, service, onClose, onCreated }: {
 
 function StoryProjectPicker(props: ProjectPickerProps & { service: ProjectService }) {
   const { service } = props
-  const [createOpen, setCreateOpen] = useState(false)
   const [projectRoot, setProjectRoot] = useState('')
   const workspaces = props.useWorkspaces(state => state.items)
 
@@ -326,28 +324,14 @@ function StoryProjectPicker(props: ProjectPickerProps & { service: ProjectServic
   return (
     <>
       <Menu
-        open={props.open && !createOpen}
+        open={props.open}
         anchor={null}
         items={items.length === 0 ? [{ type: 'label' as const, id: 'empty', text: '还没有作品' }] : items}
-        footer={[{ id: CREATE_ID, label: '新建作品', icon: <IconPlusOutline16 size={16} /> }]}
         selectedId={props.selectedId}
         portal
         getAnchorRect={() => props.anchorRef?.current?.getBoundingClientRect() ?? null}
         onClose={props.onClose}
-        onSelect={(id) => {
-          if (id === CREATE_ID) {
-            props.onClose()
-            setCreateOpen(true)
-            return
-          }
-          props.onPick(id as WorkspaceId)
-        }}
-      />
-      <CreateProjectDialog
-        open={createOpen}
-        service={service}
-        onClose={() => { setCreateOpen(false) }}
-        onCreated={workspace => { props.onPick(workspace.workspaceId) }}
+        onSelect={id => { props.onPick(id as WorkspaceId) }}
       />
     </>
   )

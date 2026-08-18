@@ -117,7 +117,6 @@ window.__ModuleLoader__.load({
 		//#endregion
 		//#region src/client/index.tsx
 		const CHANNEL = "/story-studio";
-		const CREATE_ID = "story-studio:create";
 		function QNovelSettingsRow({ readRoot, chooseRoot }) {
 			const [root, setRoot] = (0, react.useState)("");
 			const [busy, setBusy] = (0, react.useState)(false);
@@ -321,7 +320,7 @@ window.__ModuleLoader__.load({
 							className: "storyStudioDialogIdentity",
 							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 								className: "storyStudioDialogMark",
-								children: "SS"
+								children: "Q"
 							}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h2", {
 								className: "storyStudioDialogTitle",
 								children: "新建作品"
@@ -427,7 +426,6 @@ window.__ModuleLoader__.load({
 		}
 		function StoryProjectPicker(props) {
 			const { service } = props;
-			const [createOpen, setCreateOpen] = (0, react.useState)(false);
 			const [projectRoot, setProjectRoot] = (0, react.useState)("");
 			const workspaces = props.useWorkspaces((state) => state.items);
 			(0, react.useEffect)(() => {
@@ -440,41 +438,22 @@ window.__ModuleLoader__.load({
 				label: project.title,
 				icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconFolderClose16, { size: 16 })
 			}));
-			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Menu, {
-				open: props.open && !createOpen,
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(react_jsx_runtime.Fragment, { children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Menu, {
+				open: props.open,
 				anchor: null,
 				items: items.length === 0 ? [{
 					type: "label",
 					id: "empty",
 					text: "还没有作品"
 				}] : items,
-				footer: [{
-					id: CREATE_ID,
-					label: "新建作品",
-					icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconPlusOutline16, { size: 16 })
-				}],
 				selectedId: props.selectedId,
 				portal: true,
 				getAnchorRect: () => props.anchorRef?.current?.getBoundingClientRect() ?? null,
 				onClose: props.onClose,
 				onSelect: (id) => {
-					if (id === CREATE_ID) {
-						props.onClose();
-						setCreateOpen(true);
-						return;
-					}
 					props.onPick(id);
 				}
-			}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(CreateProjectDialog, {
-				open: createOpen,
-				service,
-				onClose: () => {
-					setCreateOpen(false);
-				},
-				onCreated: (workspace) => {
-					props.onPick(workspace.workspaceId);
-				}
-			})] });
+			}) });
 		}
 		function CreateProjectAction(props) {
 			const [open, setOpen] = (0, react.useState)(false);
