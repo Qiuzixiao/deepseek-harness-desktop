@@ -1,5 +1,8 @@
 # Story Studio's product layer. Third-party code is pinned in package.json and
 # shipped inside the desktop installer; no runtime download is performed.
+- id: desktop-shell
+  config:
+    mode: advanced
 - insert:
     - id: story-studio-workbench
       name: dsh-product-story-studio

@@ -374,15 +374,22 @@
       React.useEffect(() => { const l = () => set((v) => v + 1); ui.listeners.add(l); return () => { ui.listeners.delete(l) } }, [])
       return ui
     }
-    const bridgeFor = (sessionId) => {
-      if (typeof window === 'undefined') return null
-      const b = window.__DSH_CONV_BRIDGE__
-      return (b && sessionId !== null && sessionId !== undefined && b[sessionId] !== undefined) ? b[sessionId] : null
+    // ui-conversation owns the active-view store and deliberately does not
+    // expose it as a browser global. Use its rendered tab controls instead of
+    // depending on a bridge that is not part of the DSH contract.
+    const clickConversationTab = (label) => {
+      if (typeof document === 'undefined') return false
+      const tabs = document.querySelectorAll('[role="tab"]')
+      for (const tab of tabs) {
+        if (tab.textContent?.trim() === label && typeof tab.click === 'function') {
+          tab.click()
+          return true
+        }
+      }
+      return false
     }
-    const switchToEditor = () => {
-      const b = bridgeFor(ui.sessionId)
-      if (b !== null && typeof b.setView === 'function') b.setView('workbench.editor')
-    }
+    const switchToEditor = () => { clickConversationTab(tFallback('view.editor')) }
+    const switchToChat = () => { clickConversationTab(tFallback('view.chat') === 'view.chat' ? '对话' : tFallback('view.chat')) }
 
     // ---- theme tracking: monaco (vs ↔ vs-dark) and chrome follow the DSH theme ----
     const isDarkTheme = () => typeof document !== 'undefined' && document.body.hasAttribute('data-ds-dark-theme')
@@ -646,6 +653,14 @@
         return () => { disposed = true }
       }, [u.sessionId])
 
+      // Agent file operations happen outside this browser component. Keep the
+      // root and every expanded directory fresh so newly-created files appear
+      // without requiring the user to collapse and reopen the tree.
+      React.useEffect(() => {
+        const timer = setInterval(() => { void refreshTree() }, 1500)
+        return () => { clearInterval(timer) }
+      }, [u.sessionId])
+
       const toggleDir = (path) => {
         const trr = ui.tree
         if (trr === null) return
@@ -842,7 +857,10 @@
         for (const tb of u.tabs) {
           const content = u.contents.get(tb.path)
           if (content !== undefined && !u.models.has(tb.path)) {
-            const uri = u.monaco.Uri.parse('file:///' + tb.path.replace(/\\/g, '/'))
+            // Uri.file preserves the authority/path boundary for absolute
+            // workspace paths (file:///Users/...), unlike concatenating a
+            // slash to an already absolute path (file:////Users/...).
+            const uri = u.monaco.Uri.file(tb.path)
             const model = u.monaco.editor.createModel(content, tb.lang, uri)
             u.models.set(tb.path, model)
             u.contents.delete(tb.path)
@@ -860,13 +878,21 @@
         if (changed) emit()
       }, [u.monacoState, u.tabs, u.activePath])
 
+      // The conversation view can be selected after the file request finishes.
+      // Re-bind the active model whenever this view becomes visible so a
+      // previously loaded file cannot leave an empty editor surface.
+      React.useEffect(() => {
+        if (u.monacoState !== 'ready' || u.editor === null || u.activePath === null) return
+        const model = u.models.get(u.activePath)
+        if (model !== undefined && u.editor.getModel() !== model) u.editor.setModel(model)
+      }, [u.monacoState, u.activePath, u.tabs])
+
       const errorText = (code) => {
         if (code === 'too-large') return t('error.too-large')
         if (code === 'not-text') return t('error.not-text')
         if (code === 'not-found') return t('error.not-found')
         return t('error.loading') + ' (' + code + ')'
       }
-      const bridge = bridgeFor(sessionId)
       const activeTab = u.tabs.find((tb) => tb.path === u.activePath) || null
       const previewOn = u.preview === true && activeTab !== null && activeTab.status === 'ready' && isMarkdown(activeTab.name)
       const mdText = (path) => {
@@ -908,12 +934,10 @@
                   children: (previewOn ? t('view.edit') : t('view.preview'))
                 })
               : null,
-            bridge !== null
-              ? React.createElement('button', { type: 'button', className: 'wbx-back', title: t('view.back'), onClick: () => bridge.setView('chat'), children: [
+            React.createElement('button', { type: 'button', className: 'wbx-back', title: t('view.back'), onClick: switchToChat, children: [
                   React.createElement('span', { className: 'wb-codicon wb-codicon-comment-discussion' }),
                   React.createElement('span', { children: t('view.back') })
                 ] })
-              : null
           ] }),
           u.banner !== null
             ? React.createElement('div', { className: 'wbx-banner wbx-banner-' + u.banner.kind, children: [

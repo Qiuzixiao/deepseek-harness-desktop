@@ -117,6 +117,11 @@ describe('desktop profile composition', () => {
 
     const prepared = prepareDesktopProfile(undefined, home, 'darwin', STORY_STUDIO_PROFILE_NAME)
     const rows = composeEntries([prepared.patches])
+    expect(prepared.mode).toBe('advanced')
+    expect(rows.find(row => row.id === 'desktop-shell')).toEqual(expect.objectContaining({
+      config: expect.objectContaining({ mode: 'advanced' }),
+    }))
+    expect(rows.find(row => row.id === 'ui-layout')?.disabled).toBe(true)
     expect(rows).toContainEqual({
       id: 'drop-to-path',
       name: '@dsh-external/dsh-drop-to-path',

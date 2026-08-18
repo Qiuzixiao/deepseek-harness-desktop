@@ -383,10 +383,18 @@ export function prepareDesktopProfile(
     dshHome: home,
     ...rowConfig(settings),
   } as SettingsFileConfig)
-  const mode = readDesktopShellMode(settingsConfig)
+  const configuredMode = readDesktopShellMode(settingsConfig)
+  // Story Studio owns the authoring workbench and therefore always uses the
+  // desktop-owned Advanced Shell. The ordinary desktop profile keeps the
+  // upstream compatibility client unchanged.
+  const mode = profileName === STORY_STUDIO_PROFILE_NAME ? 'advanced' : configuredMode
   patches.push({
     id: 'settings',
     config: settingsConfig,
+  })
+  patches.push({
+    id: 'desktop-shell',
+    config: { mode },
   })
   if (mode === 'advanced') {
     for (const [id, packageName] of [
