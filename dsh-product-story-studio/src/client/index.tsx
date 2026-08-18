@@ -3,7 +3,7 @@ import type { ClientContext, WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import {
-  Button, IconFolderClose16, IconPlusOutline16, Menu, Modal,
+  IconCloseOutline16, IconFolderClose16, IconPlusOutline16, Menu, Modal,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { styles } from './styles.ts'
@@ -137,40 +137,75 @@ function CreateProjectDialog({ open, service, onClose, onCreated }: {
       onClose={() => { if (!busy) onClose() }}
       title="新建作品"
       closeLabel="关闭"
-      description="输入作品名称后，Story Studio 会自动建立完整的创作目录。"
-      footer={(
-        <>
-          <Button variant="ghost" disabled={busy} onClick={onClose}>取消</Button>
-          <Button variant="primary" disabled={busy || name.trim() === ''} onClick={() => { void submit() }}>
-            {busy ? '正在创建...' : '创建作品'}
-          </Button>
-        </>
-      )}
+      className="storyStudioDialog"
+      headless
     >
-      <div className="storyStudioForm">
-        <label className="storyStudioField">
-          <span className="storyStudioLabel">作品名称</span>
-          <input
-            ref={inputRef}
-            className="storyStudioInput"
-            value={name}
-            maxLength={80}
-            placeholder="例如：父子同心"
-            disabled={busy}
-            onChange={event => { setName(event.target.value) }}
-            onKeyDown={event => {
-              if (event.key === 'Enter') {
-                event.preventDefault()
-                void submit()
-              }
-            }}
-          />
-        </label>
-        <div className="storyStudioPath">
-          <IconFolderClose16 size={16} />
-          <span>{projectRoot === '' ? '正在读取作品保存位置...' : projectRoot}</span>
+      <div className="storyStudioDialogHeader">
+        <div className="storyStudioDialogIdentity">
+          <span className="storyStudioDialogMark">SS</span>
+          <div>
+            <h2 className="storyStudioDialogTitle">新建作品</h2>
+            <p className="storyStudioDialogSubtitle">从一个名字开始，自动建立完整的创作空间</p>
+          </div>
         </div>
-        {error !== undefined && <p className="storyStudioError" role="alert">{error}</p>}
+        <button
+          type="button"
+          className="storyStudioDialogClose"
+          aria-label="关闭"
+          disabled={busy}
+          onClick={onClose}
+        >
+          <IconCloseOutline16 size={16} />
+        </button>
+      </div>
+
+      <div className="storyStudioDialogBody">
+        <div className="storyStudioForm">
+          <label className="storyStudioField">
+            <span className="storyStudioLabel">作品名称</span>
+            <input
+              ref={inputRef}
+              className="storyStudioInput"
+              value={name}
+              maxLength={80}
+              placeholder="例如：父子同心"
+              disabled={busy}
+              onChange={event => { setName(event.target.value) }}
+              onKeyDown={event => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  void submit()
+                }
+              }}
+            />
+            <span className="storyStudioFieldHint">之后可以在项目中继续调整剧名和创作方向</span>
+          </label>
+
+          <div className="storyStudioLocation">
+            <div className="storyStudioLocationIcon"><IconFolderClose16 size={18} /></div>
+            <div className="storyStudioLocationText">
+              <span className="storyStudioLocationLabel">保存位置</span>
+              <span className="storyStudioLocationPath">
+                {projectRoot === '' ? '正在读取作品保存位置...' : projectRoot}
+              </span>
+            </div>
+            <span className="storyStudioLocationTag">自动管理</span>
+          </div>
+          {error !== undefined && <p className="storyStudioError" role="alert">{error}</p>}
+        </div>
+      </div>
+
+      <div className="storyStudioDialogFooter">
+        <button type="button" className="storyStudioDialogCancel" disabled={busy} onClick={onClose}>取消</button>
+        <button
+          type="button"
+          className="storyStudioDialogSubmit"
+          disabled={busy || name.trim() === ''}
+          onClick={() => { void submit() }}
+        >
+          <IconPlusOutline16 size={15} />
+          {busy ? '正在创建...' : '创建作品'}
+        </button>
       </div>
     </Modal>
   )
