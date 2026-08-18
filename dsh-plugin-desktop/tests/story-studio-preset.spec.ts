@@ -17,6 +17,11 @@ function skillFrontmatter(name: string): Record<string, unknown> {
 }
 
 describe('Story Studio preset', () => {
+  it('uses the QNovel Beta name in the desktop conversation header', () => {
+    const preset = parse(readFileSync(join(presetRoot, 'preset.yml'), 'utf8')) as Record<string, unknown>
+    expect(preset.name).toBe('QNovel Beta')
+  })
+
   it('stays derived from the installed DSH standard preset', () => {
     execFileSync(process.execPath, [join(packageRoot, 'scripts', 'generate-story-studio-preset.mjs'), '--check'])
   })
