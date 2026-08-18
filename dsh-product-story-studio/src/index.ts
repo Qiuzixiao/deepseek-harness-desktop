@@ -3,6 +3,7 @@ import Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import { createStoryProject, resolveProjectRoot, type StoryProjectConfig } from './project.ts'
 import * as workbench from './workbench-host.ts'
+import { createProjectFileRpcHandler } from './rpc/ProjectFileRpc.ts'
 
 export const name = 'dsh-product-story-studio'
 export const inject = ['connection', 'webServer', 'fs', 'sandboxPolicy', 'sessions']
@@ -57,9 +58,20 @@ export function createStoryStudioRpcHandler(config: StoryProjectConfig = {}): St
 
 export function apply(ctx: Context, config: StoryProjectConfig = {}): void {
   workbench.apply(ctx)
+
+  // 注册项目管理 RPC
   ctx.effect(
     () => ctx.connection.rpc.handle('/story-studio', createStoryStudioRpcHandler(config), { authority: 'loopback' }),
     'story-studio: project rpc',
+  )
+
+  // 注册文件操作 RPC
+  ctx.effect(
+    () => {
+      const projectRoot = resolveProjectRoot(config)
+      return ctx.connection.rpc.handle('/story-studio-files', createProjectFileRpcHandler(ctx, projectRoot), { authority: 'loopback' })
+    },
+    'story-studio: file rpc',
   )
 }
 

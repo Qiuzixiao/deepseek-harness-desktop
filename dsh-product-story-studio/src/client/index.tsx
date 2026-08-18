@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { createRoot } from 'react-dom/client'
 import type { ClientContext, WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -8,6 +9,9 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { styles } from './styles.ts'
+import { StoryStudioWorkbench, workbenchStyles } from './workbench/index.js'
+import { StoryStudioRouter } from './StoryStudioRouter.js'
+import { storyStudioAppStyles } from './StoryStudioApp.js'
 
 const CHANNEL = '/story-studio'
 const CREATE_ID = 'story-studio:create'
@@ -64,15 +68,7 @@ function StoryStudioShellOverlay({ service, onCreated }: {
   const [open, setOpen] = useState(false)
   return (
     <>
-      <div className="storyStudioProductBadge" data-story-studio-overlay>
-        <span className="storyStudioProductMark">SS</span>
-        <span className="storyStudioProductName">Story Studio</span>
-        <span className="storyStudioProductState">作品工作台</span>
-        <button type="button" className="storyStudioProductAction" onClick={() => { setOpen(true) }}>
-          <IconPlusOutline16 size={14} />
-          新建作品
-        </button>
-      </div>
+      {/* 旧UI已移除，保留创建项目对话框功能 */}
       <CreateProjectDialog
         open={open}
         service={service}
@@ -89,7 +85,24 @@ function installStyles(): () => void {
   element.dataset.storyStudio = ''
   element.textContent = styles
   if (current === null) document.head.appendChild(element)
-  return () => { element.remove() }
+
+  const wbCurrent = document.querySelector<HTMLStyleElement>('style[data-story-studio-workbench]')
+  const wbElement = wbCurrent ?? document.createElement('style')
+  wbElement.dataset.storyStudioWorkbench = ''
+  wbElement.textContent = workbenchStyles
+  if (wbCurrent === null) document.head.appendChild(wbElement)
+
+  const appCurrent = document.querySelector<HTMLStyleElement>('style[data-story-studio-app]')
+  const appElement = appCurrent ?? document.createElement('style')
+  appElement.dataset.storyStudioApp = ''
+  appElement.textContent = storyStudioAppStyles
+  if (appCurrent === null) document.head.appendChild(appElement)
+
+  return () => {
+    element.remove()
+    wbElement.remove()
+    appElement.remove()
+  }
 }
 
 function projectPathWithin(root: string, path: string): boolean {
@@ -304,6 +317,82 @@ function unwrap<T>(result: unknown): T {
 export const name = 'dsh-product-story-studio'
 export const inject = ['slots', 'workspaces', 'connection']
 
+declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface SlotMap {
+    'conversation.session': { kind: 'single'; scope: 'session'; owner: ConversationSessionOwnerProps }
+  }
+}
+
+interface ConversationSessionOwnerProps {
+  sessionId: string
+}
+
+/**
+ * Own the `conversation.session` slot only while the active session's `cwd`
+ * falls under the Story Studio deployment project root. `single` slots are
+ * exclusive at registration time and do not fall back on a `null` render
+ * (see `ui-slots`'s `register()`), so ownership must be created and disposed
+ * dynamically as the active session changes, handing the slot back to
+ * `ui-conversation`'s default implementation whenever no Story Studio
+ * session is active.
+ */
+export function bindStoryStudioSessionSlot(ctx: StoryStudioClientContext, service: ProjectService): void {
+  const sessions = ctx.get('sessions')
+  if (sessions?.list === undefined) return
+
+  let projectRoot: string | undefined
+  void service.describe().then(value => { projectRoot = value.projectRoot }).catch(() => {})
+
+  let owned: (() => void) | undefined
+  let ownedSessionId: string | undefined
+
+  const isStoryStudioSession = (cwd: string | undefined): boolean =>
+    projectRoot !== undefined && projectRoot !== '' && cwd !== undefined && cwd !== '' && projectPathWithin(projectRoot, cwd)
+
+  const reconcile = () => {
+    const snapshot = sessions.list.getSnapshot() as { current?: string; byId?: Record<string, { cwd?: string }> }
+    const currentId = snapshot.current
+    const cwd = currentId !== undefined ? snapshot.byId?.[currentId]?.cwd : undefined
+
+    console.log('[Story Studio] reconcile:', { currentId, cwd, projectRoot, ownedSessionId })
+
+    if (currentId !== undefined && currentId === ownedSessionId) return
+
+    if (owned !== undefined) {
+      console.log('[Story Studio] releasing slot ownership')
+      owned()
+      owned = undefined
+      ownedSessionId = undefined
+    }
+
+    if (currentId !== undefined && isStoryStudioSession(cwd)) {
+      console.log('[Story Studio] taking slot ownership')
+      owned = ctx.slots.inject('conversation.session', () => ctx.slots.register(
+        { name: 'conversation.session', priority: 100 },
+        () => <StoryStudioWorkbenchPlaceholder sessionId={currentId} />,
+      ))
+      ownedSessionId = currentId
+    }
+  }
+
+  ctx.effect(() => {
+    reconcile()
+    return sessions.list.subscribe(reconcile)
+  }, 'story-studio: conversation.session dynamic ownership')
+
+  ctx.effect(() => () => {
+    if (owned !== undefined) {
+      owned()
+      owned = undefined
+      ownedSessionId = undefined
+    }
+  }, 'story-studio: conversation.session ownership teardown')
+}
+
+function StoryStudioWorkbenchPlaceholder({ sessionId }: { sessionId: string }) {
+  return <StoryStudioWorkbench sessionId={sessionId} />
+}
+
 function mountWorkbench(ctx: StoryStudioClientContext): void {
   const sessions = ctx.get('sessions')
   const locale = ctx.get('locale')
@@ -333,7 +422,29 @@ function mountWorkbench(ctx: StoryStudioClientContext): void {
 
 export function apply(ctx: StoryStudioClientContext): void {
   ctx.effect(installStyles, 'story-studio: styles')
-  mountWorkbench(ctx)
+
+  // 渲染 Story Studio 应用界面
+  ctx.effect(() => {
+    const root = document.createElement('div')
+    root.id = 'story-studio-root'
+    document.body.appendChild(root)
+
+    // 将 ClientContext 暴露给 StoryStudioApp
+    ;(window as any).__dshClientContext = ctx
+
+    const reactRoot = createRoot(root)
+    reactRoot.render(<StoryStudioRouter />)
+    console.log('[Story Studio] App rendered')
+
+    return () => {
+      reactRoot.unmount()
+      root.remove()
+      delete (window as any).__dshClientContext
+    }
+  }, 'story-studio: render app')
+
+  // Don't mount workbench here - let StoryStudioRouter handle it
+  // mountWorkbench(ctx)
 
   const service: ProjectService = {
     describe: async () => unwrap<StoryStudioDescription>(await ctx.connection.rpc.call(CHANNEL, 'describe', {})),
@@ -344,6 +455,8 @@ export function apply(ctx: StoryStudioClientContext): void {
       return workspace
     },
   }
+
+  bindStoryStudioSessionSlot(ctx, service)
 
   ctx.slots.inject('conversation.hero.workspace', () => ctx.slots.register(
     { name: 'conversation.hero.workspace', priority: -200 },

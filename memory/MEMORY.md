@@ -1,0 +1,2 @@
+- [用中文回复](feedback_reply_in_chinese.md) — 用户要求以后所有回复都用中文
+- [Story Studio 进度快照](project_story_studio_progress.md) — feat/story-studio-foundation 分支当前阶段与未提交改动，2026-08-18

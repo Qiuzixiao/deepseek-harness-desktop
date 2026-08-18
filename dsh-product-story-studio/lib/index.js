@@ -1,5 +1,5 @@
 import Schema from "@deepseek-ai/schemastery";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, normalize, resolve, sep } from "node:path";
 import { stringify } from "yaml";
@@ -458,6 +458,108 @@ function apply$1(ctx) {
 	}), "dsh-workbench: /wb route");
 }
 //#endregion
+//#region src/rpc/ProjectFileRpc.ts
+function success$1(value) {
+	return {
+		ok: true,
+		value
+	};
+}
+function failure$1(error) {
+	return {
+		ok: false,
+		error: {
+			code: "internal",
+			message: error instanceof Error ? error.message : String(error),
+			details: {}
+		}
+	};
+}
+/**
+* 创建项目文件 RPC 处理器
+*/
+function createProjectFileRpcHandler(_ctx, projectRoot) {
+	return async (endpoint, payload) => {
+		try {
+			if (endpoint === "getFileTree") {
+				const files = await readdir(projectRoot, { withFileTypes: true });
+				const tree = [];
+				for (const file of files) {
+					if (file.name.startsWith(".")) continue;
+					const filePath = `${projectRoot}/${file.name}`;
+					const node = {
+						id: file.name,
+						name: file.name,
+						type: file.isDirectory() ? "folder" : "file",
+						path: filePath
+					};
+					if (file.isDirectory()) node.children = (await readdir(filePath, { withFileTypes: true })).filter((f) => !f.name.startsWith(".")).map((f) => ({
+						id: `${file.name}/${f.name}`,
+						name: f.name,
+						type: f.isDirectory() ? "folder" : "file",
+						path: `${filePath}/${f.name}`
+					}));
+					tree.push(node);
+				}
+				return success$1(tree);
+			}
+			if (endpoint === "readFile") {
+				const filePath = typeof payload === "string" ? payload : "";
+				return success$1({
+					path: filePath,
+					content: await readFile(filePath, "utf-8")
+				});
+			}
+			if (endpoint === "writeFile") {
+				const { filePath, content } = payload;
+				await writeFile(filePath, content, "utf-8");
+				return success$1(true);
+			}
+			if (endpoint === "createFile") {
+				const { filePath, content = "" } = payload;
+				try {
+					await stat(filePath);
+					throw new Error("文件已存在");
+				} catch {}
+				await writeFile(filePath, content, "utf-8");
+				return success$1(true);
+			}
+			if (endpoint === "createFolder") {
+				const { folderPath } = payload;
+				await mkdir(folderPath, { recursive: true });
+				return success$1(true);
+			}
+			if (endpoint === "deleteFile") {
+				const { filePath } = payload;
+				await unlink(filePath);
+				return success$1(true);
+			}
+			if (endpoint === "deleteFolder") {
+				const { folderPath } = payload;
+				await rm(folderPath, { recursive: true });
+				return success$1(true);
+			}
+			if (endpoint === "renameFile") {
+				const { oldPath, newPath } = payload;
+				await rename(oldPath, newPath);
+				return success$1(true);
+			}
+			if (endpoint === "fileExists") {
+				const filePath = typeof payload === "string" ? payload : "";
+				try {
+					await stat(filePath);
+					return success$1(true);
+				} catch {
+					return success$1(false);
+				}
+			}
+			throw new Error(`未知的文件操作：${endpoint}`);
+		} catch (error) {
+			return failure$1(error);
+		}
+	};
+}
+//#endregion
 //#region src/index.ts
 const name = "dsh-product-story-studio";
 const inject = [
@@ -498,6 +600,10 @@ function createStoryStudioRpcHandler(config = {}) {
 function apply(ctx, config = {}) {
 	apply$1(ctx);
 	ctx.effect(() => ctx.connection.rpc.handle("/story-studio", createStoryStudioRpcHandler(config), { authority: "loopback" }), "story-studio: project rpc");
+	ctx.effect(() => {
+		const projectRoot = resolveProjectRoot(config);
+		return ctx.connection.rpc.handle("/story-studio-files", createProjectFileRpcHandler(ctx, projectRoot), { authority: "loopback" });
+	}, "story-studio: file rpc");
 }
 //#endregion
 export { Config, apply, createStoryProject, createStoryStudioRpcHandler, inject, name, normalizeProjectName, projectDirectoryName, resolveProjectRoot };

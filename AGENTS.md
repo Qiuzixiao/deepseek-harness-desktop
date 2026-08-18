@@ -16,6 +16,24 @@ This repository owns the desktop product around an unmodified DeepSeek Harness c
 - Run type checking with `corepack yarn typecheck`.
 - Run the complete headless gate with `corepack yarn check`.
 - Run upstream operations through the root scripts, such as `corepack yarn upstream:build`.
+- Run a single test inside `dsh-plugin-desktop` with `yarn workspace dsh-plugin-desktop exec vitest run <path-to-test>` (or `vitest run -t "<name>"` for a name filter).
+- `dsh-plugin-desktop` also exposes targeted verification scripts beyond `test`/`typecheck`: `verify:closure`, `verify:cli`, `verify:loader`, `verify:profile`, and `verify:licenses` (run via `yarn workspace dsh-plugin-desktop run <script>`). Its own `check` script runs build, typecheck, test, and all `verify:*` scripts in sequence.
+
+## Architecture
+
+DSH Desktop is a thin Electron host around the official DSH Host. Electron's main process starts the Host as a Cordis generation; the Host serves an ordinary Web UI over a loopback HTTP/WebSocket carrier. There is no separate renderer IPC plugin system, and no Electron APIs are exposed to the page.
+
+Boot sequence: Electron acquires the single-instance lock and reads Desktop's private profile/mode state → the Launcher resolves the active profile (without rewriting user profiles just to list them) → the Host Cordis root starts Loader entries, registering Desktop services before third-party plugins can read them → official `dsh-base`, `dsh-web-app`, and the profile's third-party bundles form the Web carrier → the Host binds a loopback port and Electron creates a `BrowserWindow` on that same origin → only after the Web surface loads does Electron create the tray and commit the profile's last-known-good state. Any profile or mode switch disposes the current generation and starts a new one; service references, window objects, and subprocess handles must never be cached across generations.
+
+Two public Cordis services form the supported third-party integration contract (see `dsh-plugin-desktop/docs/plugin-services.md`):
+- `desktopProfiles` (`dsh-plugin-desktop/profile-service`) — `current` (immutable per generation), `list()` (read-only), `select(name)` (persists a pending target and restarts).
+- `desktopPnpm` (`dsh-plugin-desktop/pnpm`) — `run()` for raw pnpm, `runPlugin()` for DSH-CLI-mediated plugin add/remove/update with profile reconciliation. Only one package operation runs per generation.
+
+`desktopRuntime` and `desktopPnpmBootstrap` are Launcher-private/Desktop-internal and are not a third-party API surface.
+
+Compatibility mode runs the upstream default Web Client unmodified (no Desktop layout/root/sidebar/conversation overrides). Advanced mode installs Desktop-owned layout, frame, and native materials via profile composition, while still respecting upstream and third-party slots.
+
+Packaged builds use Electron Builder with `app.asar`; native/physical-path dependencies (pnpm, node-pty, Windows ACL) live in `app.asar.unpacked`, and profile fallbacks must never symlink into unresolvable virtual ASAR paths.
 
 - `deepseek-harness/` is a pinned upstream Git submodule. Never edit files inside it from a desktop feature branch.
 - `dsh-plugin-desktop/` owns the Cordis Host and Client faces, Electron bootstrap, packaging, and release tests.
