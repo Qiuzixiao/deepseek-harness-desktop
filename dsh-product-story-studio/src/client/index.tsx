@@ -413,7 +413,15 @@ function mountWorkbench(ctx: StoryStudioClientContext): void {
   }
   const mount = () => {
     if (typeof window !== 'undefined' && typeof window.__DSH_WORKBENCH__?.mount === 'function') {
-      window.__DSH_WORKBENCH__.mount({ slots: ctx.slots, locale, NS: 'workbench', React, layout, useSessions })
+      window.__DSH_WORKBENCH__.mount({
+        slots: ctx.slots,
+        locale,
+        NS: 'workbench',
+        React,
+        layout,
+        useSessions,
+        slotInject: (key: string, callback: () => unknown) => ctx.slots.inject(key as never, callback as never),
+      })
     }
   }
   let script = document.querySelector<HTMLScriptElement>('script[data-dsh-workbench-bundle]')

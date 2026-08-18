@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createStoryStudioRpcHandler } from '../src/index.ts'
-import { createStoryProject, ensureProjectRoot, normalizeProjectName, resolveProjectRoot } from '../src/project.ts'
+import { createStoryProject, ensureProjectRoot, normalizeProjectName, projectId, resolveProjectRoot } from '../src/project.ts'
 
 describe('Story Studio project creation', () => {
   it('creates a complete project below the configured global root from only a name', async () => {
@@ -12,7 +12,11 @@ describe('Story Studio project creation', () => {
     const result = await createStoryProject({ projectRoot: root }, '父子同心')
 
     expect(result).toEqual({ name: '父子同心', path: join(root, '父子同心'), projectRoot: root })
-    expect(await readFile(join(result.path, '项目说明.md'), 'utf8')).toContain('## 原始需求')
+    const brief = await readFile(join(result.path, '项目说明.md'), 'utf8')
+    expect(brief).toContain('## 原始需求')
+    expect(brief).toContain('## 冲突')
+    expect(brief).toContain('## 必须保留内容')
+    expect(brief).toContain('## 禁止内容')
     expect(await readFile(join(result.path, '项目配置.yml'), 'utf8')).toContain('title: 父子同心')
     expect(await readFile(join(result.path, '故事设定', '时间线.md'), 'utf8')).toContain('时间线')
     await expect(access(join(result.path, '.qnovel', '缓存'))).resolves.toBeUndefined()
@@ -31,6 +35,11 @@ describe('Story Studio project creation', () => {
     expect(resolveProjectRoot({}, '/Users/writer', { QNOVEL_PROJECTS_ROOT: '/Volumes/QNovel' })).toBe('/Volumes/QNovel')
     expect(resolveProjectRoot({}, '/Users/writer', { STORY_STUDIO_PROJECTS_ROOT: '/Volumes/Writing' }))
       .toBe('/Volumes/Writing')
+  })
+
+  it('uses a stable identifier for Chinese project names', () => {
+    expect(projectId('1998父子局')).toBe('1998')
+    expect(projectId('父子同心')).toMatch(/^story-[a-z0-9]+$/u)
   })
 })
 

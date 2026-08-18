@@ -46,7 +46,7 @@ const initialFiles = (name: string): ReadonlyArray<readonly [string, string]> =>
     status: 'development',
     currentDeliverable: 'brief',
   })],
-  ['项目说明.md', `# ${name}\n\n## 原始需求\n\n## 已确认事实\n\n## Agent 假设\n\n## 待确认问题\n\n## 本轮交付\n\n## 参考材料边界\n`],
+  ['项目说明.md', `# ${name}\n\n## 原始需求\n\n## 已确认事实\n\n## Agent 假设\n\n## 待确认问题\n\n## 冲突\n\n## 必须保留内容\n\n## 禁止内容\n\n## 本轮交付\n\n## 参考材料边界\n`],
   ['故事设定/故事前提.md', '# 故事前提\n'],
   ['故事设定/世界规则.md', '# 世界规则\n'],
   ['故事设定/时间线.md', '# 时间线\n'],

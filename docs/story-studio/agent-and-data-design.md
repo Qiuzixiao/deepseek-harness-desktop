@@ -46,7 +46,7 @@ Agent 先把输入整理为五组信息：
 - 不重复询问用户已经明确的事实；
 - 专业输入足够完成本轮交付时直接执行；
 - 用户暂不决定时，用推荐假设推进并标记为 `待确认`；
-- 事实与假设必须进入 `brief.md`，不能只留在聊天记录。
+- 事实与假设必须进入 `项目说明.md`，不能只留在聊天记录；`brief.md` 只作为旧项目兼容读取路径。
 
 ## 4. Skills 职责
 
@@ -56,7 +56,7 @@ Agent 先把输入整理为五组信息：
 
 ### 4.2 `story-project`
 
-负责创建和检查项目结构、维护 `story.yml`、汇总状态、定位产物。可携带确定性脚本：
+负责创建和检查项目结构、维护 `项目配置.yml`、汇总状态、定位产物。可携带确定性脚本：
 
 - `init`：建立目录和最小文件；
 - `validate`：验证 schema、路径、编号和必需引用；
@@ -130,44 +130,46 @@ Workflow 使用限制：
 
 ```text
 <作品目录>/
-  story.yml
-  brief.md
-  bible/
-    premise.md
-    world.md
-    timeline.md
-    style.md
-    characters/
+  项目配置.yml
+  项目说明.md
+  故事设定/
+    故事前提.md
+    世界规则.md
+    时间线.md
+    写作风格.md
+    人物/
       <角色-id>.md
-  references/
-    index.md
-    source/
-    analyses/
-  outline/
-    master.md
-    seasons/
-      S01.md
-      S01-E001.md
-    volumes/
-      V01.md
-      V01-C001.md
-  drafts/
-    scripts/
-      S01-E001.md
-    chapters/
-      V01-C001.md
-  reviews/
-    continuity.md
-    revisions/
-  exports/
-  .story-studio/
-    cache/
-    indexes/
+  参考资料/
+    参考资料索引.md
+    原始资料/
+    分析/
+  故事大纲/
+    季纲/
+      第01季.md
+    分集大纲/
+      第01季-第01集.md
+    卷纲/
+      第01卷.md
+    章节大纲/
+      第01卷-第001章.md
+  正文草稿/
+    短剧/
+      第01季-第01集.md
+    小说/
+      第01卷-第001章.md
+  审校记录/
+    修订/
+  导出/
+  .qnovel/
+    缓存/
+    索引/
 ```
+
+已有旧项目仍可使用 `story.yml`、`brief.md`、`bible/`、`references/`、`outline/`、`drafts/` 和 `reviews/` 读取；新项目不再写入这些英文路径，也不自动重命名旧项目。
 
 短剧只要求 seasons/scripts，小说只要求 volumes/chapters。公共 Bible、references 和 reviews 不复制。
 
-### 6.1 `story.yml`
+### 6.1 `项目配置.yml`
 
 最小字段建议：
 
@@ -193,7 +195,7 @@ genres:
 
 结构化字段只保存稳定事实和状态；长段创作内容写入 Markdown。字段扩展必须保持未知字段可保留，schema 升级通过显式 `schemaVersion` 和迁移完成。
 
-### 6.2 `brief.md`
+### 6.2 `项目说明.md`
 
 必须包含：
 
@@ -211,7 +213,7 @@ genres:
 
 ### 6.4 参考索引
 
-`references/index.md` 记录原文件名、外部路径或项目副本、文件类型、导入时间、使用许可说明、解析状态和分析文件。分析引用必须尽量包含页码、章节、场次或可定位片段。
+`参考资料/参考资料索引.md` 记录原文件名、外部路径或项目副本、文件类型、导入时间、使用许可说明、解析状态和分析文件。分析引用必须尽量包含页码、章节、场次或可定位片段。
 
 ### 6.5 生成状态
 

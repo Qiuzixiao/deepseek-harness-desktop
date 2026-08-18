@@ -31,19 +31,24 @@ const MIME = {
   '.png': 'image/png'
 }
 
-/** Resolve only a live session workspace; null is the deliberate empty state. */
-export function resolveWorkbenchSessionRoot(sessionId, sessions, sandboxPolicy) {
+/** Resolve the complete policy for a live session; null is the deliberate empty state. */
+export function resolveWorkbenchSessionPolicy(sessionId, sessions, sandboxPolicy) {
   if (sessionId === null || sessionId === undefined || sessionId === '') return null
   try {
     const session = sessions.get(sessionId)
     if (session === undefined || session.header === null || typeof session.header.cwd !== 'string' || session.header.cwd === '') return null
     const policy = sandboxPolicy.resolve({ session })
-    return policy !== null && typeof policy.workspaceRoot === 'string' && policy.workspaceRoot !== ''
-      ? policy.workspaceRoot
+    return policy !== null && policy !== undefined && typeof policy.workspaceRoot === 'string' && policy.workspaceRoot !== ''
+      ? policy
       : null
   } catch (e) {
     return null
   }
+}
+
+/** Resolve only a live session workspace for the Explorer root. */
+export function resolveWorkbenchSessionRoot(sessionId, sessions, sandboxPolicy) {
+  return resolveWorkbenchSessionPolicy(sessionId, sessions, sandboxPolicy)?.workspaceRoot ?? null
 }
 
 export function apply(ctx) {
@@ -58,8 +63,7 @@ export function apply(ctx) {
   // sandboxPolicy.resolve({}) exposes the Host process/repository directory and
   // makes the explorer appear to be rooted at dsh-plugin-desktop.
   const policyOf = (sessionId) => {
-    const root = resolveWorkbenchSessionRoot(sessionId, sessions, sandboxPolicy)
-    return root === null ? null : { workspaceRoot: root }
+    return resolveWorkbenchSessionPolicy(sessionId, sessions, sandboxPolicy)
   }
   const rootFor = (sessionId) => {
     const policy = policyOf(sessionId)
@@ -177,8 +181,12 @@ export function apply(ctx) {
       if (typeof name !== 'string' || name.trim() === '' || name === '.' || name === '..' || /[/\\]/.test(name)) {
         return { ok: false, error: 'bad-name' }
       }
-      try { await resolveInside(parent, sessionId) } catch (e) { return { ok: false, error: 'outside-workspace' } }
-      const target = join(parent, name)
+      let target
+      try {
+        target = await resolveInside(join(String(parent), name), sessionId)
+      } catch (e) {
+        return { ok: false, error: e.message === 'path-outside-workspace' ? 'outside-workspace' : textOf(e) }
+      }
       try {
         await mkdir(target)
         return { ok: true, path: target }

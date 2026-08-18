@@ -25,5 +25,5 @@ interface RpcFailure {
 export type StoryStudioRpcHandler = (endpoint: string, payload: unknown) => Promise<RpcSuccess<unknown> | RpcFailure>;
 export declare function createStoryStudioRpcHandler(config?: StoryProjectConfig, readConfig?: () => StoryProjectConfig): StoryStudioRpcHandler;
 export declare function apply(ctx: Context, config?: StoryProjectConfig): void;
-export { createStoryProject, ensureProjectRoot, normalizeProjectName, projectDirectoryName, resolveProjectRoot, } from './project.ts';
+export { createStoryProject, ensureProjectRoot, normalizeProjectName, projectDirectoryName, projectId, resolveProjectRoot, } from './project.ts';
 export type { CreatedStoryProject, StoryProjectConfig, StoryProjectDescription } from './project.ts';

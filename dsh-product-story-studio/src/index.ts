@@ -110,6 +110,7 @@ export {
   ensureProjectRoot,
   normalizeProjectName,
   projectDirectoryName,
+  projectId,
   resolveProjectRoot,
 } from './project.ts'
 export type { CreatedStoryProject, StoryProjectConfig, StoryProjectDescription } from './project.ts'

@@ -50,6 +50,17 @@ const writeIfMissing = (filename, content) => {
   if (!existsSync(filename)) writeFileSync(filename, content)
 }
 
+function stableProjectId(title) {
+  const ascii = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  if (ascii) return ascii
+  let hash = 2166136261
+  for (const char of title) {
+    hash ^= char.codePointAt(0) ?? 0
+    hash = Math.imul(hash, 16777619)
+  }
+  return `story-${(hash >>> 0).toString(36)}`
+}
+
 function init() {
   if (existsSync(projectConfigPath) || existsSync(legacyStoryPath)) throw new Error(`project already exists: ${root}`)
   const title = option('--title')
@@ -58,7 +69,7 @@ function init() {
   if (!mediumValues.has(medium)) throw new Error(`invalid --medium: ${medium}`)
   mkdirSync(root, { recursive: true })
   for (const relative of requiredDirectories) mkdirSync(join(root, relative), { recursive: true })
-  const id = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `story-${Date.now()}`
+  const id = stableProjectId(title)
   writeFileSync(projectConfigPath, stringify({
     schemaVersion: 1,
     id,
@@ -68,7 +79,7 @@ function init() {
     status: 'development',
     currentDeliverable: 'brief',
   }))
-  writeIfMissing(join(root, '项目说明.md'), `# ${title}\n\n## 原始需求\n\n## 已确认事实\n\n## Agent 假设\n\n## 待确认问题\n\n## 本轮交付\n\n## 参考材料边界\n`)
+  writeIfMissing(join(root, '项目说明.md'), `# ${title}\n\n## 原始需求\n\n## 已确认事实\n\n## Agent 假设\n\n## 待确认问题\n\n## 冲突\n\n## 必须保留内容\n\n## 禁止内容\n\n## 本轮交付\n\n## 参考材料边界\n`)
   writeIfMissing(join(root, '故事设定/故事前提.md'), '# 故事前提\n')
   writeIfMissing(join(root, '故事设定/世界规则.md'), '# 世界规则\n')
   writeIfMissing(join(root, '故事设定/时间线.md'), '# 时间线\n')
@@ -82,7 +93,7 @@ function readStory() {
   if (!existsSync(path)) throw new Error(`missing 项目配置.yml (or legacy story.yml): ${root}`)
   const story = parse(readFileSync(path, 'utf8'))
   if (!story || typeof story !== 'object' || Array.isArray(story)) throw new Error('项目配置.yml must contain a map')
-  if (story.schemaVersion !== 1) throw new Error('项目配置.yml schemaVersion must be 1')
+  if (story.schemaVersion !== undefined && story.schemaVersion !== 1) throw new Error('项目配置.yml schemaVersion must be 1')
   if (typeof story.id !== 'string' || typeof story.title !== 'string') throw new Error('项目配置.yml requires id and title')
   if (!mediumValues.has(story.medium)) throw new Error('项目配置.yml medium is invalid')
   return { story, legacy: path === legacyStoryPath }

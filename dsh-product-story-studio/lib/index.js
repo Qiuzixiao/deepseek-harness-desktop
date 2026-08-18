@@ -50,7 +50,7 @@ const initialFiles = (name) => [
 		status: "development",
 		currentDeliverable: "brief"
 	})],
-	["项目说明.md", `# ${name}\n\n## 原始需求\n\n## 已确认事实\n\n## Agent 假设\n\n## 待确认问题\n\n## 本轮交付\n\n## 参考材料边界\n`],
+	["项目说明.md", `# ${name}\n\n## 原始需求\n\n## 已确认事实\n\n## Agent 假设\n\n## 待确认问题\n\n## 冲突\n\n## 必须保留内容\n\n## 禁止内容\n\n## 本轮交付\n\n## 参考材料边界\n`],
 	["故事设定/故事前提.md", "# 故事前提\n"],
 	["故事设定/世界规则.md", "# 世界规则\n"],
 	["故事设定/时间线.md", "# 时间线\n"],
@@ -132,14 +132,14 @@ const MIME = {
 	".html": "text/html; charset=utf-8",
 	".png": "image/png"
 };
-/** Resolve only a live session workspace; null is the deliberate empty state. */
-function resolveWorkbenchSessionRoot(sessionId, sessions, sandboxPolicy) {
+/** Resolve the complete policy for a live session; null is the deliberate empty state. */
+function resolveWorkbenchSessionPolicy(sessionId, sessions, sandboxPolicy) {
 	if (sessionId === null || sessionId === void 0 || sessionId === "") return null;
 	try {
 		const session = sessions.get(sessionId);
 		if (session === void 0 || session.header === null || typeof session.header.cwd !== "string" || session.header.cwd === "") return null;
 		const policy = sandboxPolicy.resolve({ session });
-		return policy !== null && typeof policy.workspaceRoot === "string" && policy.workspaceRoot !== "" ? policy.workspaceRoot : null;
+		return policy !== null && policy !== void 0 && typeof policy.workspaceRoot === "string" && policy.workspaceRoot !== "" ? policy : null;
 	} catch (e) {
 		return null;
 	}
@@ -151,8 +151,7 @@ function apply$1(ctx) {
 	const webServer = ctx.webServer;
 	const assetsRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "assets", "workbench");
 	const policyOf = (sessionId) => {
-		const root = resolveWorkbenchSessionRoot(sessionId, sessions, sandboxPolicy);
-		return root === null ? null : { workspaceRoot: root };
+		return resolveWorkbenchSessionPolicy(sessionId, sessions, sandboxPolicy);
 	};
 	const rootFor = (sessionId) => {
 		const policy = policyOf(sessionId);
@@ -348,15 +347,15 @@ function apply$1(ctx) {
 				ok: false,
 				error: "bad-name"
 			};
+			let target;
 			try {
-				await resolveInside(parent, sessionId);
+				target = await resolveInside(join(String(parent), name), sessionId);
 			} catch (e) {
 				return {
 					ok: false,
-					error: "outside-workspace"
+					error: e.message === "path-outside-workspace" ? "outside-workspace" : textOf(e)
 				};
 			}
-			const target = join(parent, name);
 			try {
 				await mkdir(target);
 				return {
@@ -565,6 +564,6 @@ function apply(ctx, config = {}) {
 	ctx.effect(() => ctx.connection.rpc.handle("/story-studio", createStoryStudioRpcHandler(config, readConfig), { authority: "loopback" }), "story-studio: project rpc");
 }
 //#endregion
-export { Config, QNOVEL_SETTINGS_NAMESPACE, QNovelSettingsSchema, apply, createStoryProject, createStoryStudioRpcHandler, ensureProjectRoot, inject, name, normalizeProjectName, projectDirectoryName, resolveProjectRoot };
+export { Config, QNOVEL_SETTINGS_NAMESPACE, QNovelSettingsSchema, apply, createStoryProject, createStoryStudioRpcHandler, ensureProjectRoot, inject, name, normalizeProjectName, projectDirectoryName, projectId, resolveProjectRoot };
 
 //# sourceMappingURL=index.js.map

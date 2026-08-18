@@ -538,7 +538,8 @@ window.__ModuleLoader__.load({
 					NS: "workbench",
 					React: react,
 					layout,
-					useSessions
+					useSessions,
+					slotInject: (key, callback) => ctx.slots.inject(key, callback)
 				});
 			};
 			let script = document.querySelector("script[data-dsh-workbench-bundle]");

@@ -14,6 +14,7 @@
     const NS = params.NS
     const React = params.React
     const layout = params.layout
+    const slotInject = typeof params.slotInject === 'function' ? params.slotInject : slots.inject.bind(slots)
     const styles = {
       insert: (css) => {
         const tag = document.createElement('style')
@@ -1008,7 +1009,11 @@
       name: 'explorer',
       locale: NS
     }, ExplorerRoot))
-    slots.inject('conversation.view', () => slots.register({
+    // The product client supplies the real Cordis-bound injection function. The
+    // bundle itself is a global static script, so calling slots.inject here
+    // directly would lose the product generation context while waiting for the
+    // official conversation.view declaration.
+    slotInject('conversation.view', () => slots.register({
       name: 'conversation.view',
       id: 'workbench.editor',
       order: 5,
