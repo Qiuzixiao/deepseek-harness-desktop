@@ -302,6 +302,13 @@ describe('published package surface', () => {
     expect(shellEnvironment).toContain('DESKTOP_SHELL_ENVIRONMENT_KEYS')
   })
 
+  it('exports the resolved DSH home to in-process bundled plugins', () => {
+    const main = readFileSync(new URL('src/main.ts', packageRoot), 'utf8')
+
+    expect(main).toContain('const homeDir = resolveDshHome()')
+    expect(main).toContain('process.env.DSH_HOME = homeDir')
+  })
+
   it('fixes the installed application identity', () => {
     expect(manifest.version).toBe(workspaceManifest.version)
     expect(manifest.dependencies?.['dsh-product-story-studio']).toBe('0.1.0')

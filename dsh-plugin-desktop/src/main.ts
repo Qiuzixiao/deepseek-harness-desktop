@@ -395,6 +395,12 @@ async function start(): Promise<void> {
     })
     for (const [name, value] of Object.entries(shellEnvironmentResolution.updates)) process.env[name] = value
     const homeDir = resolveDshHome()
+    // The Electron Host loads checkpoint-rewind in-process, so it cannot rely
+    // on the DSH_HOME export that the CLI launcher adds to child commands.
+    // Publish the already-resolved home to this generation before Cordis
+    // composition; bundled plugins then get the same stable snapshot root as
+    // the desktop terminal and pnpm subprocesses without manual setup.
+    process.env.DSH_HOME = homeDir
     const windowsVolumeConcerns = diagnoseWindowsVolumes(process.platform, [
       { label: 'application install', path: process.execPath },
       { label: 'desktop user data', path: app.getPath('userData') },
