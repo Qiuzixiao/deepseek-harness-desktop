@@ -13,7 +13,11 @@ export const styles = `
    upstream sidebar's 6px top padding + 60px logo row + 8px logo margin. */
 [class~="hHd-Xa_root"]{position:relative}
 [class~="hHd-Xa_root"]:not([class~="hHd-Xa_collapsed"]) [class~="hHd-Xa_newSession"]{width:calc(50% - 6px);margin-right:auto}
-[class~="hHd-Xa_root"]:not([class~="hHd-Xa_collapsed"]) [class~="hHd-Xa_footerActions"]{position:absolute;z-index:4;top:74px;left:calc(50% + 2px);right:14px;width:auto;height:38px;display:flex}
+/* The footer slot is mounted after the workspace region by the upstream
+   sidebar. Pull only that slot up into the same 38px action row as New
+   Session; it must never render as a second bottom action. */
+[class~="hHd-Xa_root"]:not([class~="hHd-Xa_collapsed"]) [class~="hHd-Xa_footerActions"]{position:absolute;z-index:4;top:74px;left:calc(50% + 2px);right:14px;width:auto;height:38px;display:flex;align-items:stretch}
+[class~="hHd-Xa_root"]:not([class~="hHd-Xa_collapsed"]) [class~="hHd-Xa_footerActions"] > *{width:100%;height:38px}
 .qNovelCreateSlotHost{position:static;width:100%;height:38px}
 .qNovelCreateSlotHost[data-wide=true]{display:block}
 .qNovelCreateSlotHost:not([data-wide=true]){display:none}

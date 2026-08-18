@@ -2,7 +2,7 @@
   "name": "dsh-product-story-studio",
   "version": "0.1.0",
   "private": true,
-  "description": "Bundled Story Studio product composition for DSH Desktop",
+  "description": "Bundled QNovel Beta product composition for the DSH Desktop host",
   "license": "MIT",
   "type": "module",
   "main": "./lib/index.js",

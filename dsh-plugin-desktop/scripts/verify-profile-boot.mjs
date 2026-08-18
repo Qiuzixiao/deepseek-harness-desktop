@@ -165,7 +165,7 @@ try {
     throw new Error('assembled desktop profile is missing the desktop pnpm Host capability')
   }
   const storyStudio = (await ctx.agentPresets.list()).find(preset => preset.id === 'story-studio')
-  if (storyStudio?.trust !== 'system' || storyStudio.name !== 'Story Studio') {
+  if (storyStudio?.trust !== 'system' || storyStudio.name !== 'QNovel Beta') {
     throw new Error(`assembled desktop profile is missing the Story Studio system preset: ${JSON.stringify(storyStudio)}`)
   }
   if (ctx.desktopProfiles.current.name !== STORY_STUDIO_PROFILE_NAME
