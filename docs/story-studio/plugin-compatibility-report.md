@@ -20,7 +20,8 @@ Rich File Reader 已进一步通过中文 DOCX、表格、长文档分页、两�
 | 插件 | 版本 | 来源 | SHA-256 | 许可证 |
 | --- | --- | --- | --- | --- |
 | `dsh-rich-file-reader` | `0.3.1` | GitHub release tarball | `9900d34c06d1f3d1b0ac6813eba7c79b964a63e8ac6740ead4fb127c3f68c4b2` | MIT |
-| `dsh-better-sidebar` | `0.12.3` | npm registry tarball | `8d9dd6abd7cf5f01965856bf2bdd2a2ec0cc03535f158335391e31f74231381a` | MIT |
+| `dsh-workbench` | `0.2.0` | vendored from Git commit `16f20acf544abcefa9e40b6159fd1b9badd425a6` | bundled assets | MIT |
+| `monaco-editor` | `0.52.2` | bundled static assets | bundled assets | MIT |
 | `dsh-checkpoint-rewind` | `0.5.1` | npm registry tarball | `f3ad47de27e6495155d6082e9ec00c04b2ef78f96841559831adbf243690bbde` | Apache-2.0 |
 
 机器可读锁位于 `config/story-studio/plugins.lock.json`。审计脚本拒绝非 HTTPS、浮动文件、包名/版本/许可证不一致、缺少 bundle patch、错误 Cordis row、缺少许可证文本、超限归档和 hash 漂移。
@@ -46,7 +47,7 @@ Rich File Reader 已进一步通过中文 DOCX、表格、长文档分页、两�
 ```text
 @deepseek-ai/dsh-base
 @deepseek-ai/dsh-web-app
-dsh-better-sidebar
+dsh-workbench
 dsh-checkpoint-rewind
 dsh-rich-file-reader
 ```
@@ -119,7 +120,7 @@ dsh-rich-file-reader
 corepack yarn story-studio:test
 corepack yarn story-studio:plugins:audit
 corepack yarn story-studio:plugins:smoke --plugin rich-file-reader
-corepack yarn story-studio:plugins:smoke --plugin better-sidebar
+corepack yarn workspace dsh-product-story-studio check
 corepack yarn story-studio:plugins:smoke --plugin checkpoint-rewind
 corepack yarn story-studio:plugins:smoke
 corepack yarn story-studio:rich-file-reader:smoke --skip-ocr

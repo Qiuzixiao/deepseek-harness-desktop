@@ -30,7 +30,7 @@
 | Session、Workspace、设置、附件 | DSH 官方 seam | 无需插件 | 采用官方能力 |
 | 文件读写与文本搜索 | `ctx.fs`、官方 fs tools | 无需插件 | 采用官方能力 |
 | 文件拖拽、粘贴与路径注入 | Workspace、composer | `dsh-drop-to-path` | **MVP 使用** |
-| 文件树、编辑器、Git Diff | 官方没有完整编辑工作台 | `dsh-better-sidebar`、`dsh-compass` | Better Sidebar 优先试验；Compass 只读 fallback |
+| 文件树、编辑器、Markdown 预览 | 官方没有完整编辑工作台 | `dsh-workbench` | 直接内置 Workbench；不再加载旧文件树 |
 | DOCX/文本层 PDF 解析 | fs | `dsh-rich-file-reader` | 与 Drop to Path 组合验证；不再承担主要输入入口 |
 | Agent 变更回退 | Session fork、Git | `dsh-checkpoint-rewind` | 优先试验 |
 | Git 命令 | subprocess/shell | `dsh-plugin-git-workflow` | 暂不预装 |
@@ -66,9 +66,9 @@
 - 决策：**MVP 预装**。不作为主要文件输入入口；当前只验收按工作区路径读取 DOCX 和文本层 PDF。Excel、PPT 和扫描 PDF 的完整生产不进入本轮验收。
 - 淘汰条件：无法在 packaged app 中稳定装载、原生依赖不可复现、composer 与其他插件冲突，或真实剧本文档提取质量不可接受。
 
-### 3.3 `dsh-better-sidebar`
+### 3.3 `dsh-workbench`
 
-- 来源：[omdsh-dev/DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar)
+- 来源：[Dpf555/dsh-workbench](https://github.com/Dpf555/dsh-workbench)
 - registry 观察版本：`0.12.3`；检查的仓库快照清单为 `0.12.2`，生产评估必须重新审核精确 `0.12.3` tarball。
 - 许可证：MIT。
 - 能力：文件树、CodeMirror 编辑、Markdown/HTML/PDF/Office 预览、终端、Git diff/历史/暂存/提交、后台任务、插件 tab/viewer service。

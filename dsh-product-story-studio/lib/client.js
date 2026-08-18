@@ -4,7 +4,30 @@ window.__ModuleLoader__.load({
 		var module = { exports: {} };
 		var exports = module.exports;
 		Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
+		//#region \0rolldown/runtime.js
+		var __create = Object.create;
+		var __defProp = Object.defineProperty;
+		var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+		var __getOwnPropNames = Object.getOwnPropertyNames;
+		var __getProtoOf = Object.getPrototypeOf;
+		var __hasOwnProp = Object.prototype.hasOwnProperty;
+		var __copyProps = (to, from, except, desc) => {
+			if (from && typeof from === "object" || typeof from === "function") for (var keys = __getOwnPropNames(from), i = 0, n = keys.length, key; i < n; i++) {
+				key = keys[i];
+				if (!__hasOwnProp.call(to, key) && key !== except) __defProp(to, key, {
+					get: ((k) => from[k]).bind(null, key),
+					enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable
+				});
+			}
+			return to;
+		};
+		var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(isNodeMode || !mod || !mod.__esModule || !__hasOwnProp.call(mod, "default") ? __defProp(target, "default", {
+			value: mod,
+			enumerable: true
+		}) : target, mod));
+		//#endregion
 		let react = require("react");
+		react = __toESM(react, 1);
 		let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 		let react_jsx_runtime = require("react/jsx-runtime");
 		//#region src/client/styles.ts
@@ -356,8 +379,37 @@ window.__ModuleLoader__.load({
 			"workspaces",
 			"connection"
 		];
+		function mountWorkbench(ctx) {
+			const sessions = ctx.get("sessions");
+			const locale = ctx.get("locale");
+			const layout = ctx.get("layout");
+			let useSessions;
+			if (sessions?.list !== void 0 && typeof sessions.list.subscribe === "function" && typeof sessions.list.getSnapshot === "function") useSessions = (selector) => {
+				return selector(react.useSyncExternalStore(sessions.list.subscribe, sessions.list.getSnapshot));
+			};
+			const mount = () => {
+				if (typeof window !== "undefined" && typeof window.__DSH_WORKBENCH__?.mount === "function") window.__DSH_WORKBENCH__.mount({
+					slots: ctx.slots,
+					locale,
+					NS: "workbench",
+					React: react,
+					layout,
+					useSessions
+				});
+			};
+			let script = document.querySelector("script[data-dsh-workbench-bundle]");
+			if (script === null) {
+				script = document.createElement("script");
+				script.src = "/wb/workbench-client.js";
+				script.dataset.dshWorkbenchBundle = "1";
+				document.head.appendChild(script);
+			}
+			script.addEventListener("load", mount);
+			mount();
+		}
 		function apply(ctx) {
 			ctx.effect(installStyles, "story-studio: styles");
+			mountWorkbench(ctx);
 			const service = {
 				describe: async () => unwrap(await ctx.connection.rpc.call(CHANNEL, "describe", {})),
 				create: async (projectName) => unwrap(await ctx.connection.rpc.call(CHANNEL, "createProject", { name: projectName })),

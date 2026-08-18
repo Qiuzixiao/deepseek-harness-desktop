@@ -23,6 +23,7 @@
     "lib/**/*.js",
     "lib/**/*.map",
     "lib/types/**/*.d.ts",
+    "assets/workbench/**",
     "LICENSE",
     "README.md"
   ],
@@ -38,7 +39,8 @@
         "@deepseek-ai/dsh-client-ui-conversation",
         "@deepseek-ai/dsh-client-ui-layout",
         "@deepseek-ai/dsh-client-ui-sidebar",
-        "@deepseek-ai/dsh-client-ui-slots"
+        "@deepseek-ai/dsh-client-ui-slots",
+        "dsh-product-story-studio/client"
       ],
       "platform": "web"
     },
@@ -55,7 +57,6 @@
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.1",
     "@dsh-external/dsh-drop-to-path": "github:loudMore/dsh-drop-to-path#a00a5a2e18fd89e829b1c96f2f2e85af67366e10",
-    "dsh-better-sidebar": "https://registry.npmjs.org/dsh-better-sidebar/-/dsh-better-sidebar-0.12.3.tgz",
     "dsh-checkpoint-rewind": "patch:dsh-checkpoint-rewind@https%3A//registry.npmjs.org/dsh-checkpoint-rewind/-/dsh-checkpoint-rewind-0.5.1.tgz#~/.yarn/patches/dsh-checkpoint-rewind-https-bca87cee44.patch",
     "dsh-rich-file-reader": "https://github.com/shixiliya1/dsh-rich-file-reader/releases/download/v0.3.1/dsh-rich-file-reader-0.3.1.tgz",
     "yaml": "^2.9.0"

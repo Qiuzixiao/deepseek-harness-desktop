@@ -38,7 +38,7 @@ Story Studio 是基于 DSH Desktop 的内部 AI 编剧平台，面向短剧编�
 - 产品层提供“新建作品”流程，用户只输入名称；作品统一保存到 `~/Documents/Story Studio`（可由 `STORY_STUDIO_PROJECTS_ROOT` 覆盖），随后自动注册并切换 DSH Workspace；
 - 工作台采用左侧会话与作品入口、中间官方对话区、右侧 Better Sidebar 文件树/编辑/预览区，不再重复开发通用文件工作台；
 - Preset 内置 `story-intake`、`story-project`、`short-drama-writing`、`novel-writing`、`reference-analysis` 和 `story-review` 六个首批 Skills；
-- Electron 安装包内置 `dsh-product-story-studio`、固定 commit 的 `dsh-drop-to-path`、`dsh-rich-file-reader@0.3.1`、`dsh-better-sidebar@0.12.3`、经过本仓库 `rc.7` 兼容补丁的 `dsh-checkpoint-rewind@0.5.1` 和 Story Studio 资源；首次启动自动创建 `story-studio` Profile，不需要运行安装命令或访问 GitHub；
+- Electron 安装包内置 `dsh-product-story-studio`、`dsh-workbench`（含 Monaco 资源）、固定 commit 的 `dsh-drop-to-path`、`dsh-rich-file-reader@0.3.1`、经过本仓库 `rc.7` 兼容补丁的 `dsh-checkpoint-rewind@0.5.1` 和 Story Studio 资源；首次启动自动创建 `story-studio` Profile，不需要运行安装命令或访问 GitHub；
 - `read_rich_file`、文件树/编辑器/Git diff、`checkpoint`、`/checkpoint` 和 `/rewind` 随产品 Profile 装配；当前文档输入验收只覆盖 DOCX 与文本层 PDF，Excel、PPT 和扫描 PDF 的完整生产不在本轮范围；
 - 短剧正文、小说正文、参考拆解和审校均由已打包 Skills 提供，创作文件以 Story Studio 项目合同落盘。
 - 真实模型验收已完成一部 12 章中文现实悬疑短篇，从 brief/Bible/大纲到正文、两轮审校和返修均通过实际 Agent 会话写入项目目录。

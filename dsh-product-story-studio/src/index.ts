@@ -2,9 +2,10 @@ import type { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import { createStoryProject, resolveProjectRoot, type StoryProjectConfig } from './project.ts'
+import * as workbench from './workbench-host.ts'
 
 export const name = 'dsh-product-story-studio'
-export const inject = ['connection']
+export const inject = ['connection', 'webServer', 'fs', 'sandboxPolicy', 'sessions']
 
 export const Config: Schema<StoryProjectConfig> = Schema.object({
   projectRoot: Schema.string().default('').description('作品统一保存目录；留空时使用“文稿/Story Studio”'),
@@ -55,6 +56,7 @@ export function createStoryStudioRpcHandler(config: StoryProjectConfig = {}): St
 }
 
 export function apply(ctx: Context, config: StoryProjectConfig = {}): void {
+  workbench.apply(ctx)
   ctx.effect(
     () => ctx.connection.rpc.handle('/story-studio', createStoryStudioRpcHandler(config), { authority: 'loopback' }),
     'story-studio: project rpc',

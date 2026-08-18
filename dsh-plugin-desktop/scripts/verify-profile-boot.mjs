@@ -289,7 +289,6 @@ try {
     '@deepseek-ai/dsh-client-ui-directory-picker-browse',
     '@dsh-external/dsh-drop-to-path',
     'dsh-rich-file-reader',
-    'dsh-better-sidebar',
     'dsh-checkpoint-rewind',
   ]) {
     if (!ids.has(id)) throw new Error(`assembled advanced Web graph is missing ${id}`)

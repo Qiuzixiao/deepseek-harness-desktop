@@ -4,6 +4,8 @@ export interface DesktopLayoutSnapshot {
   sidebar: number
   /** Preferred details width; zero means closed. */
   details: number
+  /** Preferred Workbench Explorer width; zero means the compact rail. */
+  explorer: number
   /** Whether the current viewport is below the automatic-collapse breakpoint. */
   narrow: boolean
   /** Manual narrow-screen override that temporarily expands the rail. */
@@ -18,6 +20,8 @@ export interface DesktopColumns {
   center: number
   /** Rendered details width. */
   details: number
+  /** Rendered Explorer width. */
+  explorer: number
 }
 
 /** Compatibility-mode compact rail used by the upstream Windows sidebar. */
@@ -31,6 +35,9 @@ export const SIDEBAR_AUTO_COLLAPSE = 1024
 export const DETAILS_DEFAULT = 360
 export const DETAILS_MIN = 300
 export const DETAILS_MAX = 520
+export const EXPLORER_DEFAULT = 320
+export const EXPLORER_MIN = 240
+export const EXPLORER_MAX = 480
 export const CENTER_MIN = 640
 
 /**
@@ -43,19 +50,30 @@ export const CENTER_MIN = 640
 export function computeDesktopColumns(
   viewport: number,
   sidebar: number,
-  details: number,
+  explorerOrDetails: number,
+  detailsOrCollapsed: number = 0,
   collapsedWidth: number = SIDEBAR_COLLAPSED,
 ): DesktopColumns {
+  // Keep the old three-argument helper contract for desktop layout tests and callers.
+  const legacy = arguments.length < 5
+  const explorer = legacy ? 0 : explorerOrDetails
+  const details = legacy ? explorerOrDetails : detailsOrCollapsed
+  if (legacy) collapsedWidth = arguments.length === 4 ? detailsOrCollapsed : SIDEBAR_COLLAPSED
   const sidebarWidth = sidebar === 0 ? collapsedWidth : clamp(sidebar, SIDEBAR_MIN, SIDEBAR_MAX)
   const preferredDetails = details === 0 ? 0 : clamp(details, DETAILS_MIN, DETAILS_MAX)
-  if (sidebarWidth + preferredDetails + CENTER_MIN <= viewport) {
-    return { sidebar: sidebarWidth, center: viewport - sidebarWidth - preferredDetails, details: preferredDetails }
+  const explorerWidth = explorer === 0 ? 28 : clamp(explorer, EXPLORER_MIN, EXPLORER_MAX)
+  if (sidebarWidth + explorerWidth + preferredDetails + CENTER_MIN <= viewport) {
+    return { sidebar: sidebarWidth, center: viewport - sidebarWidth - explorerWidth - preferredDetails, explorer: explorerWidth, details: preferredDetails }
   }
-  const reducedDetails = preferredDetails === 0 ? 0 : Math.max(DETAILS_MIN, viewport - sidebarWidth - CENTER_MIN)
-  if (sidebarWidth + reducedDetails + CENTER_MIN <= viewport) {
-    return { sidebar: sidebarWidth, center: CENTER_MIN, details: reducedDetails }
+  const reducedDetails = preferredDetails === 0 ? 0 : Math.max(DETAILS_MIN, viewport - sidebarWidth - explorerWidth - CENTER_MIN)
+  if (sidebarWidth + explorerWidth + reducedDetails + CENTER_MIN <= viewport) {
+    return { sidebar: sidebarWidth, center: CENTER_MIN, explorer: explorerWidth, details: reducedDetails }
   }
-  return { sidebar: sidebarWidth, center: Math.max(0, viewport - sidebarWidth), details: 0 }
+  const reducedExplorer = explorerWidth === 28 ? 28 : Math.max(EXPLORER_MIN, viewport - sidebarWidth - CENTER_MIN)
+  if (sidebarWidth + reducedExplorer + CENTER_MIN <= viewport) {
+    return { sidebar: sidebarWidth, center: CENTER_MIN, explorer: reducedExplorer, details: 0 }
+  }
+  return { sidebar: sidebarWidth, center: Math.max(0, viewport - sidebarWidth - 28), explorer: 28, details: 0 }
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -67,6 +85,7 @@ export class DesktopLayoutState {
   private snapshot: DesktopLayoutSnapshot = Object.freeze({
     sidebar: SIDEBAR_DEFAULT,
     details: 0,
+    explorer: EXPLORER_DEFAULT,
     narrow: false,
     narrowExpanded: false,
   })
@@ -108,6 +127,10 @@ export class DesktopLayoutState {
     if (this.snapshot.details !== 0) this.publish({ ...this.snapshot, details: 0 })
   }
 
+  toggleExplorer(): void {
+    this.publish({ ...this.snapshot, explorer: this.snapshot.explorer === 0 ? EXPLORER_DEFAULT : 0 })
+  }
+
   /** @param width - requested sidebar width from a resize gesture. */
   setSidebar(width: number): void {
     this.publish({ ...this.snapshot, sidebar: clamp(width, SIDEBAR_MIN, SIDEBAR_MAX) })
@@ -116,6 +139,10 @@ export class DesktopLayoutState {
   /** @param width - requested details width from a resize gesture. */
   setDetails(width: number): void {
     this.publish({ ...this.snapshot, details: clamp(width, DETAILS_MIN, DETAILS_MAX) })
+  }
+
+  setExplorer(width: number): void {
+    this.publish({ ...this.snapshot, explorer: clamp(width, EXPLORER_MIN, EXPLORER_MAX) })
   }
 
   private publish(next: DesktopLayoutSnapshot): void {

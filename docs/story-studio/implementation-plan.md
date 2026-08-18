@@ -116,7 +116,7 @@ Workflow 使用 DSH 动态 Workflow 引擎执行，不建立另一套任务编�
 
 产品 Client Slot 覆盖空白会话的 Workspace 选择器并增加“新建作品”入口。创建弹窗只接收作品名称，Host 在统一全局根目录中建立项目合同，再通过官方 Workspace API 注册、重命名并切换作品。
 
-中间继续使用官方 conversation；右侧复用 `dsh-better-sidebar@0.12.3` 的 Explorer、CodeMirror 和 Markdown/代码/PDF/图片预览。产品层不重新实现通用文件树、编辑器、Git 面板或聊天界面。
+中间继续使用官方 conversation；右侧直接使用内置 `dsh-workbench` 的 Explorer、Monaco 多标签编辑器和 Markdown 预览。产品层不重新实现通用文件树、编辑器或聊天界面。
 
 ## 4. 关键用户流程
 

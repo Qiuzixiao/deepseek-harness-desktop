@@ -1,3 +1,4 @@
+import * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { ClientContext, WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
@@ -49,6 +50,12 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 type ProjectPickerProps = PropsRuntime<'conversation.hero.workspace'>
 type CreateActionProps = PropsRuntime<'sidebar.footer.action'>
+
+declare global {
+  interface Window {
+    __DSH_WORKBENCH__?: { mount(params: Record<string, unknown>): void }
+  }
+}
 
 function StoryStudioShellOverlay({ service, onCreated }: {
   service: ProjectService
@@ -297,8 +304,36 @@ function unwrap<T>(result: unknown): T {
 export const name = 'dsh-product-story-studio'
 export const inject = ['slots', 'workspaces', 'connection']
 
+function mountWorkbench(ctx: StoryStudioClientContext): void {
+  const sessions = ctx.get('sessions')
+  const locale = ctx.get('locale')
+  const layout = ctx.get('layout')
+  let useSessions: ((selector: (snapshot: unknown) => unknown) => unknown) | undefined
+  if (sessions?.list !== undefined && typeof sessions.list.subscribe === 'function' && typeof sessions.list.getSnapshot === 'function') {
+    useSessions = (selector) => {
+      const snapshot = React.useSyncExternalStore(sessions.list.subscribe, sessions.list.getSnapshot)
+      return selector(snapshot)
+    }
+  }
+  const mount = () => {
+    if (typeof window !== 'undefined' && typeof window.__DSH_WORKBENCH__?.mount === 'function') {
+      window.__DSH_WORKBENCH__.mount({ slots: ctx.slots, locale, NS: 'workbench', React, layout, useSessions })
+    }
+  }
+  let script = document.querySelector<HTMLScriptElement>('script[data-dsh-workbench-bundle]')
+  if (script === null) {
+    script = document.createElement('script')
+    script.src = '/wb/workbench-client.js'
+    script.dataset.dshWorkbenchBundle = '1'
+    document.head.appendChild(script)
+  }
+  script.addEventListener('load', mount)
+  mount()
+}
+
 export function apply(ctx: StoryStudioClientContext): void {
   ctx.effect(installStyles, 'story-studio: styles')
+  mountWorkbench(ctx)
 
   const service: ProjectService = {
     describe: async () => unwrap<StoryStudioDescription>(await ctx.connection.rpc.call(CHANNEL, 'describe', {})),

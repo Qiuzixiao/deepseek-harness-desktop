@@ -17,7 +17,7 @@ export interface AdvancedFrameInjected {
 
 /** Full advanced root slot props. */
 export type AdvancedFrameProps = PropsRuntime<'root'>
-  & PropsRenderSlots<'sidebar' | 'conversation' | 'details' | 'shell.overlay'>
+  & PropsRenderSlots<'sidebar' | 'conversation' | 'explorer' | 'details' | 'shell.overlay'>
   & AdvancedFrameInjected
 
 /** Desktop-owned transparent frame around the unchanged product surfaces. */
@@ -58,6 +58,7 @@ export function AdvancedFrame({ layout, platform, renderSlot, useSessions }: Adv
   const columns = computeDesktopColumns(
     viewport,
     sidebarPreference,
+    panels.explorer,
     detailsSession === undefined ? 0 : panels.details,
     platform === 'darwin' ? MACOS_SIDEBAR_COLLAPSED : SIDEBAR_COLLAPSED,
   )
@@ -68,7 +69,7 @@ export function AdvancedFrame({ layout, platform, renderSlot, useSessions }: Adv
       className="dshDesktopFrame"
       data-desktop-platform={platform}
       data-sidebar-collapsed={collapsed || undefined}
-      style={{ gridTemplateColumns: `${columns.sidebar}px minmax(0, 1fr) ${columns.details}px` }}
+      style={{ gridTemplateColumns: `${columns.sidebar}px minmax(0, 1fr) ${columns.explorer}px ${columns.details}px` }}
     >
       {platform === 'darwin' && <div className="dshDesktopMacCaptionRow" aria-hidden="true" />}
       {platform === 'win32' && <div className="dshDesktopWindowsCaptionRow" aria-hidden="true" />}
@@ -78,6 +79,11 @@ export function AdvancedFrame({ layout, platform, renderSlot, useSessions }: Adv
         </div>
       </aside>
       <main className="dshDesktopConversationSurface">{renderSlot('conversation', {})}</main>
+      <aside className="dshDesktopExplorerSurface" data-explorer-collapsed={columns.explorer <= 28 || undefined}>
+        {columns.explorer <= 28
+          ? <button type="button" className="dshDesktopExplorerRail" onClick={() => layout.toggleExplorer()} aria-label="打开文件树" title="打开文件树">‹</button>
+          : renderSlot('explorer', {})}
+      </aside>
       <aside className="dshDesktopDetailsSurface">{renderSlot('details', {})}</aside>
       <div className="dshDesktopOverlay" data-shell-overlay>
         {renderSlot('shell.overlay', {})}
@@ -89,6 +95,9 @@ export function AdvancedFrame({ layout, platform, renderSlot, useSessions }: Adv
           size={columns.sidebar}
           onResize={(width) => { layout.setSidebar(width) }}
         />
+      )}
+      {columns.explorer > 28 && (
+        <ResizeHandle side="explorer" left={viewport - columns.details - columns.explorer} size={columns.explorer} onResize={(width) => { layout.setExplorer(width) }} />
       )}
       {columns.details > 0 && (
         <ResizeHandle
@@ -102,7 +111,7 @@ export function AdvancedFrame({ layout, platform, renderSlot, useSessions }: Adv
   )
 }
 
-function ResizeHandle(props: { side: 'sidebar' | 'details'; left: number; size: number; onResize: (width: number) => void }) {
+function ResizeHandle(props: { side: 'sidebar' | 'explorer' | 'details'; left: number; size: number; onResize: (width: number) => void }) {
   const origin = useRef(0)
   const base = useRef(0)
   const onPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {

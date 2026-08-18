@@ -68,7 +68,6 @@ test('the checked-in lock pins the three stage-zero candidates', () => {
   assert.equal(lock.dshRuntime, '0.1.0-rc.7')
   assert.deepEqual(lock.plugins.map(plugin => plugin.id), [
     'rich-file-reader',
-    'better-sidebar',
     'checkpoint-rewind',
   ])
 })

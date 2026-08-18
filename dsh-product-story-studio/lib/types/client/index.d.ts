@@ -28,6 +28,13 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
         };
     }
 }
+declare global {
+    interface Window {
+        __DSH_WORKBENCH__?: {
+            mount(params: Record<string, unknown>): void;
+        };
+    }
+}
 export declare const name = "dsh-product-story-studio";
 export declare const inject: string[];
 export declare function apply(ctx: StoryStudioClientContext): void;

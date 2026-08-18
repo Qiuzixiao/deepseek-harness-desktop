@@ -8,7 +8,7 @@ const root = resolve(import.meta.dirname, '../..')
 test('pins the Story Studio Profile and Drop to Path commit', async () => {
   const specification = JSON.parse(await readFile(resolve(root, 'config/story-studio/profile.json'), 'utf8'))
   assert.equal(specification.profile, 'story-studio')
-  assert.equal(specification.plugins.length, 4)
+  assert.equal(specification.plugins.length, 3)
   const plugin = specification.plugins[0]
   assert.equal(plugin.package, '@dsh-external/dsh-drop-to-path')
   assert.match(plugin.commit, /^[0-9a-f]{40}$/u)
@@ -22,11 +22,6 @@ test('pins the Story Studio Profile and Drop to Path commit', async () => {
     version: '0.3.1',
   })
   assert.deepEqual(specification.plugins[2], {
-    package: 'dsh-better-sidebar',
-    source: 'https://registry.npmjs.org/dsh-better-sidebar/-/dsh-better-sidebar-0.12.3.tgz',
-    version: '0.12.3',
-  })
-  assert.deepEqual(specification.plugins[3], {
     package: 'dsh-checkpoint-rewind',
     source: 'https://registry.npmjs.org/dsh-checkpoint-rewind/-/dsh-checkpoint-rewind-0.5.1.tgz',
     version: '0.5.1',

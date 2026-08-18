@@ -7,8 +7,6 @@
       name: '@dsh-external/dsh-drop-to-path'
     - id: rich-file-reader
       name: dsh-rich-file-reader
-    - id: better-sidebar
-      name: dsh-better-sidebar
     - id: checkpoint-rewind
       name: dsh-checkpoint-rewind
       config:

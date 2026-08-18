@@ -43,11 +43,10 @@ describe('packaged desktop runtime verification', () => {
     const chmod = vi.fn()
     repairPackagedMacHelperModes('/unpacked', () => true, chmod)
 
-    expect(chmod.mock.calls).toHaveLength(4)
+    expect(chmod.mock.calls).toHaveLength(2)
     expect(chmod.mock.calls.every(([, mode]) => mode === 0o755)).toBe(true)
     expect(chmod.mock.calls.map(([path]) => path)).toEqual(expect.arrayContaining([
       join('/unpacked', 'node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper'),
-      join('/unpacked', 'node_modules/dsh-better-sidebar/node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper'),
     ]))
   })
 

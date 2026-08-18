@@ -12,11 +12,6 @@
       "version": "0.3.1"
     },
     {
-      "package": "dsh-better-sidebar",
-      "source": "https://registry.npmjs.org/dsh-better-sidebar/-/dsh-better-sidebar-0.12.3.tgz",
-      "version": "0.12.3"
-    },
-    {
       "package": "dsh-checkpoint-rewind",
       "source": "https://registry.npmjs.org/dsh-checkpoint-rewind/-/dsh-checkpoint-rewind-0.5.1.tgz",
       "version": "0.5.1"

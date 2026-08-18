@@ -14,6 +14,8 @@ export interface DesktopLayoutService {
   openDetails(): void
   /** Close the details panel. */
   closeDetails(): void
+  /** Toggle the Story Studio Workbench Explorer panel. */
+  toggleExplorer(): void
 }
 
 declare module '@deepseek-ai/cordis' {
@@ -31,6 +33,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'conversation': { kind: 'single'; scope: 'session-maybe'; owner: Record<never, never> }
     /** Unchanged upstream details surface. */
     'details': { kind: 'single'; scope: 'session'; owner: Record<never, never> }
+    /** Desktop-owned Workbench Explorer panel. */
+    'explorer': { kind: 'single'; scope: 'root'; owner: Record<never, never> }
     /** Frame-wide additive overlays. */
     'shell.overlay': { kind: 'list'; scope: 'root' }
   }

@@ -378,7 +378,8 @@ the package names, versions, and licenses for transparency.
 | detect-libc | 2.1.2 | Apache-2.0 |
 | devlop | 1.1.0 | MIT |
 | diff | 9.0.0 | BSD-3-Clause |
-| dsh-better-sidebar | 0.12.3 | MIT |
+| dsh-workbench | 0.2.0 (vendored) | MIT |
+| monaco-editor | 0.52.2 assets | MIT |
 | dsh-checkpoint-rewind | 0.5.1 | Apache-2.0 |
 | dsh-community-market | 0.1.0-dev.0 | MIT |
 | dsh-product-story-studio | 0.1.0 | MIT |
