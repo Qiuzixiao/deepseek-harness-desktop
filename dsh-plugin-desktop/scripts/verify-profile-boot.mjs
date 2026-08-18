@@ -32,7 +32,13 @@ let nativeThemeSource = 'system'
 const trayItems = []
 
 try {
-  writeFileSync(join(home, 'settings.yaml'), 'dsh-desktop:\n  mode: advanced\n')
+  writeFileSync(join(home, 'settings.yaml'), [
+    'dsh-desktop:',
+    '  mode: advanced',
+    'agent-presets:',
+    '  default: minimal',
+    '',
+  ].join('\n'))
   const prepared = prepareDesktopProfile('1', home, 'win32', STORY_STUDIO_PROFILE_NAME)
   const hostServicePluginDir = join(
     prepared.profile.dir,
@@ -128,6 +134,8 @@ try {
         nodeShimPath: pnpmRuntime.nodeShimPath,
         clearEnvironmentPath: pnpmRuntime.clearEnvironmentPath,
         dshBootstrapPath: fileURLToPath(new URL('../lib/desktop-cli.js', import.meta.url)),
+        installRecoveryStatePath: join(home, 'plugin-install-recovery', 'state.json'),
+        generationId: 'profile-smoke-generation',
       })
       await host.plugin(DesktopProfileService, {
         current: {
@@ -163,6 +171,21 @@ try {
   if (ctx.desktopProfiles.current.name !== STORY_STUDIO_PROFILE_NAME
     || ctx.desktopProfiles.current.dir !== prepared.profile.dir) {
     throw new Error('assembled desktop profile service has the wrong active identity')
+  }
+  const agentPresets = ctx.get('agentPresets')
+  if (agentPresets === undefined) {
+    throw new Error('assembled Windows profile is missing the agent preset roster')
+  }
+  const presetIds = (await agentPresets.list()).map(preset => preset.id)
+  if (presetIds.includes('minimal') || !presetIds.includes('standard')) {
+    throw new Error(`assembled Windows profile exposes unexpected presets: ${presetIds.join(', ')}`)
+  }
+  if (agentPresets.defaultId !== 'standard') {
+    throw new Error(`assembled Windows profile selected unsupported default ${agentPresets.defaultId}`)
+  }
+  const legacyPreset = await agentPresets.resolve('minimal')
+  if (legacyPreset.id !== 'minimal') {
+    throw new Error(`assembled Windows profile remapped legacy preset to ${legacyPreset.id}`)
   }
   const toolNames = new Set(ctx.tools.schemas().map(schema => schema.name))
   for (const name of ['read_rich_file', 'ocr_pdf', 'checkpoint']) {
