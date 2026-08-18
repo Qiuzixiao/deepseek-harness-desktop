@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { ClientContext, WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import {
   Button, IconFolderClose16, IconPlusOutline16, Menu, Modal,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -48,6 +49,32 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 type ProjectPickerProps = PropsRuntime<'conversation.hero.workspace'>
 type CreateActionProps = PropsRuntime<'sidebar.footer.action'>
+
+function StoryStudioShellOverlay({ service, onCreated }: {
+  service: ProjectService
+  onCreated: (workspace: WorkspaceView) => void
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <div className="storyStudioProductBadge" data-story-studio-overlay>
+        <span className="storyStudioProductMark">SS</span>
+        <span className="storyStudioProductName">Story Studio</span>
+        <span className="storyStudioProductState">作品工作台</span>
+        <button type="button" className="storyStudioProductAction" onClick={() => { setOpen(true) }}>
+          <IconPlusOutline16 size={14} />
+          新建作品
+        </button>
+      </div>
+      <CreateProjectDialog
+        open={open}
+        service={service}
+        onClose={() => { setOpen(false) }}
+        onCreated={onCreated}
+      />
+    </>
+  )
+}
 
 function installStyles(): () => void {
   const current = document.querySelector<HTMLStyleElement>('style[data-story-studio]')
@@ -256,5 +283,10 @@ export function apply(ctx: StoryStudioClientContext): void {
   ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register(
     { name: 'sidebar.footer.action', id: 'story-studio-create', order: -100 },
     props => <CreateProjectAction {...props} service={service} start={id => { ctx.workspaces.startSession(id) }} />,
+  ))
+
+  ctx.slots.inject('shell.overlay', () => ctx.slots.register(
+    { name: 'shell.overlay', id: 'story-studio-product-entry', order: -100 },
+    () => <StoryStudioShellOverlay service={service} onCreated={workspace => { ctx.workspaces.startSession(workspace.workspaceId) }} />,
   ))
 }

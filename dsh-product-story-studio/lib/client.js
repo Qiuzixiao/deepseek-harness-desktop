@@ -9,6 +9,12 @@ window.__ModuleLoader__.load({
 		let react_jsx_runtime = require("react/jsx-runtime");
 		//#region src/client/styles.ts
 		const styles = `
+.storyStudioProductBadge{pointer-events:auto;position:fixed;z-index:35;top:10px;right:92px;display:flex;align-items:center;gap:8px;height:30px;padding:0 6px 0 9px;border:1px solid color-mix(in srgb,#287a5b 28%,var(--dsw-alias-border-l2));border-radius:8px;background:color-mix(in srgb,var(--dsw-alias-bg-base) 94%,#287a5b);box-shadow:0 2px 8px #0000000d;color:var(--dsw-alias-text-primary);font-size:12px}
+.storyStudioProductMark{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:5px;background:#287a5b;color:#fff;font-size:9px;font-weight:750;letter-spacing:.2px}
+.storyStudioProductName{font-weight:700;color:var(--dsw-alias-text-primary)}
+.storyStudioProductState{color:var(--dsw-alias-text-secondary);padding-right:3px}
+.storyStudioProductAction{display:inline-flex;align-items:center;gap:4px;height:24px;border:0;border-radius:5px;background:#287a5b;color:#fff;padding:0 8px;font:inherit;font-size:11px;cursor:pointer}
+.storyStudioProductAction:hover{background:#216447}
 .storyStudioCreateAction{display:flex;align-items:center;justify-content:center;min-width:32px;height:32px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-text-secondary);cursor:pointer;transition:background-color 120ms ease,color 120ms ease}
 .storyStudioCreateAction:hover{background:var(--dsw-alias-fill-hover);color:var(--dsw-alias-text-primary)}
 .storyStudioCreateAction[data-wide=true]{width:100%;justify-content:flex-start;gap:9px;padding:0 10px;font-size:13px}
@@ -20,11 +26,48 @@ window.__ModuleLoader__.load({
 .storyStudioPath{display:flex;align-items:flex-start;gap:8px;padding:10px 11px;border-left:3px solid #287a5b;background:color-mix(in srgb,#287a5b 7%,var(--dsw-alias-bg-base));font-size:12px;line-height:1.5;color:var(--dsw-alias-text-secondary);word-break:break-all}
 .storyStudioError{margin:0;color:var(--dsw-alias-text-error,#c43d3d);font-size:12px;line-height:1.45}
 .storyStudioEmpty{padding:10px 12px;font-size:12px;color:var(--dsw-alias-text-tertiary)}
+@media (max-width:900px){.storyStudioProductState{display:none}.storyStudioProductBadge{right:76px}.storyStudioProductName{display:none}}
 `;
 		//#endregion
 		//#region src/client/index.tsx
 		const CHANNEL = "/story-studio";
 		const CREATE_ID = "story-studio:create";
+		function StoryStudioShellOverlay({ service, onCreated }) {
+			const [open, setOpen] = (0, react.useState)(false);
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				className: "storyStudioProductBadge",
+				"data-story-studio-overlay": true,
+				children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						className: "storyStudioProductMark",
+						children: "SS"
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						className: "storyStudioProductName",
+						children: "Story Studio"
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						className: "storyStudioProductState",
+						children: "作品工作台"
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+						type: "button",
+						className: "storyStudioProductAction",
+						onClick: () => {
+							setOpen(true);
+						},
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconPlusOutline16, { size: 14 }), "新建作品"]
+					})
+				]
+			}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(CreateProjectDialog, {
+				open,
+				service,
+				onClose: () => {
+					setOpen(false);
+				},
+				onCreated
+			})] });
+		}
 		function installStyles() {
 			const current = document.querySelector("style[data-story-studio]");
 			const element = current ?? document.createElement("style");
@@ -255,6 +298,16 @@ window.__ModuleLoader__.load({
 				service,
 				start: (id) => {
 					ctx.workspaces.startSession(id);
+				}
+			})));
+			ctx.slots.inject("shell.overlay", () => ctx.slots.register({
+				name: "shell.overlay",
+				id: "story-studio-product-entry",
+				order: -100
+			}, () => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(StoryStudioShellOverlay, {
+				service,
+				onCreated: (workspace) => {
+					ctx.workspaces.startSession(workspace.workspaceId);
 				}
 			})));
 		}

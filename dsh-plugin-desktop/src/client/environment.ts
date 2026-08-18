@@ -22,13 +22,19 @@ const PLATFORMS = new Set<DesktopClientPlatform>(['darwin', 'win32', 'linux'])
  */
 export function parseDesktopClientEnvironment(search: string): DesktopClientEnvironment {
   const params = new URLSearchParams(search)
-  const mode = params.get('dsh-desktop-mode')
-  const platform = params.get('dsh-desktop-platform')
+  const mode = params.get('dsh-desktop-mode') ?? 'compatibility'
+  const platformParam = params.get('dsh-desktop-platform')
+  const platformFallback: DesktopClientPlatform = /Mac|iPhone|iPad/u.test(navigator.platform)
+    ? 'darwin'
+    : /Win/u.test(navigator.platform)
+      ? 'win32'
+      : 'linux'
+  const platform = platformParam ?? platformFallback
   if (!MODES.has(mode as DesktopClientMode)) {
-    throw new Error(`dsh-plugin-desktop: invalid or missing dsh-desktop-mode ${JSON.stringify(mode)}`)
+    throw new Error(`dsh-plugin-desktop: invalid dsh-desktop-mode ${JSON.stringify(mode)}`)
   }
   if (!PLATFORMS.has(platform as DesktopClientPlatform)) {
-    throw new Error(`dsh-plugin-desktop: invalid or missing dsh-desktop-platform ${JSON.stringify(platform)}`)
+    throw new Error(`dsh-plugin-desktop: invalid dsh-desktop-platform ${JSON.stringify(platform)}`)
   }
   return { mode: mode as DesktopClientMode, platform: platform as DesktopClientPlatform }
 }

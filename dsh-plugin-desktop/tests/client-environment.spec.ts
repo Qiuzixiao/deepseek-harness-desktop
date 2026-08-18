@@ -23,12 +23,14 @@ describe('desktop client environment', () => {
   })
 
   it.each([
-    ['', 'dsh-desktop-mode'],
     ['?dsh-desktop-mode=glass&dsh-desktop-platform=darwin', 'dsh-desktop-mode'],
-    ['?dsh-desktop-mode=advanced', 'dsh-desktop-platform'],
     ['?dsh-desktop-mode=advanced&dsh-desktop-platform=android', 'dsh-desktop-platform'],
   ])('fails loud for malformed marker %s', (search, field) => {
     expect(() => parseDesktopClientEnvironment(search)).toThrow(field)
+  })
+
+  it('defaults direct browser visits to compatibility mode', () => {
+    expect(parseDesktopClientEnvironment('')).toMatchObject({ mode: 'compatibility' })
   })
 })
 
