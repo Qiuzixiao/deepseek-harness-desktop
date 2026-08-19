@@ -3,6 +3,8 @@
 - id: desktop-shell
   config:
     mode: advanced
+- id: community-market
+  disabled: true
 - insert:
     - id: story-studio-workbench
       name: dsh-product-story-studio
