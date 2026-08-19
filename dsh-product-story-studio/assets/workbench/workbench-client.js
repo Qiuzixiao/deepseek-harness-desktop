@@ -652,21 +652,47 @@
       React.useEffect(() => {
         if (u.tree !== null) return
         let disposed = false
-        host.call('wb.describe', null).then((d) => {
-          if (disposed || d === null || typeof d !== 'object') return
-          if (d.ok !== true) {
-            ui.tree = { empty: true, error: typeof d.error === 'string' ? d.error : 'no-workspace-selected' }
-            emit()
-            return
-          }
-          host.call('wb.listDir', { path: d.root }).then((res) => {
+        let retryTimer = null
+        let booting = false
+        const retry = () => {
+          if (disposed || retryTimer !== null) return
+          retryTimer = setTimeout(() => {
+            retryTimer = null
+            void bootstrap()
+          }, 500)
+        }
+        const bootstrap = async () => {
+          if (disposed || booting || ui.tree === null || ui.tree.empty !== true && ui.tree !== null) return
+          booting = true
+          try {
+            const d = await host.call('wb.describe', null)
+            if (disposed || d === null || typeof d !== 'object') return
+            if (d.ok !== true) {
+              ui.tree = { empty: true, error: typeof d.error === 'string' ? d.error : 'no-workspace-selected' }
+              emit()
+              retry()
+              return
+            }
+            const res = await host.call('wb.listDir', { path: d.root })
             if (disposed) return
             const entries = (res !== null && typeof res === 'object' && res.ok === true) ? res.entries : []
             ui.tree = { root: d.root, rootName: d.rootName, dirs: { [d.root]: entries }, expanded: new Set([d.root]) }
             emit()
-          }, () => {})
-        }, () => {})
-        return () => { disposed = true }
+          } catch (e) {
+            retry()
+          } finally {
+            booting = false
+          }
+        }
+        // A restored session can be selected before its history/header has
+        // finished opening. Keep the deliberate empty state recoverable.
+        ui.tree = { empty: true, error: 'no-workspace-selected' }
+        emit()
+        void bootstrap()
+        return () => {
+          disposed = true
+          if (retryTimer !== null) clearTimeout(retryTimer)
+        }
       }, [u.sessionId])
 
       // Agent file operations happen outside this browser component. Keep the
