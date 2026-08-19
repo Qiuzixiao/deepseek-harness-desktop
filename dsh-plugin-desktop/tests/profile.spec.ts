@@ -199,7 +199,7 @@ describe('desktop profile composition', {
       id: 'agent-presets',
       config: expect.objectContaining({
         roots: [
-          expect.objectContaining({ path: expect.stringContaining('resources/agent-presets'), trust: 'system' }),
+          expect.objectContaining({ path: expect.stringMatching(/resources[\\/]agent-presets/u), trust: 'system' }),
         ],
       }),
     }))
