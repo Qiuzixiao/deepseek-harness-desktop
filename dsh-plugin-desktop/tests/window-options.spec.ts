@@ -89,7 +89,7 @@ describe('compatibility BrowserWindow options', () => {
 
     expect(options).toEqual(expect.objectContaining({
       titleBarStyle: 'hiddenInset',
-      trafficLightPosition: { x: 16, y: 16 },
+      trafficLightPosition: { x: 16, y: 10 },
       transparent: true,
       backgroundColor: '#00000000',
       vibrancy: 'sidebar',

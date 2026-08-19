@@ -17,14 +17,13 @@ body[data-dsh-desktop-mode="advanced"] { margin: 0; background: transparent !imp
 .dshDesktopFrame[data-desktop-platform="darwin"] .dshDesktopUpstreamSidebar { padding-top: ${MACOS_TITLEBAR_HEIGHT}px; -webkit-app-region: no-drag; }
 .dshDesktopFrame[data-desktop-platform="darwin"][data-sidebar-collapsed] .dshDesktopUpstreamSidebar { width: ${SIDEBAR_COLLAPSED}px; margin: 0 auto; }
 .dshDesktopFrame[data-desktop-platform="darwin"] { grid-template-rows: ${MACOS_TITLEBAR_HEIGHT}px minmax(0, 1fr); }
-.dshDesktopFrame[data-desktop-platform="darwin"] .dshDesktopSidebarSurface { grid-row: 1 / -1; background: linear-gradient(to bottom, color-mix(in srgb, var(--dsw-alias-bg-base) 88%, var(--dsw-specific-sidebar-fill)) 0 ${MACOS_TITLEBAR_HEIGHT}px, transparent ${MACOS_TITLEBAR_HEIGHT}px); -webkit-app-region: no-drag; }
+.dshDesktopFrame[data-desktop-platform="darwin"] .dshDesktopSidebarSurface { grid-row: 1 / -1; -webkit-app-region: no-drag; }
 .dshDesktopFrame[data-desktop-platform="darwin"] .dshDesktopConversationSurface,
 .dshDesktopFrame[data-desktop-platform="darwin"] .dshDesktopExplorerSurface,
 .dshDesktopFrame[data-desktop-platform="darwin"] .dshDesktopDetailsSurface { grid-row: 2; }
-.dshDesktopFrame[data-desktop-platform="darwin"] .dshDesktopSidebarSurface::before { content: ""; position: absolute; z-index: 1; top: 0; right: 0; left: ${MACOS_TRAFFIC_LIGHT_SAFE_WIDTH}px; height: ${MACOS_DRAG_REGION_HEIGHT}px; background: color-mix(in srgb, var(--dsw-alias-bg-base) 88%, var(--dsw-specific-sidebar-fill)); box-shadow: inset 0 -1px 0 var(--dsw-alias-border-l1); user-select: none; -webkit-app-region: drag; }
-.dshDesktopMacCaptionRow { position: relative; grid-column: 2 / -1; grid-row: 1; min-width: 0; background: color-mix(in srgb, var(--dsw-alias-bg-base) 92%, var(--dsw-alias-bg-layer-1)); border-bottom: 1px solid var(--dsw-alias-border-l1); }
-.dshDesktopMacCaptionRow::before { content: ""; position: absolute; z-index: 1; top: 0; right: 0; left: 0; height: ${MACOS_DRAG_REGION_HEIGHT}px; user-select: none; -webkit-app-region: drag; }
-.dshDesktopMacCaptionRow::after { content: "QNovel Beta"; position: absolute; z-index: 2; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: -.01em; pointer-events: none; -webkit-app-region: drag; }
+.dshDesktopMacCaptionRow { position: relative; z-index: 2; grid-column: 1 / -1; grid-row: 1; min-width: 0; background: color-mix(in srgb, var(--dsw-alias-bg-base) 92%, var(--dsw-alias-bg-layer-1)); border-bottom: 1px solid var(--dsw-alias-border-l1); pointer-events: none; }
+.dshDesktopMacCaptionRow::before { content: ""; position: absolute; z-index: 1; top: 0; right: 0; left: ${MACOS_TRAFFIC_LIGHT_SAFE_WIDTH}px; height: ${MACOS_DRAG_REGION_HEIGHT}px; user-select: none; pointer-events: auto; -webkit-app-region: drag; }
+.dshDesktopMacCaptionRow::after { content: "QNovel Beta"; position: absolute; z-index: 2; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: -.01em; pointer-events: none; }
 .dshDesktopConversationSurface { grid-column: 2; grid-row: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--dsw-alias-bg-base); }
 .dshDesktopExplorerSurface { grid-column: 3; grid-row: 1; min-width: 0; min-height: 0; overflow: hidden; background: var(--dsw-alias-bg-base); border-left: 1px solid var(--dsw-alias-border-l2); }
 .dshDesktopExplorerRail { width: 28px; height: 100%; border: 0; background: transparent; color: var(--dsw-alias-label-secondary); cursor: pointer; font-size: 18px; }
@@ -45,8 +44,7 @@ body[data-dsh-desktop-mode="advanced"] { margin: 0; background: transparent !imp
 [role="dialog"], [aria-modal="true"] { -webkit-app-region: no-drag !important; }
 html:has([aria-modal="true"]) .dshDesktopWindowsCaptionRow::before,
 html:has([aria-modal="true"]) .dshDesktopMacCaptionRow::before,
-html:has([aria-modal="true"]) .dshDesktopSidebarSurface,
-html:has([aria-modal="true"]) .dshDesktopSidebarSurface::before { -webkit-app-region: no-drag !important; }
+html:has([aria-modal="true"]) .dshDesktopSidebarSurface { -webkit-app-region: no-drag !important; }
 @media (prefers-reduced-motion: reduce) { .dshDesktopFrame { transition: none !important; } }
 `
 
