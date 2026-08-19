@@ -50,6 +50,89 @@ index 2261ccd88b..d540f157e6 100644
    })
  
    /**
+diff --git a/lib/panel.mjs b/lib/panel.mjs
+index 06ed36a43b..dd8325bc2b 100644
+--- a/lib/panel.mjs
++++ b/lib/panel.mjs
+@@ -8,6 +8,7 @@
+ // 经 ./typert 清单（typert.host.mjs）与 client Remote 贡献暴露到 Web。
+ 
+ import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
++import { symbols } from '@deepseek-ai/cordis'
+ import { LIMITS, PANEL_SERVICE } from './constants.mjs'
+ import { resolveRecordByPrefix, sortOldestFirst } from './checkpoints.mjs'
+ import { configDiff } from './diff.mjs'
+@@ -15,6 +16,15 @@ import { sessionDelta } from './session.mjs'
+ import { workspaceKeyOf } from './workspace.mjs'
+ import { TIMELINE_MAX_ROWS } from './wire.mjs'
+ 
++const panelDependencies = new WeakMap()
++
++function dependenciesOf(service) {
++  const original = service[symbols.original] ?? service
++  const deps = panelDependencies.get(original)
++  if (deps === undefined) throw new Error('checkpointPanel: service dependencies are unavailable')
++  return deps
++}
++
+ /** 时间线行（wire 形状；领域记录 → 面板只读视图，绝不透出 ref/配置全文）。 */
+ function timelineRowOf(record) {
+   return {
+@@ -41,7 +51,6 @@ function timelineRowOf(record) {
+  */
+ export class CheckpointPanelService extends TypertRemoteService {
+   /** @type {{tablePromise: Promise<object>, ops: Promise<void>, registry: object, getLive: () => object}} */
+-  #deps
+ 
+   /**
+    * @param {import('@deepseek-ai/cordis').Context} ctx - Cordis 上下文。
+@@ -49,7 +58,7 @@ export class CheckpointPanelService extends TypertRemoteService {
+    */
+   constructor(ctx, deps) {
+     super(ctx, PANEL_SERVICE)
+-    this.#deps = deps
++    panelDependencies.set(this, deps)
+   }
+ 
+   /**
+@@ -59,12 +68,13 @@ export class CheckpointPanelService extends TypertRemoteService {
+    * @returns {Promise<object>} 时间线快照。
+    */
+   async timeline(limit) {
+-    await this.#deps.ops
+-    const table = await this.#deps.tablePromise
++    const deps = dependenciesOf(this)
++    await deps.ops
++    const table = await deps.tablePromise
+     const records = [...table.entries()].map(([, record]) => record)
+     const sorted = records.sort((a, b) => b.time - a.time || b.seq - a.seq)
+     const capped = Number.isInteger(limit) && limit >= 1 ? Math.min(limit, TIMELINE_MAX_ROWS) : LIMITS.MAX_LIST_LIMIT
+-    const live = this.#deps.getLive()
++    const live = deps.getLive()
+     return {
+       rows: sorted.slice(0, capped).map(timelineRowOf),
+       total: records.length,
+@@ -97,8 +107,9 @@ export class CheckpointPanelService extends TypertRemoteService {
+       toNote: null,
+     })
+     try {
+-      await this.#deps.ops
+-      const table = await this.#deps.tablePromise
++      const deps = dependenciesOf(this)
++      await deps.ops
++      const table = await deps.tablePromise
+       const records = [...table.entries()].map(([, record]) => record)
+       const fromHit = resolveRecordByPrefix(records, from)
+       const toHit = resolveRecordByPrefix(records, to)
+@@ -116,7 +127,7 @@ export class CheckpointPanelService extends TypertRemoteService {
+       if (fromRecord.provider !== toRecord.provider) {
+         return empty(`checkpoints use different providers (${fromRecord.provider} vs ${toRecord.provider})`)
+       }
+-      const provider = this.#deps.registry.get(fromRecord.provider)
++      const provider = deps.registry.get(fromRecord.provider)
+       if (provider === undefined || typeof provider.diffFiles !== 'function') {
+         return empty(`provider ${fromRecord.provider} does not support pairwise diff`)
+       }
 diff --git a/lib/wire.mjs b/lib/wire.mjs
 index f2cc3e1e5a..2f5ba4c395 100644
 --- a/lib/wire.mjs
