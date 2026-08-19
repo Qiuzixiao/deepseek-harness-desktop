@@ -30,6 +30,7 @@ test('Story Studio project contract initializes and reports a short-drama projec
   assert.match(brief, /必须保留内容/u)
   assert.match(brief, /禁止内容/u)
   assert.match(await readFile(join(project, '项目配置.yml'), 'utf8'), /title: 1998父子局/u)
+  assert.match(await readFile(join(project, '灵感速记/灵感速记.md'), 'utf8'), /灵感速记/u)
 })
 
 test('Story Studio project contract keeps Chinese-only ids deterministic', async () => {

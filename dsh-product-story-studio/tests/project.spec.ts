@@ -19,6 +19,7 @@ describe('Story Studio project creation', () => {
     expect(brief).toContain('## 禁止内容')
     expect(await readFile(join(result.path, '项目配置.yml'), 'utf8')).toContain('title: 父子同心')
     expect(await readFile(join(result.path, '故事设定', '时间线.md'), 'utf8')).toContain('时间线')
+    expect(await readFile(join(result.path, '灵感速记', '灵感速记.md'), 'utf8')).toContain('灵感速记')
     await expect(access(join(result.path, '.qnovel', '缓存'))).resolves.toBeUndefined()
     await expect(access(join(result.path, '.qnovel', '索引'))).resolves.toBeUndefined()
   })

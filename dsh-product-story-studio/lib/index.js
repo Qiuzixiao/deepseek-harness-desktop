@@ -36,6 +36,7 @@ const requiredDirectories = [
 	"正文草稿/短剧",
 	"正文草稿/小说",
 	"审校记录/修订",
+	"灵感速记",
 	"导出",
 	".qnovel/缓存",
 	".qnovel/索引"
@@ -55,7 +56,8 @@ const initialFiles = (name) => [
 	["故事设定/世界规则.md", "# 世界规则\n"],
 	["故事设定/时间线.md", "# 时间线\n"],
 	["故事设定/写作风格.md", "# 写作风格\n"],
-	["参考资料/参考资料索引.md", "# 参考资料索引\n\n| 文件 | 路径 | 格式 | 用途 | 状态 |\n| --- | --- | --- | --- | --- |\n"]
+	["参考资料/参考资料索引.md", "# 参考资料索引\n\n| 文件 | 路径 | 格式 | 用途 | 状态 |\n| --- | --- | --- | --- | --- |\n"],
+	["灵感速记/灵感速记.md", "# 灵感速记\n"]
 ];
 function resolveProjectRoot(config = {}, home = homedir(), environment = process.env) {
 	const configured = config.projectRoot?.trim();

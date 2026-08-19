@@ -85,6 +85,8 @@ function init() {
   writeIfMissing(join(root, '故事设定/时间线.md'), '# 时间线\n')
   writeIfMissing(join(root, '故事设定/写作风格.md'), '# 写作风格\n')
   writeIfMissing(join(root, '参考资料/参考资料索引.md'), '# 参考资料索引\n\n| 文件 | 路径 | 格式 | 用途 | 状态 |\n| --- | --- | --- | --- | --- |\n')
+  mkdirSync(join(root, '灵感速记'), { recursive: true })
+  writeIfMissing(join(root, '灵感速记/灵感速记.md'), '# 灵感速记\n')
   process.stdout.write(JSON.stringify({ ok: true, command: 'init', path: root, id, medium }) + '\n')
 }
 
