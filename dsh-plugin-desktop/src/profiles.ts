@@ -32,16 +32,18 @@ export function apply(ctx: Context): void {
       order: 10,
       label: () => desktopTrayLabel(ctx.desktopRuntime.locale, 'profile', ctx.desktopProfiles.current.name),
       invoke: () => {},
-      submenu: () => ctx.desktopProfiles.list().map(profile => ({
-        label: () => profileLabel(profile, ctx.desktopRuntime.locale),
-        type: 'radio',
-        checked: () => profile.name === ctx.desktopProfiles.current.name,
-        enabled: () => selectable(profile),
-        invoke: async () => {
-          if (profile.name === ctx.desktopProfiles.current.name) return
-          await ctx.desktopProfiles.select(profile.name)
-        },
-      })),
+      submenu: () => ctx.desktopProfiles.list()
+        .filter(profile => profile.name !== 'desktop' && profile.name !== 'web')
+        .map(profile => ({
+          label: () => profileLabel(profile, ctx.desktopRuntime.locale),
+          type: 'radio',
+          checked: () => profile.name === ctx.desktopProfiles.current.name,
+          enabled: () => selectable(profile),
+          invoke: async () => {
+            if (profile.name === ctx.desktopProfiles.current.name) return
+            await ctx.desktopProfiles.select(profile.name)
+          },
+        })),
     })
     return () => { registration.dispose() }
   }, 'dsh-plugin-desktop: native profile selector')
