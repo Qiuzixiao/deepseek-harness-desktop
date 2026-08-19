@@ -538,8 +538,12 @@ export function prepareDesktopProfile(
   }
   const presets = rows.get(AGENT_PRESETS_ROW_ID)
   if (presets !== undefined) {
+    const presetsConfig = rowConfig(presets)
     const config = {
-      ...rowConfig(presets),
+      ...presetsConfig,
+      default: profileName === STORY_STUDIO_PROFILE_NAME
+        ? 'story-studio'
+        : presetsConfig.default,
       roots: [
         { path: desktopPresetRoot(), trust: 'system' },
       ],

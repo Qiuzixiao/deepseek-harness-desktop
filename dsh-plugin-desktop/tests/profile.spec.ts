@@ -162,6 +162,9 @@ describe('desktop profile composition', {
     expect(rows.find(row => row.id === 'desktop-shell')).toEqual(expect.objectContaining({
       config: expect.objectContaining({ mode: 'advanced' }),
     }))
+    expect(rows.find(row => row.id === 'agent-presets')).toEqual(expect.objectContaining({
+      config: expect.objectContaining({ default: 'story-studio' }),
+    }))
     expect(rows.find(row => row.id === 'ui-layout')?.disabled).toBe(true)
     expect(rows.find(row => row.id === 'community-market')).toEqual(expect.objectContaining({
       name: 'dsh-community-market',
@@ -203,6 +206,7 @@ describe('desktop profile composition', {
         ],
       }),
     }))
+    expect((presetPatch?.config as Record<string, unknown>).default).toBe('standard')
     expect(readFileSync(prepared.rootConfig, 'utf8')).toBe('[]\n')
     expect(prepared.homeDir).toBe(home)
     expect(fileURLToPath(prepared.bareModuleBaseUrl)).toBe(join(prepared.profile.dir, 'package.json'))
