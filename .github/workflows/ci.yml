@@ -116,6 +116,18 @@ jobs:
         env:
           DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
         run: yarn workspace dsh-plugin-desktop dist:win-portable
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: QNovel-windows-installer
+          path: dsh-plugin-desktop/dist/QNovel-*-x64-Setup.exe
+          if-no-files-found: error
+      - name: Upload Windows portable archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: QNovel-windows-portable
+          path: dsh-plugin-desktop/dist/QNovel-*-x64-Portable.zip
+          if-no-files-found: error
 
   # macOS-only universal packaging smoke on a real macOS runner: the signed
   # release is built manually on a credentialed machine, so an unsigned DMG
