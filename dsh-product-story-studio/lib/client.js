@@ -519,6 +519,7 @@ window.__ModuleLoader__.load({
 		const name = "dsh-product-story-studio";
 		const inject = [
 			"slots",
+			"sessions",
 			"workspaces",
 			"connection"
 		];

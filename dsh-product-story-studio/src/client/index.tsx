@@ -383,7 +383,10 @@ async function readQNovelRoot(connection: ConnectionHandle): Promise<string> {
 }
 
 export const name = 'dsh-product-story-studio'
-export const inject = ['slots', 'workspaces', 'connection']
+// The workbench receives the active Session through this dependency.  The
+// center Workspace picker changes that Session asynchronously, and without a
+// declared dependency this bridge can mount before the sessions store exists.
+export const inject = ['slots', 'sessions', 'workspaces', 'connection']
 
 function mountWorkbench(ctx: StoryStudioClientContext): void {
   const sessions = ctx.get('sessions')
