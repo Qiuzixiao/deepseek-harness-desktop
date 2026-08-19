@@ -36,7 +36,7 @@ try {
     'dsh-desktop:',
     '  mode: advanced',
     'agent-presets:',
-    '  default: minimal',
+    '  default: standard',
     '',
   ].join('\n'))
   const prepared = prepareDesktopProfile('1', home, 'win32', STORY_STUDIO_PROFILE_NAME)
@@ -177,15 +177,13 @@ try {
     throw new Error('assembled Windows profile is missing the agent preset roster')
   }
   const presetIds = (await agentPresets.list()).map(preset => preset.id)
-  if (presetIds.includes('minimal') || !presetIds.includes('standard')) {
+  const expectedPresetIds = ['standard', 'cordis', 'story-studio']
+  if (presetIds.length !== expectedPresetIds.length
+    || expectedPresetIds.some((id, index) => presetIds[index] !== id)) {
     throw new Error(`assembled Windows profile exposes unexpected presets: ${presetIds.join(', ')}`)
   }
   if (agentPresets.defaultId !== 'standard') {
     throw new Error(`assembled Windows profile selected unsupported default ${agentPresets.defaultId}`)
-  }
-  const legacyPreset = await agentPresets.resolve('minimal')
-  if (legacyPreset.id !== 'minimal') {
-    throw new Error(`assembled Windows profile remapped legacy preset to ${legacyPreset.id}`)
   }
   const toolNames = new Set(ctx.tools.schemas().map(schema => schema.name))
   for (const name of ['read_rich_file', 'ocr_pdf', 'checkpoint']) {
@@ -286,7 +284,7 @@ try {
     throw new Error('assembled desktop profile is missing the update tray command')
   }
   if (process.platform !== 'linux'
-    && !trayItems.some(item => item.label() === 'Open DSH Terminal')) {
+    && !trayItems.some(item => item.label() === 'Open QNovel Terminal')) {
     throw new Error('assembled desktop profile is missing the terminal tray command')
   }
   const profileMenu = trayItems.find(item => item.label() === `Profile: ${STORY_STUDIO_PROFILE_NAME}`)

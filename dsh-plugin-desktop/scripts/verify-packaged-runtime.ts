@@ -91,8 +91,6 @@ export const REQUIRED_UNPACKED_RUNTIME_ENTRIES = [
   'node_modules/dsh-product-story-studio/cordis.patch.yml',
   'node_modules/dsh-product-story-studio/lib/index.js',
   'node_modules/dsh-product-story-studio/lib/client.js',
-  'node_modules/dsh-product-story-studio/lib/types/index.d.ts',
-  'node_modules/dsh-product-story-studio/lib/types/client/index.d.ts',
   'node_modules/dsh-product-story-studio/LICENSE',
   'node_modules/@dsh-external/dsh-drop-to-path/package.json',
   'node_modules/@dsh-external/dsh-drop-to-path/cordis.patch.yml',
