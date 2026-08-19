@@ -662,7 +662,7 @@
           }, 500)
         }
         const bootstrap = async () => {
-          if (disposed || booting || ui.tree === null || ui.tree.empty !== true && ui.tree !== null) return
+          if (disposed || booting || ui.tree === null || ui.tree.empty !== true) return
           booting = true
           try {
             const d = await host.call('wb.describe', null)
@@ -675,7 +675,11 @@
             }
             const res = await host.call('wb.listDir', { path: d.root })
             if (disposed) return
-            const entries = (res !== null && typeof res === 'object' && res.ok === true) ? res.entries : []
+            if (res === null || typeof res !== 'object' || res.ok !== true) {
+              retry()
+              return
+            }
+            const entries = res.entries
             ui.tree = { root: d.root, rootName: d.rootName, dirs: { [d.root]: entries }, expanded: new Set([d.root]) }
             emit()
           } catch (e) {

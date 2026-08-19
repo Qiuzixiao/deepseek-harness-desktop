@@ -11,5 +11,7 @@ describe('dsh-workbench client bootstrap', () => {
     expect(source).toContain('void bootstrap()')
     expect(source).toContain('}, 500)')
     expect(source).toContain('if (retryTimer !== null) clearTimeout(retryTimer)')
+    expect(source).toContain("if (res === null || typeof res !== 'object' || res.ok !== true) {")
+    expect(source).toContain('              retry()\n              return\n            }\n            const entries = res.entries')
   })
 })
