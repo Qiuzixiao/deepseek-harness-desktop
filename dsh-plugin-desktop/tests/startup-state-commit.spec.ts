@@ -173,7 +173,7 @@ describe('Desktop startup state commit ownership', () => {
     expect(readDesktopProfileState(profileStatePath)).toEqual({
       version: 1,
       active: 'work',
-      lastKnownGood: 'desktop',
+      lastKnownGood: 'story-studio',
     })
   })
 
@@ -206,13 +206,13 @@ describe('Desktop startup state commit ownership', () => {
     expect(result).toEqual({
       route: 'last-known-good',
       recoveryActionsSafe: true,
-      reopenLastKnownGood: 'desktop',
+      reopenLastKnownGood: 'story-studio',
     })
     expect(events).toEqual(['quiesce-host'])
     expect(readDesktopProfileState(profileStatePath)).toEqual({
       version: 1,
-      active: 'desktop',
-      lastKnownGood: 'desktop',
+      active: 'story-studio',
+      lastKnownGood: 'story-studio',
     })
     expect(existsSync(desktopInstallRecoveryStatePath(userDataDir))).toBe(false)
   })
@@ -266,7 +266,7 @@ describe('Desktop startup state commit ownership', () => {
     expect(readDesktopProfileState(profileStatePath)).toEqual({
       version: 1,
       active: 'work',
-      lastKnownGood: 'desktop',
+      lastKnownGood: 'story-studio',
     })
   })
 
