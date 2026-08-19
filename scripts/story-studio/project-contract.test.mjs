@@ -5,15 +5,16 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 
 const exec = promisify(execFile)
 const root = new URL('../../', import.meta.url)
-const script = new URL('dsh-plugin-desktop/resources/agent-presets/story-studio/skills/story-project/scripts/story-project.mjs', root)
+const script = fileURLToPath(new URL('dsh-plugin-desktop/resources/agent-presets/story-studio/skills/story-project/scripts/story-project.mjs', root))
 
 test('Story Studio project contract initializes and reports a short-drama project', async () => {
   const home = await mkdtemp(join(tmpdir(), 'story-studio-project-contract-'))
   const project = join(home, 'story')
-  const run = async (...args) => exec(process.execPath, [script.pathname, ...args], { encoding: 'utf8' })
+  const run = async (...args) => exec(process.execPath, [script, ...args], { encoding: 'utf8' })
 
   const initialized = JSON.parse((await run('init', project, '--title', '1998父子局', '--medium', 'short-drama')).stdout)
   assert.equal(initialized.ok, true)
@@ -34,7 +35,7 @@ test('Story Studio project contract initializes and reports a short-drama projec
 test('Story Studio project contract keeps Chinese-only ids deterministic', async () => {
   const home = await mkdtemp(join(tmpdir(), 'story-studio-project-id-'))
   const project = join(home, 'story')
-  const run = async (...args) => exec(process.execPath, [script.pathname, ...args], { encoding: 'utf8' })
+  const run = async (...args) => exec(process.execPath, [script, ...args], { encoding: 'utf8' })
   const first = JSON.parse((await run('init', project, '--title', '父子同心', '--medium', 'short-drama')).stdout)
   assert.match(first.id, /^story-[a-z0-9]+$/u)
   assert.notEqual(first.id, `story-${Date.now()}`)
