@@ -49,16 +49,15 @@ describe('desktop profiles Host plugin', () => {
       checked: command.checked?.(),
       enabled: command.enabled?.(),
     }))).toEqual([
-      { label: 'desktop', checked: true, enabled: true },
       { label: '工作 profile', checked: false, enabled: true },
       { label: 'headless (Unavailable for Desktop)', checked: false, enabled: false },
     ])
 
     locale = 'zh'
     expect(trayItem?.label()).toBe('配置文件：desktop')
-    expect(trayItem?.submenu?.()[2]?.label()).toBe('headless（不可用于桌面端）')
+    expect(trayItem?.submenu?.()[1]?.label()).toBe('headless（不可用于桌面端）')
 
-    await commands[1]?.invoke()
+    await commands[0]?.invoke()
     expect(events).toEqual(['select:工作 profile'])
     expect(runtime.requestRestart).not.toHaveBeenCalled()
     disposeEffect?.()
