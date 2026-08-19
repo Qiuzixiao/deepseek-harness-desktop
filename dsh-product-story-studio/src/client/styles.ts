@@ -43,7 +43,7 @@ export const styles = `
 [class*="_fishHitbox"]{position:relative}
 /* Keep the upstream fish node because its hover animation lives on that node;
    replace only its painted artwork with the supplied Qnovel SVG. */
-[class*="_fishHitbox"] [class*="_fish"]{visibility:visible!important;width:34px;height:34px;color:transparent!important;fill:transparent!important;stroke:transparent!important;background:url("/wb/qnovel/Qnovel.svg") center/contain no-repeat}
+[class*="_fishHitbox"] [class*="_fish"]{visibility:visible!important;width:34px;height:34px;color:transparent!important;fill:transparent!important;stroke:transparent!important;background:url("/wb/qnovel/icon-qnovel.svg") center/contain no-repeat}
 [class*="_fishHitbox"] [class*="_fish"]>*{visibility:hidden!important}
 [class*="_headline"]{column-gap:11px}
 .storyStudioDialog{box-sizing:border-box;width:min(520px,calc(100vw - 32px));gap:0;padding:0;border-radius:12px;border-color:var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);overflow:hidden}

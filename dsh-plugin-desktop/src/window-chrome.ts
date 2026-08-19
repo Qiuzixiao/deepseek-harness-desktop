@@ -1,5 +1,5 @@
 /** Height reserved above the macOS sidebar content in CSS pixels. */
-export const MACOS_TITLEBAR_HEIGHT = 28
+export const MACOS_TITLEBAR_HEIGHT = 32
 
 /** Height of the macOS native drag hit regions in CSS pixels. */
 export const MACOS_DRAG_REGION_HEIGHT = 32

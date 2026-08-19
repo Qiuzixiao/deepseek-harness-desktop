@@ -16,7 +16,7 @@ describe('QNovel sidebar and brand presentation contract', () => {
     expect(styles).toContain('content:"把故事，写成作品"')
     expect(styles).toContain('content:"Beta"')
     expect(styles).toContain('url("/wb/qnovel/icon-qnovel.svg")')
-    expect(styles).toContain('url("/wb/qnovel/Qnovel.svg")')
+    expect(styles).toContain('[class*="_fishHitbox"] [class*="_fish"]{visibility:visible!important;width:34px;height:34px;color:transparent!important;fill:transparent!important;stroke:transparent!important;background:url("/wb/qnovel/icon-qnovel.svg")')
     expect(styles).toContain('[class*="logoRow"] [class*="brand"]{position:absolute;left:50%;transform:translateX(-50%);flex:none')
     expect(styles).toContain('[class*="logoRow"] [class*="brand"]>*{display:none')
     expect(styles).toContain('[class*="logoRow"] [class*="toggle"]:has([class*="railFish"])::before')
