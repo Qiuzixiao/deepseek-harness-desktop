@@ -18,8 +18,8 @@ function ok(line) { console.log(`\x1b[32m${line}\x1b[0m`) }
 function step(n, text) { print(`\n\x1b[36m[${n}] ${text}\x1b[0m`) }
 
 function tryRun(args) {
-  try { return RUN(args) }
-  catch { return null }
+  try { RUN(args); return true }
+  catch { return false }
 }
 
 // -- 0. safety gate: the working tree must be clean before we merge
@@ -62,7 +62,7 @@ if (behind === 0) {
 step(4, `合并上游（${behind} 个提交）`)
 const merged = tryRun(['merge', 'upstream/master', '--no-edit'])
 
-if (merged === null) {
+if (!merged) {
   warn('合并遇到冲突，需要手动处理：')
   print('  1. 打开冲突文件，搜索 <<<<<<< HEAD 标记')
   print('  2. 保留你想要的两边内容，删掉标记行')
