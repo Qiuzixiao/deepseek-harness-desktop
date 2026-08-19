@@ -1,6 +1,6 @@
 import { access, mkdtemp, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createStoryStudioRpcHandler } from '../src/index.ts'
 import { createStoryProject, ensureProjectRoot, normalizeProjectName, projectId, resolveProjectRoot } from '../src/project.ts'
@@ -31,10 +31,13 @@ describe('Story Studio project creation', () => {
   })
 
   it('uses one stable global projects directory by default', () => {
-    expect(resolveProjectRoot({}, '/Users/writer', {})).toBe('/Users/writer/Documents/QNovel作品')
-    expect(resolveProjectRoot({}, '/Users/writer', { QNOVEL_PROJECTS_ROOT: '/Volumes/QNovel' })).toBe('/Volumes/QNovel')
-    expect(resolveProjectRoot({}, '/Users/writer', { STORY_STUDIO_PROJECTS_ROOT: '/Volumes/Writing' }))
-      .toBe('/Volumes/Writing')
+    const home = join(tmpdir(), 'writer')
+    const configuredRoot = join(home, 'configured')
+    const legacyConfiguredRoot = join(home, 'legacy-configured')
+    expect(resolveProjectRoot({}, home, {})).toBe(resolve(home, 'Documents', 'QNovel作品'))
+    expect(resolveProjectRoot({}, home, { QNOVEL_PROJECTS_ROOT: configuredRoot })).toBe(resolve(configuredRoot))
+    expect(resolveProjectRoot({}, home, { STORY_STUDIO_PROJECTS_ROOT: legacyConfiguredRoot }))
+      .toBe(resolve(legacyConfiguredRoot))
   })
 
   it('uses a stable identifier for Chinese project names', () => {
