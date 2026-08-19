@@ -93,10 +93,10 @@ describe('desktop update installer download', () => {
       request,
     })
 
-    expect(result).toBe(join(directory, 'DSH-Desktop-2.1.0-mac.dmg'))
+    expect(result).toBe(join(directory, 'QNovel-2.1.0-mac.dmg'))
     expect(await readFile(result)).toEqual(Buffer.from(artifact))
     expect(calls).toHaveLength(1)
-    expect(calls[0]?.url).toBe(DESKTOP_DOWNLOAD_URLS.darwin)
+    expect(calls[0]?.url).toBe(DESKTOP_DOWNLOAD_URLS.darwin.replaceAll('{version}', '2.1.0'))
     expect(calls[0]?.init).toMatchObject({ method: 'GET', cache: 'no-store', redirect: 'follow' })
     await expectNoPartialFiles(directory)
   })
@@ -109,12 +109,12 @@ describe('desktop update installer download', () => {
       version: '2.2.0',
       destinationPath: destinationPath(directory, 'win32', '2.2.0'),
       request: async (url) => {
-        expect(url).toBe(DESKTOP_DOWNLOAD_URLS.win32)
+        expect(url).toBe(DESKTOP_DOWNLOAD_URLS.win32.replaceAll('{version}', '2.2.0'))
         return chunkedResponse([artifact])
       },
     })
 
-    expect(result).toBe(join(directory, 'DSH-Desktop-2.2.0-windows.exe'))
+    expect(result).toBe(join(directory, 'QNovel-2.2.0-windows.exe'))
     expect(await readFile(result)).toEqual(Buffer.from(artifact))
     await expectNoPartialFiles(directory)
   })
@@ -130,7 +130,7 @@ describe('desktop update installer download', () => {
 
     expect(result).toBe(join(
       directory,
-      'DSH-Desktop-2.8.0+build-mac.dmg',
+      'QNovel-2.8.0+build-mac.dmg',
     ))
   })
 

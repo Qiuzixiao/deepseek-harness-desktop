@@ -1,7 +1,7 @@
-/** Headless version checks against the public DSH Desktop release service. */
+/** Headless version checks against the QNovel GitHub Releases API. */
 
-/** Public endpoint returning the latest stable DSH Desktop version. */
-export const DESKTOP_VERSION_ENDPOINT = 'https://www.dshdesktop.cn/api/desktop/version'
+/** Public endpoint returning the latest QNovel GitHub release. */
+export const DESKTOP_VERSION_ENDPOINT = 'https://api.github.com/repos/Qiuzixiao/deepseek-harness-desktop/releases/latest'
 
 /** Maximum response body bytes accepted from the version service. */
 export const MAX_VERSION_RESPONSE_BYTES = 4 * 1024
@@ -97,7 +97,10 @@ export async function checkForStableUpdate(
 
   const init: RequestInit = {
     method: 'GET',
-    headers: { Accept: 'application/json' },
+    headers: {
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+    },
     cache: 'no-store',
     redirect: 'error',
     ...(options.signal === undefined ? {} : { signal: options.signal }),
@@ -169,8 +172,9 @@ function parseVersionResponse(body: string): ParsedSemVer | null {
   } catch {
     return null
   }
-  if (!isRecord(value) || typeof value.version !== 'string') return null
-  return parseCanonicalStableVersion(value.version)
+  if (!isRecord(value) || typeof value.tag_name !== 'string') return null
+  const tag = value.tag_name.startsWith('v') ? value.tag_name.slice(1) : value.tag_name
+  return parseCanonicalStableVersion(tag)
 }
 
 function parseCanonicalStableVersion(input: string): ParsedSemVer | null {

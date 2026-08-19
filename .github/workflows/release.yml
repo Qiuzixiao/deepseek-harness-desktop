@@ -1,0 +1,96 @@
+name: QNovel Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to build, for example v1.0.0
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  DSH_TELEMETRY_DISABLED: '1'
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - id: release
+        shell: bash
+        env:
+          EVENT_TAG: ${{ github.ref_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          tag="${INPUT_TAG:-$EVENT_TAG}"
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+  windows:
+    needs: resolve
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+      - run: corepack enable
+      - run: yarn install --immutable
+      - name: Verify package version
+        shell: bash
+        run: test "$(node -p "require('./dsh-plugin-desktop/package.json').version")" = "${{ needs.resolve.outputs.version }}"
+      - name: Build Windows installer
+        run: yarn workspace dsh-plugin-desktop dist:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QNovel-windows-${{ needs.resolve.outputs.version }}
+          path: dsh-plugin-desktop/dist/QNovel-${{ needs.resolve.outputs.version }}-x64-Setup.exe
+          if-no-files-found: error
+
+  macos:
+    needs: resolve
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+      - run: corepack enable
+      - run: yarn install --immutable
+      - name: Verify package version
+        run: test "$(node -p "require('./dsh-plugin-desktop/package.json').version")" = "${{ needs.resolve.outputs.version }}"
+      - name: Build unsigned universal macOS DMG
+        run: yarn workspace dsh-plugin-desktop dist:mac-smoke
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QNovel-macos-${{ needs.resolve.outputs.version }}
+          path: dsh-plugin-desktop/dist/mac-smoke/QNovel-${{ needs.resolve.outputs.version }}-universal.dmg
+          if-no-files-found: error
+
+  publish:
+    needs: [resolve, windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: QNovel-*-${{ needs.resolve.outputs.version }}
+          path: release-assets
+          merge-multiple: true
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.resolve.outputs.tag }}
+        run: gh release create "$TAG" release-assets/* --repo "$GITHUB_REPOSITORY" --title "QNovel $TAG" --generate-notes

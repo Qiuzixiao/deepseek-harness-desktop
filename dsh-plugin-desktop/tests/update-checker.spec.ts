@@ -9,7 +9,7 @@ import {
 } from '../src/update-checker.ts'
 
 function versionResponse(version: unknown, init: ResponseInit = {}): Response {
-  return Response.json({ version }, init)
+  return Response.json({ tag_name: typeof version === 'string' ? `v${version}` : version }, init)
 }
 
 describe('strict SemVer parsing', () => {
@@ -80,9 +80,8 @@ describe('public Desktop version check', () => {
       signal: controller.signal,
     })
     const headers = new Headers(calls[0]?.init.headers)
-    expect(headers.get('accept')).toBe('application/json')
-    expect(headers.has('if-none-match')).toBe(false)
-    expect(headers.has('x-github-api-version')).toBe(false)
+    expect(headers.get('accept')).toBe('application/vnd.github+json')
+    expect(headers.get('x-github-api-version')).toBe('2022-11-28')
   })
 
   it.each([

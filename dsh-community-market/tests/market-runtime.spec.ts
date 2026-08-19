@@ -58,7 +58,7 @@ const rawCatalog = {
     id: 'anywhere-labs/deepseek-harness-desktop/dsh-plugin-desktop',
     name: 'deepseek-harness-desktop',
     owner: 'anywhere-labs',
-    url: 'https://github.com/anywhere-labs/deepseek-harness-desktop',
+      url: 'https://github.com/anywhere-labs/deepseek-harness-desktop',
     category: 'dev',
     description: { en: 'Desktop shell', zh: '桌面外壳' },
     pushedAt: '2026-08-17T05:45:19Z',

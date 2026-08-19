@@ -1,4 +1,4 @@
-/** Headless, confirmation-gated downloads for DSH Desktop installers. */
+/** Headless, confirmation-gated downloads for QNovel GitHub Release installers. */
 
 import { randomUUID } from 'node:crypto'
 import { chmod, lstat, mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
@@ -9,10 +9,10 @@ import { compareSemVerVersions, parseSemVer } from './update-checker.ts'
 /** Desktop platforms with a fixed installer download endpoint. */
 export type DesktopDownloadPlatform = 'darwin' | 'win32'
 
-/** Fixed download endpoints that record one user-confirmed installer download. */
+/** GitHub Release asset endpoints for one user-confirmed installer download. */
 export const DESKTOP_DOWNLOAD_URLS: Readonly<Record<DesktopDownloadPlatform, string>> = {
-  darwin: 'https://www.dshdesktop.cn/api/downloads/mac',
-  win32: 'https://www.dshdesktop.cn/api/downloads/windows',
+  darwin: 'https://github.com/Qiuzixiao/deepseek-harness-desktop/releases/download/v{version}/QNovel-{version}-universal.dmg',
+  win32: 'https://github.com/Qiuzixiao/deepseek-harness-desktop/releases/download/v{version}/QNovel-{version}-x64-Setup.exe',
 }
 
 /** Maximum accepted installer size, in bytes. */
@@ -110,7 +110,7 @@ export async function downloadDesktopUpdate(options: DownloadDesktopUpdateOption
 
   let response: Response
   try {
-    response = await options.request(DESKTOP_DOWNLOAD_URLS[platform], {
+    response = await options.request(releaseAssetUrl(platform, options.version), {
       method: 'GET',
       cache: 'no-store',
       redirect: 'follow',
@@ -161,7 +161,7 @@ export function desktopUpdateFilename(platform: DesktopDownloadPlatform, version
   validatedVersion(version)
   const extension = platform === 'darwin' ? 'dmg' : 'exe'
   const platformName = platform === 'darwin' ? 'mac' : 'windows'
-  return `DSH-Desktop-${version}-${platformName}.${extension}`
+  return `QNovel-${version}-${platformName}.${extension}`
 }
 
 /** Remember a downloaded installer until an upgraded application resolves its retention. */
@@ -235,6 +235,10 @@ function validatedPlatform(platform: DesktopDownloadPlatform): DesktopDownloadPl
     throw new UpdateDownloadError('invalid-options', `Unsupported update download platform: ${String(platform)}`)
   }
   return platform
+}
+
+function releaseAssetUrl(platform: DesktopDownloadPlatform, version: string): string {
+  return DESKTOP_DOWNLOAD_URLS[platform].replaceAll('{version}', encodeURIComponent(version))
 }
 
 function validatedVersion(version: string): string {
