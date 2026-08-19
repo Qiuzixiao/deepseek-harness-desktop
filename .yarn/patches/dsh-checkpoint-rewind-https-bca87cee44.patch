@@ -1,5 +1,17 @@
+diff --git a/client/index.js b/client/index.js
+index a0ec9cf353..1537d3d8de 100644
+--- a/client/index.js
++++ b/client/index.js
+@@ -67,6 +67,7 @@ window.__ModuleLoader__.load({
+         invocation: Object.freeze({ kind: 'direct' }),
+         parameters: Object.freeze([Object.freeze({
+           name: 'limit', wire: 'limit', source: 'json',
++          acceptsUndefined: true,
+           codec: Object.freeze({
+             mode: 'strict',
+             typeSymbol: 'dsh-checkpoint-rewind/types#TimelineLimit',
 diff --git a/index.mjs b/index.mjs
-index 2261ccd88b86fd62592dac6dc68bcec9953df0b5..d540f157e6ea0e0d9591f7b7d4b29b60a7dbc1d0 100644
+index 2261ccd88b..d540f157e6 100644
 --- a/index.mjs
 +++ b/index.mjs
 @@ -284,7 +284,7 @@ export async function apply(ctx, config = {}) {
@@ -38,3 +50,15 @@ index 2261ccd88b86fd62592dac6dc68bcec9953df0b5..d540f157e6ea0e0d9591f7b7d4b29b60
    })
  
    /**
+diff --git a/lib/wire.mjs b/lib/wire.mjs
+index f2cc3e1e5a..2f5ba4c395 100644
+--- a/lib/wire.mjs
++++ b/lib/wire.mjs
+@@ -80,6 +80,7 @@ export const TIMELINE_DESCRIPTOR = Object.freeze({
+     name: 'limit',
+     wire: 'limit',
+     source: 'json',
++    acceptsUndefined: true,
+     codec: Object.freeze({
+       mode: 'strict',
+       typeSymbol: `${PACKAGE}/types#TimelineLimit`,

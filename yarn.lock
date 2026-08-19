@@ -7389,7 +7389,7 @@ __metadata:
 
 "dsh-checkpoint-rewind@patch:dsh-checkpoint-rewind@https%3A//registry.npmjs.org/dsh-checkpoint-rewind/-/dsh-checkpoint-rewind-0.5.1.tgz#~/.yarn/patches/dsh-checkpoint-rewind-https-bca87cee44.patch":
   version: 0.5.1
-  resolution: "dsh-checkpoint-rewind@patch:dsh-checkpoint-rewind@https%3A//registry.npmjs.org/dsh-checkpoint-rewind/-/dsh-checkpoint-rewind-0.5.1.tgz#~/.yarn/patches/dsh-checkpoint-rewind-https-bca87cee44.patch::version=0.5.1&hash=5d02dc"
+  resolution: "dsh-checkpoint-rewind@patch:dsh-checkpoint-rewind@https%3A//registry.npmjs.org/dsh-checkpoint-rewind/-/dsh-checkpoint-rewind-0.5.1.tgz#~/.yarn/patches/dsh-checkpoint-rewind-https-bca87cee44.patch::version=0.5.1&hash=3eec87"
   dependencies:
     zod: "npm:^4.4.3"
   peerDependencies:
@@ -7400,7 +7400,7 @@ __metadata:
     "@deepseek-ai/dsh-tools": 0.1.0-rc.6
     "@deepseek-ai/dsh-typert-protocol": 0.1.0-rc.6
     "@deepseek-ai/schemastery": ">=3.0.0"
-  checksum: 10c0/7cb82ad3d89a8c6e6e7b9e3e450b90bff43412bede9fbfd258a8f4344bf7572644a07861097fa612376007d111e8ac415ef8cdd75f189604ffc0f27968d53864
+  checksum: 10c0/5a325caa10dd508f4371a9e58c4a7c255f35677d6b3aa3f06e40a4ad867ffdff3cc90bf3f2f89f225360113253c554c010ecddb6c8caf26bcebbd9230c42da53
   languageName: node
   linkType: hard
 
