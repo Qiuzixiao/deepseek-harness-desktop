@@ -6,6 +6,12 @@ export const styles = `
 [class*="logoRow"] [class*="brand"]>*{display:none!important}
 [class*="logoRow"] [class*="brand"]::before{content:"";visibility:visible;display:block;flex:none;width:22px;height:22px;background:url("/wb/qnovel/icon-qnovel.svg") center/contain no-repeat}
 [class*="logoRow"] [class*="brand"]::after{content:"QNovel";visibility:visible;display:block;color:var(--dsw-alias-label-primary);font-size:16px;line-height:24px;font-weight:740;letter-spacing:-.02em}
+/* The collapsed rail still mounts the upstream FishLogo. Replace that glyph
+   with the QNovel mark while keeping the official expand/collapse behavior;
+   hovering continues to reveal the panel icon. */
+[class*="logoRow"] [class*="toggle"]:has([class*="railFish"])::before{content:"";display:block;width:24px;height:24px;background:url("/wb/qnovel/icon-qnovel.svg") center/contain no-repeat}
+[class*="logoRow"] [class*="toggle"]:has([class*="railFish"]) [class*="railFish"]{display:none!important}
+[class*="logoRow"] [class*="toggle"]:has([class*="railFish"]):hover::before{display:none}
 /* The upstream slot is technically rendered in the footer, but QNovel's
    product contract is explicit: New Session and New Work are one top action
    row directly below the wordmark. Position the slot's wrapper (rather than

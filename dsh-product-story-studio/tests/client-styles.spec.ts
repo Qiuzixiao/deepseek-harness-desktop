@@ -19,5 +19,7 @@ describe('QNovel sidebar and brand presentation contract', () => {
     expect(styles).toContain('url("/wb/qnovel/Qnovel.svg")')
     expect(styles).toContain('[class*="logoRow"] [class*="brand"]{position:absolute;left:50%;transform:translateX(-50%);flex:none')
     expect(styles).toContain('[class*="logoRow"] [class*="brand"]>*{display:none')
+    expect(styles).toContain('[class*="logoRow"] [class*="toggle"]:has([class*="railFish"])::before')
+    expect(styles).toContain('background:url("/wb/qnovel/icon-qnovel.svg") center/contain no-repeat')
   })
 })
