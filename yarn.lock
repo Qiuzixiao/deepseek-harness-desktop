@@ -1169,7 +1169,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@deepseek-ai/dsh-client-ui-commands@npm:0.1.0-rc.7, @deepseek-ai/dsh-client-ui-commands@npm:^0.1.0-rc.7":
+"@deepseek-ai/dsh-client-ui-commands@npm:0.1.0-rc.7":
   version: 0.1.0-rc.7
   resolution: "@deepseek-ai/dsh-client-ui-commands@npm:0.1.0-rc.7"
   dependencies:
@@ -1187,6 +1187,27 @@ __metadata:
     "@deepseek-ai/dsh-invariants": ^0.1.0-rc.7
     react: ^18.2.0
   checksum: 10c0/73965de31258749289bde39eb9ee6c82ccf5d9646b0a24c8a49ea001acffa9562c561c9783e8b9a271e404ab68ee8e88db3608c9406925fd4eff2213a59d4708
+  languageName: node
+  linkType: hard
+
+"@deepseek-ai/dsh-client-ui-commands@patch:@deepseek-ai/dsh-client-ui-commands@npm%3A0.1.0-rc.7#./patches/dsh-client-ui-commands@0.1.0-rc.7.patch::locator=deepseek-harness-desktop%40workspace%3A.":
+  version: 0.1.0-rc.7
+  resolution: "@deepseek-ai/dsh-client-ui-commands@patch:@deepseek-ai/dsh-client-ui-commands@npm%3A0.1.0-rc.7#./patches/dsh-client-ui-commands@0.1.0-rc.7.patch::version=0.1.0-rc.7&hash=aeccb2&locator=deepseek-harness-desktop%40workspace%3A."
+  dependencies:
+    clsx: "npm:^2.0.0"
+  peerDependencies:
+    "@deepseek-ai/cordis": ^4.0.1
+    "@deepseek-ai/dsh-api-remotes": ^0.1.0-rc.7
+    "@deepseek-ai/dsh-client-locale": ^0.1.0-rc.7
+    "@deepseek-ai/dsh-client-runtime": ^0.1.0-rc.7
+    "@deepseek-ai/dsh-client-ui-conversation": ^0.1.0-rc.7
+    "@deepseek-ai/dsh-client-ui-input-trigger": ^0.1.0-rc.7
+    "@deepseek-ai/dsh-client-ui-primitives": ^0.1.0-rc.7
+    "@deepseek-ai/dsh-client-ui-slots": ^0.1.0-rc.7
+    "@deepseek-ai/dsh-commands": ^0.1.0-rc.7
+    "@deepseek-ai/dsh-invariants": ^0.1.0-rc.7
+    react: ^18.2.0
+  checksum: 10c0/58561a2354980e27fd44d759fe4b2a42e706f4cc3b8abc127a276d712d15439ae3115f375aba0be0f1278fc12747a157b6334edbda00e313c940fcd7a37181a6
   languageName: node
   linkType: hard
 
@@ -1331,7 +1352,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@deepseek-ai/dsh-client-ui-input-trigger@npm:0.1.0-rc.7, @deepseek-ai/dsh-client-ui-input-trigger@npm:^0.1.0-rc.7":
+"@deepseek-ai/dsh-client-ui-input-trigger@npm:0.1.0-rc.7":
   version: 0.1.0-rc.7
   resolution: "@deepseek-ai/dsh-client-ui-input-trigger@npm:0.1.0-rc.7"
   dependencies:
@@ -1345,6 +1366,23 @@ __metadata:
     "@deepseek-ai/dsh-invariants": ^0.1.0-rc.7
     react: ^18.2.0
   checksum: 10c0/ed716ff2acad3f910da2e43523b089a81d3a008b5691f51e1577aca31bb26d891413adcc9af0f24906d6054e6d1680d9b9462dc0fdf825dcc5af5ed8fe7c171f
+  languageName: node
+  linkType: hard
+
+"@deepseek-ai/dsh-client-ui-input-trigger@patch:@deepseek-ai/dsh-client-ui-input-trigger@npm%3A0.1.0-rc.7#./patches/dsh-client-ui-input-trigger@0.1.0-rc.7.patch::locator=deepseek-harness-desktop%40workspace%3A.":
+  version: 0.1.0-rc.7
+  resolution: "@deepseek-ai/dsh-client-ui-input-trigger@patch:@deepseek-ai/dsh-client-ui-input-trigger@npm%3A0.1.0-rc.7#./patches/dsh-client-ui-input-trigger@0.1.0-rc.7.patch::version=0.1.0-rc.7&hash=785d10&locator=deepseek-harness-desktop%40workspace%3A."
+  dependencies:
+    clsx: "npm:^2.0.0"
+  peerDependencies:
+    "@deepseek-ai/cordis": ^4.0.1
+    "@deepseek-ai/dsh-client-locale": ^0.1.0-rc.7
+    "@deepseek-ai/dsh-client-runtime": ^0.1.0-rc.7
+    "@deepseek-ai/dsh-client-ui-primitives": ^0.1.0-rc.7
+    "@deepseek-ai/dsh-client-ui-slots": ^0.1.0-rc.7
+    "@deepseek-ai/dsh-invariants": ^0.1.0-rc.7
+    react: ^18.2.0
+  checksum: 10c0/42b34d5090965317d170f502f54ed0c35dfcfe79e4210ef91072de035f876935e3732f809b18c72108fe9f2319766cb74e56fab08bf840d46b665bdb1f1f03c2
   languageName: node
   linkType: hard
 

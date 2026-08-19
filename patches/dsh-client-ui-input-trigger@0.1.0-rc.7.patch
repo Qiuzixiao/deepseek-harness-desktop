@@ -1,0 +1,28 @@
+diff --git a/lib/client.js b/lib/client.js
+index c99eb37f2589c662c78dd7472f6ea9bde0cdc008..103d7f2d3a5a70b545713166c4017fb3c0ba798f 100644
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -765,8 +765,8 @@ window.__ModuleLoader__.load({
+ 									children: item.icon
+ 								}),
+ 								(0, react_jsx_runtime.jsx)("span", {
+-									className: MenuView_module_css_default.itemName,
+-									children: item.name
++								className: MenuView_module_css_default.itemName,
++									children: item.displayName ?? item.name
+ 								}),
+ 								item.description !== void 0 && (0, react_jsx_runtime.jsx)("span", {
+ 									className: MenuView_module_css_default.itemDescription,
+diff --git a/lib/types/types.d.ts b/lib/types/types.d.ts
+index 7b0708b2a7ae82f439dcb57526eaebf661d6990a..6f6cff93bdbea2270f22308b5e726daf0d026e17 100644
+--- a/lib/types/types.d.ts
++++ b/lib/types/types.d.ts
+@@ -27,6 +27,8 @@ export type PickVia = 'menu' | 'space' | 'enter';
+ /** One menu candidate. Pure display data — zero behavior declaration. */
+ export interface InputTriggerCandidate {
+     readonly name: string;
++    /** Optional localized display name; the source name remains the execution key. */
++    readonly displayName?: string;
+     readonly description?: string;
+     readonly icon?: string;
+     readonly hint?: string;

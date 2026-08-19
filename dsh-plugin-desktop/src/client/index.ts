@@ -7,9 +7,17 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 import { applyAdvancedShell } from './advanced-shell.ts'
 import { startRendererBootReporter } from './boot-health.ts'
+import { provideCommandDisplay } from './command-display.ts'
 import { installDesktopDirectoryPickerBridge } from './directory-picker.ts'
 import { parseDesktopClientEnvironment } from './environment.ts'
 import { installWorkspaceFolderDrop } from './workspace-folder-drop.ts'
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /** Desktop-owned display copy for the upstream slash-command menu. */
+    commandDisplay: import('./command-display.ts').CommandDisplayService
+  }
+}
 
 export { applyAdvancedShell } from './advanced-shell.ts'
 export {
@@ -34,6 +42,10 @@ export const inject = [
 export function apply(ctx: ClientContext): void {
   const environment = parseDesktopClientEnvironment(window.location.search)
   if (!environment) return
+  ctx.effect(
+    () => provideCommandDisplay(ctx),
+    'dsh-plugin-desktop: command display copy',
+  )
   ctx.effect(
     () => startRendererBootReporter(ctx.loader),
     'dsh-plugin-desktop: renderer boot health report',

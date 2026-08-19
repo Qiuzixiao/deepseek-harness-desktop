@@ -1,0 +1,22 @@
+diff --git a/lib/client.js b/lib/client.js
+index 69098340266f9040198fbaa707196a26d8bc53f9..a64118cd2daccbb536ce8716444c48c09742dc2a 100644
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -624,13 +624,16 @@ window.__ModuleLoader__.load({
+ 			/** Menu candidates: host catalog + contribution availability, then position filtering and fuzzy name ranking. */
+ 			async candidates(session, req) {
+ 				const list = await this.directory.ensureReady(session.sessionId, req.signal);
++				const display = this.ctx.get("commandDisplay");
++				const locale = this.ctx.get("locale")?.getLocale().active;
+ 				const rows = [];
+ 				const seen = /* @__PURE__ */ new Set();
+ 				for (const c of list) {
+ 					seen.add(c.name);
+ 					rows.push({
+ 						name: c.name,
+-						description: c.description,
++						...(display?.resolve(c.name, locale)?.label !== void 0 ? { displayName: display.resolve(c.name, locale).label } : {}),
++						description: display?.resolve(c.name, locale)?.description ?? c.description,
+ 						...c.input !== void 0 ? { hint: c.input.hint } : {}
+ 					});
+ 				}
