@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import { readFileSync, readdirSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 import { describe, expect, it } from 'vitest'
 
@@ -127,6 +129,22 @@ describe('published package surface', () => {
   it('keeps unaudited marketplace packages out of the published runtime', () => {
     expect(manifest.dependencies).not.toHaveProperty('dshmarket')
     expect(manifest.optionalDependencies ?? {}).not.toHaveProperty('dshmarket')
+  })
+
+  it('patches app boot to accept an empty patch layer', () => {
+    const patchPath = './patches/dsh-app-boot@0.1.0-rc.7.patch'
+    expect(workspaceManifest.resolutions).toMatchObject({
+      '@deepseek-ai/dsh-app-boot@npm:0.1.0-rc.7': expect.stringContaining(patchPath),
+      '@deepseek-ai/dsh-app-boot@npm:^0.1.0-rc.7': expect.stringContaining(patchPath),
+    })
+    const marker = 'if (parsed === void 0 || parsed === null) return [];'
+    const patch = readFileSync(new URL(patchPath, workspaceRoot), 'utf8')
+    const installedBoot = readFileSync(new URL(
+      'node_modules/@deepseek-ai/dsh-app-boot/lib/index.js',
+      packageRoot,
+    ), 'utf8')
+    expect(patch).toContain(marker)
+    expect(installedBoot).toContain(marker)
   })
 
   it('patches the browse panel with the Windows native-picker icon bridge', () => {
@@ -264,6 +282,47 @@ describe('published package surface', () => {
     expect(verified).toBeGreaterThan(awaitRenderer)
     expect(profileHealthy).toBeGreaterThan(verified)
     expect(clearVerified).toBeGreaterThan(profileHealthy)
+  })
+
+  it('wires lifecycle evidence through key startup stages and terminal outcomes', () => {
+    const main = readFileSync(new URL('src/main.ts', packageRoot), 'utf8')
+    const createRecorder = main.indexOf('const lifecycleRecorder = createDesktopLifecycleRecorder({')
+    const startRun = main.indexOf('lifecycleRecorder.startStartup(startupStage)')
+    const finishRenderer = main.indexOf('lifecycleRecorder.finishRendererBoot(')
+    const rendererStage = main.indexOf("startupStage = 'renderer-startup'")
+    const startRenderer = main.indexOf('lifecycleRecorder.startRendererBoot()')
+    const awaitRenderer = main.indexOf('const rendererReport = await rendererBoot')
+    const healthStage = main.indexOf("startupStage = 'health-commit'")
+    const completeStartup = main.indexOf('lifecycleRecorder.completeStartup(startupStage, rendererReport)')
+    const catchFailure = main.indexOf('} catch (cause) {')
+    const failPendingRenderer = main.indexOf('lifecycleRecorder.failRendererBootIfPending(')
+    const catchFailStartup = main.indexOf('lifecycleRecorder.failStartup(', failPendingRenderer)
+
+    expect(main).toContain("import { createDesktopLifecycleRecorder } from './lifecycle-events.ts'")
+    expect(createRecorder).toBeGreaterThanOrEqual(0)
+    expect(startRun).toBeGreaterThan(createRecorder)
+    for (const stage of [
+      'shell-environment',
+      'runtime-bootstrap',
+      'profile-selection',
+      'install-recovery',
+      'profile-composition',
+      'host-boot',
+      'renderer-startup',
+      'health-commit',
+    ]) {
+      expect(main).toContain(`startupStage = '${stage}'`)
+    }
+    expect(main).toContain('lifecycleRecorder.transitionStartupStage(startupStage)')
+    expect(finishRenderer).toBeGreaterThan(createRecorder)
+    expect(startRenderer).toBeGreaterThan(rendererStage)
+    expect(startRenderer).toBeLessThan(awaitRenderer)
+    expect(healthStage).toBeGreaterThan(awaitRenderer)
+    expect(completeStartup).toBeGreaterThan(healthStage)
+    expect(failPendingRenderer).toBeGreaterThan(catchFailure)
+    expect(catchFailStartup).toBeGreaterThan(failPendingRenderer)
+    expect(main).toContain('lifecycleRendererFailureReason(runtime.rendererBootFailureReason)')
+    expect(main).toContain('lifecycleStartupFailureReason(cause, runtime)')
   })
 
   it('routes protected and ordinary startup failures through the native recovery window', () => {
@@ -412,7 +471,7 @@ describe('published package surface', () => {
     expect(manifest.devDependencies?.['@electron/asar']).toBe('3.4.1')
   })
 
-  it('runs the full gate on Windows and packages through root scripts on native runners', () => {
+  it('runs the full gate once before reusing native packaging outputs on Windows', () => {
     const windowsJob = ciWorkflow.slice(
       ciWorkflow.indexOf('  desktop-windows:'),
       ciWorkflow.indexOf('  desktop-macos:'),
@@ -423,12 +482,39 @@ describe('published package surface', () => {
     )
 
     expect(windowsJob).toContain('- run: yarn check')
-    expect(windowsJob).toContain('- run: yarn dist:win')
-    expect(windowsJob).toContain('- run: yarn dist:win-portable')
-    expect(windowsJob).not.toContain('yarn workspace dsh-plugin-desktop dist:win')
-    expect(macosJob).toContain('- run: yarn workspace dsh-community-market check')
-    expect(macosJob).toContain('- run: yarn dist:mac-smoke')
-    expect(macosJob).not.toContain('yarn workspace dsh-plugin-desktop dist:mac-smoke')
+    expect(windowsJob).toContain('run: yarn workspace dsh-plugin-desktop dist:win')
+    expect(windowsJob).toContain('run: yarn workspace dsh-plugin-desktop dist:win-portable')
+    expect(windowsJob).toContain('DSH_PACKAGE_CHECK_ALREADY_RAN: \'1\'')
+    expect(macosJob).not.toContain('- run: yarn workspace dsh-community-market check')
+    expect(macosJob).toContain('- run: yarn check')
+    expect(macosJob).toContain('run: yarn workspace dsh-plugin-desktop dist:mac-smoke')
+    expect(macosJob).toContain('DSH_PACKAGE_CHECK_ALREADY_RAN: \'1\'')
+    expect(macosJob).not.toContain('- run: yarn dist:mac-smoke')
+  })
+
+  it('skips product packaging only for documentation-only changes', () => {
+    const classifier = fileURLToPath(new URL('../../scripts/classify-ci-changes.mjs', import.meta.url))
+    const classify = (paths: string[]): string => execFileSync(
+      process.execPath,
+      [classifier],
+      { input: Buffer.from(`${paths.join('\0')}\0`), encoding: 'utf8' },
+    ).trim()
+
+    expect(classify([
+      'docs/architecture.md',
+      '.agents/notes/implemented/architecture/decision.md',
+      '.agents/notes/implemented/architecture/decision.i18n.yaml',
+      'dsh-community-market/docs/schema.json',
+      '.github/ISSUE_TEMPLATE/feature_request.yml',
+    ])).toBe('false')
+    expect(classify(['README.md', 'dsh-plugin-desktop/src/index.ts'])).toBe('true')
+    expect(classify(['.github/workflows/ci.yml'])).toBe('true')
+    expect(classify(['THIRD_PARTY_NOTICES.md'])).toBe('true')
+    expect(classify([])).toBe('true')
+
+    expect(ciWorkflow).toContain('product="$(git diff --name-only -z')
+    expect(ciWorkflow).toContain("if: needs.changes.outputs.product == 'true'")
+    expect(ciWorkflow).toContain('Documentation-only change; product build and tests are not required.')
   })
 
   it('generates the tray source from the supplied Qnovel SVG', () => {
