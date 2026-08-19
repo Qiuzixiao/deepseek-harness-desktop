@@ -2,8 +2,8 @@ export const styles = `
 .qNovelBrandOverlay{display:none}
 /* The upstream brand button remains the New Session shortcut. Keep its behavior,
    but let the product layer own the visible QNovel mark and wordmark. */
-[class*="logoRow"] [class*="brand"]{visibility:visible!important;justify-content:flex-start;gap:8px;font-size:0!important;letter-spacing:-.02em}
-[class*="logoRow"] [class*="brand"]>*{visibility:hidden!important}
+[class*="logoRow"] [class*="brand"]{position:absolute;left:50%;transform:translateX(-50%);flex:none!important;width:auto!important;visibility:visible!important;justify-content:center;gap:4px;font-size:0!important;letter-spacing:-.02em}
+[class*="logoRow"] [class*="brand"]>*{display:none!important}
 [class*="logoRow"] [class*="brand"]::before{content:"";visibility:visible;display:block;flex:none;width:22px;height:22px;background:url("/wb/qnovel/icon-qnovel.svg") center/contain no-repeat}
 [class*="logoRow"] [class*="brand"]::after{content:"QNovel";visibility:visible;display:block;color:var(--dsw-alias-label-primary);font-size:16px;line-height:24px;font-weight:740;letter-spacing:-.02em}
 /* The upstream slot is technically rendered in the footer, but QNovel's
