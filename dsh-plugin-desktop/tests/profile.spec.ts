@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { composeEntries, initProfile, PROFILE_TEMPLATES } from '@deepseek-ai/dsh-app-boot'
 import {
@@ -13,7 +13,6 @@ import {
   ensureStoryStudioProfile,
   prepareDesktopProfile,
   readDesktopShellMode,
-  shippedPresetRoot,
   STORY_STUDIO_PACKAGE_NAME,
   STORY_STUDIO_PROFILE_NAME,
 } from '../src/profile.ts'
@@ -64,48 +63,6 @@ afterEach(() => {
 describe('desktop profile composition', {
   timeout: process.platform === 'win32' ? 10_000 : 5_000,
 }, () => {
-  it('reads packaged Cordis skills from the physical unpacked preset root', () => {
-    const home = temporaryHome()
-    const resources = join(home, 'resources')
-    const archivedDsh = join(resources, 'app.asar', 'node_modules', '@deepseek-ai', 'dsh')
-    const physicalPresetRoot = join(
-      resources,
-      'app.asar.unpacked',
-      'node_modules',
-      '@deepseek-ai',
-      'dsh',
-      'config',
-      'agent-presets',
-    )
-    const skillPath = join(
-      physicalPresetRoot,
-      'cordis',
-      'skills',
-      'cordis-plugin-development',
-      'SKILL.md',
-    )
-    mkdirSync(join(resources, 'app.asar', 'lib'), { recursive: true })
-    mkdirSync(archivedDsh, { recursive: true })
-    mkdirSync(dirname(skillPath), { recursive: true })
-    writeFileSync(join(archivedDsh, 'package.json'), JSON.stringify({
-      name: '@deepseek-ai/dsh',
-      exports: { './package.json': './package.json' },
-    }) + '\n')
-    writeFileSync(skillPath, '# Cordis plugin development\n')
-
-    const moduleUrl = pathToFileURL(join(resources, 'app.asar', 'lib', 'profile.js')).href
-    const resolvedRoot = shippedPresetRoot(moduleUrl)
-
-    expect(resolvedRoot).toBe(realpathSync(physicalPresetRoot))
-    expect(readFileSync(join(
-      resolvedRoot,
-      'cordis',
-      'skills',
-      'cordis-plugin-development',
-      'SKILL.md',
-    ), 'utf8')).toBe('# Cordis plugin development\n')
-  })
-
   it('adds the Web surface before third-party bundles and removes the launcher bundle duplicate', () => {
     expect(desktopBundleList([
       '@deepseek-ai/dsh-base',
@@ -242,7 +199,6 @@ describe('desktop profile composition', {
       id: 'agent-presets',
       config: expect.objectContaining({
         roots: [
-          expect.objectContaining({ path: expect.stringContaining('config/agent-presets'), trust: 'system' }),
           expect.objectContaining({ path: expect.stringContaining('resources/agent-presets'), trust: 'system' }),
         ],
       }),

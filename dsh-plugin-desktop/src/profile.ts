@@ -1,8 +1,8 @@
 /** Compatibility profile composition over the official Web bundle and user plugins. */
 
-import { createRequire, findPackageJSON } from 'node:module'
+import { findPackageJSON } from 'node:module'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { evaluate, isJsExpr, type EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
@@ -334,14 +334,6 @@ function loadRecoveryFilteredProfile(
   }
 }
 
-/** Resolve the agent presets shipped by the matching dsh CLI dependency. */
-export function shippedPresetRoot(moduleUrl: string = import.meta.url): string {
-  const require = createRequire(moduleUrl)
-  return unpackedAsarPath(
-    join(dirname(require.resolve('@deepseek-ai/dsh/package.json')), 'config', 'agent-presets'),
-  )
-}
-
 /** Resolve the product presets shipped with DSH Desktop. */
 function desktopPresetRoot(): string {
   return fileURLToPath(new URL('../resources/agent-presets', import.meta.url))
@@ -549,7 +541,6 @@ export function prepareDesktopProfile(
     const config = {
       ...rowConfig(presets),
       roots: [
-        { path: shippedPresetRoot(), trust: 'system' },
         { path: desktopPresetRoot(), trust: 'system' },
       ],
     }
