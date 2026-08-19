@@ -34,9 +34,10 @@ window.__ModuleLoader__.load({
 		const styles = `
 .qNovelBrandOverlay{display:none}
 /* The upstream brand button remains the New Session shortcut. Keep its behavior,
-   but let the product layer own the visible wordmark in the same slot. */
-[class*="logoRow"] [class*="brand"]{visibility:visible!important;justify-content:flex-start;font-size:0!important;letter-spacing:-.02em}
+   but let the product layer own the visible QNovel mark and wordmark. */
+[class*="logoRow"] [class*="brand"]{visibility:visible!important;justify-content:flex-start;gap:8px;font-size:0!important;letter-spacing:-.02em}
 [class*="logoRow"] [class*="brand"]>*{visibility:hidden!important}
+[class*="logoRow"] [class*="brand"]::before{content:"";visibility:visible;display:block;flex:none;width:22px;height:22px;background:url("/wb/qnovel/icon-qnovel.svg") center/contain no-repeat}
 [class*="logoRow"] [class*="brand"]::after{content:"QNovel";visibility:visible;display:block;color:var(--dsw-alias-label-primary);font-size:16px;line-height:24px;font-weight:740;letter-spacing:-.02em}
 /* The upstream slot is technically rendered in the footer, but QNovel's
    product contract is explicit: New Session and New Work are one top action
@@ -67,13 +68,15 @@ window.__ModuleLoader__.load({
 [class*="_previewBadge"]{font-size:0!important;border-color:color-mix(in srgb,#287a5b 28%,var(--dsw-alias-interactive-bg-hover));background:color-mix(in srgb,#287a5b 12%,transparent);color:#70c49c}
 [class*="_previewBadge"]::after{content:"Beta";font-family:var(--ds-font-family-code);font-size:12px;line-height:18px;font-weight:600}
 [class*="_fishHitbox"]{position:relative}
-[class*="_fishHitbox"] [class*="_fish"]{visibility:hidden}
-[class*="_fishHitbox"]::after{content:"Q";box-sizing:border-box;display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:11px;background:linear-gradient(145deg,#3c9a72,#206044);box-shadow:0 5px 14px color-mix(in srgb,#287a5b 28%,transparent);color:#fff;font-size:19px;font-weight:780;line-height:34px;letter-spacing:-.06em}
+/* Keep the upstream fish node because its hover animation lives on that node;
+   replace only its painted artwork with the supplied Qnovel SVG. */
+[class*="_fishHitbox"] [class*="_fish"]{visibility:visible!important;width:34px;height:34px;color:transparent!important;fill:transparent!important;stroke:transparent!important;background:url("/wb/qnovel/Qnovel.svg") center/contain no-repeat}
+[class*="_fishHitbox"] [class*="_fish"]>*{visibility:hidden!important}
 [class*="_headline"]{column-gap:11px}
 .storyStudioDialog{box-sizing:border-box;width:min(520px,calc(100vw - 32px));gap:0;padding:0;border-radius:12px;border-color:var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);overflow:hidden}
 .storyStudioDialogHeader{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:22px 24px 18px;border-bottom:1px solid var(--dsw-alias-border-l1)}
 .storyStudioDialogIdentity{display:flex;align-items:center;gap:12px;min-width:0}
-.storyStudioDialogMark{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;flex:none;border-radius:8px;background:#287a5b;color:#fff;font-size:12px;font-weight:750}
+.storyStudioDialogMark{box-sizing:border-box;display:block;width:36px;height:36px;flex:none;border-radius:8px;object-fit:contain}
 .storyStudioDialogTitle{margin:0;color:var(--dsw-alias-label-primary);font-size:17px;line-height:24px;font-weight:680}
 .storyStudioDialogSubtitle{margin:2px 0 0;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}
 .storyStudioDialogClose{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;flex:none;border:0;border-radius:7px;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer}
@@ -112,7 +115,7 @@ window.__ModuleLoader__.load({
 .qNovelSettingsButton:disabled{opacity:.5;cursor:not-allowed}
 .qNovelOnboarding{box-sizing:border-box;width:min(480px,calc(100vw - 32px));padding:0;border-radius:16px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);overflow:hidden}
 .qNovelOnboardingHeader{display:flex;align-items:center;gap:14px;padding:26px 26px 20px;border-bottom:1px solid var(--dsw-alias-border-l1)}
-.qNovelOnboardingMark{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:12px;background:#287a5b;color:#fff;font-size:18px;font-weight:760}
+.qNovelOnboardingMark{box-sizing:border-box;display:block;width:42px;height:42px;flex:none;border-radius:12px;object-fit:contain}
 .qNovelOnboardingHeader h2{margin:0;color:var(--dsw-alias-label-primary);font-size:18px;line-height:26px;font-weight:700}
 .qNovelOnboardingHeader p{margin:3px 0 0;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px}
 .qNovelOnboardingBody{padding:22px 26px;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:21px}
@@ -125,6 +128,7 @@ window.__ModuleLoader__.load({
 		//#endregion
 		//#region src/client/index.tsx
 		const CHANNEL = "/story-studio";
+		const QNOVEL_ICON_URL = "/wb/qnovel/icon-qnovel.svg";
 		function QNovelSettingsRow({ readRoot, chooseRoot }) {
 			const [root, setRoot] = (0, react.useState)("");
 			const [busy, setBusy] = (0, react.useState)(false);
@@ -228,9 +232,10 @@ window.__ModuleLoader__.load({
 				children: [
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 						className: "qNovelOnboardingHeader",
-						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("img", {
 							className: "qNovelOnboardingMark",
-							children: "Q"
+							src: QNOVEL_ICON_URL,
+							alt: "QNovel"
 						}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h2", { children: "先选择作品目录" }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", { children: "QNovel 会把每个作品独立保存到这个目录中。" })] })]
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
@@ -326,9 +331,10 @@ window.__ModuleLoader__.load({
 						className: "storyStudioDialogHeader",
 						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 							className: "storyStudioDialogIdentity",
-							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("img", {
 								className: "storyStudioDialogMark",
-								children: "Q"
+								src: QNOVEL_ICON_URL,
+								alt: "QNovel"
 							}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("h2", {
 								className: "storyStudioDialogTitle",
 								children: "新建作品"

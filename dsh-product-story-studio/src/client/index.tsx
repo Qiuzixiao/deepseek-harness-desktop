@@ -11,6 +11,7 @@ import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { styles } from './styles.ts'
 
 const CHANNEL = '/story-studio'
+const QNOVEL_ICON_URL = '/wb/qnovel/icon-qnovel.svg'
 
 interface StoryStudioDescription {
   projectRoot: string
@@ -145,7 +146,7 @@ function StoryStudioShellOverlay({ service }: { service: ProjectService }) {
       {configured === false && (
         <Modal open onClose={() => {}} title="选择作品目录" closeLabel="关闭" className="qNovelOnboarding" headless>
           <div className="qNovelOnboardingHeader">
-            <span className="qNovelOnboardingMark">Q</span>
+            <img className="qNovelOnboardingMark" src={QNOVEL_ICON_URL} alt="QNovel" />
             <div>
               <h2>先选择作品目录</h2>
               <p>QNovel 会把每个作品独立保存到这个目录中。</p>
@@ -233,7 +234,7 @@ function CreateProjectDialog({ open, service, onClose, onCreated }: {
     >
       <div className="storyStudioDialogHeader">
         <div className="storyStudioDialogIdentity">
-          <span className="storyStudioDialogMark">Q</span>
+          <img className="storyStudioDialogMark" src={QNOVEL_ICON_URL} alt="QNovel" />
           <div>
             <h2 className="storyStudioDialogTitle">新建作品</h2>
             <p className="storyStudioDialogSubtitle">从一个名字开始，自动建立完整的创作空间</p>

@@ -431,10 +431,12 @@ describe('published package surface', () => {
     expect(macosJob).not.toContain('yarn workspace dsh-plugin-desktop dist:mac-smoke')
   })
 
-  it('keeps one fixed brand-blue tray source for generated native assets', () => {
+  it('generates the tray source from the supplied Qnovel SVG', () => {
     const source = readFileSync(new URL('build/tray-icon.svg', packageRoot), 'utf8')
 
-    expect(source.match(/#4D6BFE/gu)).toHaveLength(1)
+    expect(source).toContain('data-qnovel="brand"')
+    expect(source).toContain('#4D6BFE')
+    expect(source).not.toContain('M1.000000')
     expect(source).not.toMatch(/<style\b|prefers-color-scheme/iu)
     for (const filename of [
       'tray-iconTemplate.png',

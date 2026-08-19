@@ -15,6 +15,7 @@ describe('QNovel sidebar and brand presentation contract', () => {
     expect(styles).toContain('content:"QNovel"')
     expect(styles).toContain('content:"把故事，写成作品"')
     expect(styles).toContain('content:"Beta"')
-    expect(styles).toContain('content:"Q"')
+    expect(styles).toContain('url("/wb/qnovel/icon-qnovel.svg")')
+    expect(styles).toContain('url("/wb/qnovel/Qnovel.svg")')
   })
 })
