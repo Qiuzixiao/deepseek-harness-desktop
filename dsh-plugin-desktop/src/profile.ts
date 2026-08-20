@@ -336,7 +336,9 @@ function loadRecoveryFilteredProfile(
 
 /** Resolve the product presets shipped with DSH Desktop. */
 function desktopPresetRoot(): string {
-  return fileURLToPath(new URL('../resources/agent-presets', import.meta.url))
+  return unpackedAsarPath(
+    fileURLToPath(new URL('../resources/agent-presets', import.meta.url)),
+  )
 }
 
 /** Read a row's object config without trusting arbitrary YAML values. */

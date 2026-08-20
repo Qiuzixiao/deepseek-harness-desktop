@@ -16,6 +16,7 @@ import {
   STORY_STUDIO_PACKAGE_NAME,
   STORY_STUDIO_PROFILE_NAME,
 } from '../src/profile.ts'
+import { unpackedAsarPath } from '../src/packaged-runtime-path.ts'
 
 const homes: string[] = []
 
@@ -202,7 +203,10 @@ describe('desktop profile composition', {
       id: 'agent-presets',
       config: expect.objectContaining({
         roots: [
-          expect.objectContaining({ path: expect.stringMatching(/resources[\\/]agent-presets/u), trust: 'system' }),
+          expect.objectContaining({
+            path: unpackedAsarPath(fileURLToPath(new URL('../resources/agent-presets', import.meta.url))),
+            trust: 'system',
+          }),
         ],
       }),
     }))
