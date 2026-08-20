@@ -152,6 +152,30 @@ describe('published package surface', () => {
     expect(installedBoot).toContain(marker)
   })
 
+  it('patches the packaged onboarding notice with QNovel copy', () => {
+    const patchPath = './patches/dsh-client-ui-settings-models@0.1.0-rc.7.patch'
+    expect(workspaceManifest.resolutions).toMatchObject({
+      '@deepseek-ai/dsh-client-ui-settings-models@npm:0.1.0-rc.7': expect.stringContaining(patchPath),
+      '@deepseek-ai/dsh-client-ui-settings-models@npm:^0.1.0-rc.7': expect.stringContaining(patchPath),
+    })
+    const patch = readFileSync(new URL(patchPath, workspaceRoot), 'utf8')
+    const installedClient = readFileSync(new URL(
+      'node_modules/@deepseek-ai/dsh-client-ui-settings-models/lib/client.js',
+      packageRoot,
+    ), 'utf8')
+
+    for (const marker of [
+      '2026-08-20.1',
+      'QNovel 目前仍处于面向早期用户开放测试的阶段',
+      'QNovel is currently in early testing.',
+    ]) {
+      expect(patch).toContain(marker)
+      expect(installedClient).toContain(marker)
+    }
+    expect(patch).not.toContain('+\t\t\t\tbody: "DeepSeek Harness 目前的 0.1 版本')
+    expect(installedClient).not.toContain('DeepSeek Harness 目前的 0.1 版本')
+  })
+
   it('patches the browse panel with the Windows native-picker icon bridge', () => {
     const patchPath = './patches/dsh-client-ui-directory-picker-browse@0.1.0-rc.7.patch'
     expect(workspaceManifest.resolutions).toMatchObject({

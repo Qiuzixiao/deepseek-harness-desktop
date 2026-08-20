@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "QNovel Beta: an Electron shell for AI-assisted story writing, composed as a DeepSeek Harness Cordis plugin",
   "license": "MIT",
   "publishConfig": {

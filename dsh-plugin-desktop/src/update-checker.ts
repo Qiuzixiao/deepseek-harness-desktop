@@ -4,7 +4,7 @@
 export const DESKTOP_VERSION_ENDPOINT = 'https://api.github.com/repos/Qiuzixiao/deepseek-harness-desktop/releases/latest'
 
 /** Maximum response body bytes accepted from the version service. */
-export const MAX_VERSION_RESPONSE_BYTES = 4 * 1024
+export const MAX_VERSION_RESPONSE_BYTES = 64 * 1024
 
 /** Strictly parsed SemVer components. Numeric components remain strings to avoid overflow. */
 export interface ParsedSemVer {

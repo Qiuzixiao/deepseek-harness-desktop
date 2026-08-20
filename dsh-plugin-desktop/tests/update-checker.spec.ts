@@ -106,6 +106,23 @@ describe('public Desktop version check', () => {
     })).resolves.toMatchObject({ status: 'update-available' })
   })
 
+  it('accepts a normal GitHub release payload larger than the old 4 KiB limit', async () => {
+    const body = JSON.stringify({
+      tag_name: 'v2.1.0',
+      body: 'x'.repeat(10 * 1024),
+    })
+
+    await expect(checkForStableUpdate({
+      currentVersion: '2.0.0',
+      request: async () => new Response(body, {
+        headers: { 'content-length': String(Buffer.byteLength(body)) },
+      }),
+    })).resolves.toMatchObject({
+      status: 'update-available',
+      latestVersion: '2.1.0',
+    })
+  })
+
   it.each([
     ['leading v', { version: 'v2.1.0' }],
     ['prerelease', { version: '2.1.0-rc.1' }],

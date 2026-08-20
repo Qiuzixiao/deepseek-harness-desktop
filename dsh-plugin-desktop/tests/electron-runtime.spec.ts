@@ -1066,7 +1066,7 @@ describe('Electron desktop runtime', () => {
         appExecutable: process.execPath,
         electronVersion: '43.4.0',
         profileName: 'desktop',
-        productVersion: '1.0.0',
+        productVersion: '1.0.1',
         profileDir: expect.stringMatching(/profiles[\\/]+desktop$/u),
         homeDir: expect.stringContaining('dsh-desktop-user-data'),
         installRecoveryStatePath: expect.stringMatching(/[\\/]plugin-install-recovery[\\/]state\.json$/u),
@@ -1103,7 +1103,7 @@ describe('Electron desktop runtime', () => {
     expect(diagnostics.export).toHaveBeenCalledWith(
       expect.stringContaining('dsh-desktop-user-data'),
       expect.objectContaining({
-        appVersion: '1.0.0',
+        appVersion: '1.0.1',
         crashDumpsDir: expect.stringMatching(/[\\/]Crashpad$/u),
       }),
     )
@@ -1331,7 +1331,7 @@ describe('Electron desktop runtime', () => {
     expect(runtime.updates).toMatchObject({
       isPackaged: false,
       canDownload: false,
-      currentVersion: '1.0.0',
+      currentVersion: '1.0.1',
       statePath: join('/tmp/dsh-desktop-user-data', 'updates', 'state.json'),
     })
     electron.app.isPackaged = true
@@ -1343,7 +1343,8 @@ describe('Electron desktop runtime', () => {
       latestVersion: '2.0.0',
     })
     expect(electron.dialog.showMessageBox).toHaveBeenLastCalledWith(expect.objectContaining({
-      title: 'DSH Desktop Is Up to Date',
+      title: 'QNovel Is Up to Date',
+      message: 'No newer version of QNovel is available.',
       detail: 'Installed version: 2.0.0',
       buttons: ['OK'],
     }))
@@ -1351,8 +1352,19 @@ describe('Electron desktop runtime', () => {
     await runtime.updates.showManualCheckResult(null)
     expect(electron.dialog.showMessageBox).toHaveBeenLastCalledWith(expect.objectContaining({
       title: 'Unable to Check for Updates',
+      message: 'QNovel could not check for updates.',
       buttons: ['OK'],
     }))
+
+    runtime.setLocalePreference('zh')
+    await runtime.updates.showManualCheckResult(null)
+    expect(electron.dialog.showMessageBox).toHaveBeenLastCalledWith(expect.objectContaining({
+      title: '无法检查更新',
+      message: 'QNovel 无法检查更新。',
+      detail: '请稍后重试。',
+      buttons: ['确定'],
+    }))
+    runtime.setLocalePreference('en')
 
     electron.dialog.showMessageBox.mockResolvedValueOnce({ response: 1, checkboxChecked: false })
     await expect(runtime.updates.confirmDownload('2.1.0')).resolves.toBe(false)
@@ -1384,7 +1396,8 @@ describe('Electron desktop runtime', () => {
       path: '/tmp/QNovel-2.1.0-mac.dmg',
     })
     expect(electron.dialog.showMessageBox).toHaveBeenLastCalledWith(expect.objectContaining({
-      title: 'DSH Desktop Update Downloaded',
+      title: 'QNovel Update Downloaded',
+      message: 'QNovel 2.1.0 is ready to install.',
       buttons: ['OK'],
     }))
 

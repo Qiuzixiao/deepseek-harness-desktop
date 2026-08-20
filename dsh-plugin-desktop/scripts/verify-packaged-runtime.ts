@@ -1,6 +1,6 @@
 /** Fail-loud verification of the runtime entries sealed into Electron's app.asar. */
 
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { isAbsolute, join, relative, sep } from 'node:path'
@@ -151,6 +151,7 @@ export const REQUIRED_UNPACKED_PACKAGE_SPECIFIERS = [
   'dsh-rich-file-reader/package.json',
   '@deepseek-ai/dsh-base/package.json',
   '@deepseek-ai/dsh-web-app/package.json',
+  '@deepseek-ai/dsh-client-ui-settings-models/package.json',
 ] as const
 
 /** Injectable archive listing seam used by focused tests. */
@@ -161,6 +162,40 @@ export type FileProbe = (filename: string) => boolean
 
 /** Injectable mode repair used for executable helper files copied by Electron Builder. */
 export type FileModeWriter = (filename: string, mode: number) => void
+
+/** Injectable UTF-8 reader used by the packaged branding gate. */
+export type TextFileReader = (filename: string) => string
+
+/** Verify the dynamic onboarding plugin sealed into the packaged application. */
+export function verifyPackagedQNovelNotice(
+  unpackedRoot: string,
+  read: TextFileReader = filename => readFileSync(filename, 'utf8'),
+): void {
+  const clientPath = join(
+    unpackedRoot,
+    'node_modules/@deepseek-ai/dsh-client-ui-settings-models/lib/client.js',
+  )
+  let client: string
+  try {
+    client = read(clientPath)
+  } catch (cause) {
+    throw new Error(`dsh-plugin-desktop: cannot read packaged QNovel onboarding bundle at ${clientPath}`, {
+      cause,
+    })
+  }
+  for (const marker of [
+    'WELCOME_NOTICE_VERSION = "2026-08-20.1"',
+    'QNovel 目前仍处于面向早期用户开放测试的阶段',
+    'QNovel is currently in early testing.',
+  ]) {
+    if (!client.includes(marker)) {
+      throw new Error(`dsh-plugin-desktop: packaged QNovel onboarding bundle is missing marker: ${marker}`)
+    }
+  }
+  if (client.includes('DeepSeek Harness 目前的 0.1 版本')) {
+    throw new Error('dsh-plugin-desktop: packaged QNovel onboarding bundle contains the upstream notice')
+  }
+}
 
 /**
  * Restore execute bits that package traversal can drop from nested node-pty helpers.
@@ -451,12 +486,15 @@ export async function afterPack(
   context: PackagedRuntimeContext,
   verify: typeof verifyPackagedRuntime = verifyPackagedRuntime,
   smoke: PackagedDiagnosticWorkerSmoke = smokePackagedDiagnosticWorker,
+  verifyNotice: typeof verifyPackagedQNovelNotice = verifyPackagedQNovelNotice,
 ): Promise<void> {
   if (context.electronPlatformName === 'darwin') {
     repairPackagedMacHelperModes(resolvePackagedUnpackedRoot(context))
   }
   verify(context)
-  await smoke(resolvePackagedUnpackedRoot(context))
+  const unpackedRoot = resolvePackagedUnpackedRoot(context)
+  verifyNotice(unpackedRoot)
+  await smoke(unpackedRoot)
 }
 
 export default afterPack

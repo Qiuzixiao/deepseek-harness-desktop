@@ -482,12 +482,13 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
 
   /** Ask before making the fixed download endpoint's counted request. */
   private async confirmUpdateDownload(version: string): Promise<boolean> {
+    const zh = this.currentLocale === 'zh'
     const result = await dialog.showMessageBox({
       type: 'info',
-      title: 'DSH Desktop Update Available',
-      message: `DSH Desktop ${version} is available.`,
-      detail: 'Download this update now?',
-      buttons: ['Download', 'Later'],
+      title: zh ? 'QNovel 有可用更新' : 'QNovel Update Available',
+      message: zh ? `QNovel ${version} 已发布。` : `QNovel ${version} is available.`,
+      detail: zh ? '现在下载安装包吗？' : 'Download this update now?',
+      buttons: zh ? ['下载', '稍后'] : ['Download', 'Later'],
       defaultId: 1,
       cancelId: 1,
       noLink: true,
@@ -497,13 +498,14 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
 
   /** Report one user-triggered check without exposing network or response details. */
   private async showManualUpdateCheckResult(result: UpdateCheckResult | null): Promise<void> {
+    const zh = this.currentLocale === 'zh'
     if (result === null) {
       await dialog.showMessageBox({
         type: 'warning',
-        title: 'Unable to Check for Updates',
-        message: 'DSH Desktop could not check for updates.',
-        detail: 'Please try again later.',
-        buttons: ['OK'],
+        title: zh ? '无法检查更新' : 'Unable to Check for Updates',
+        message: zh ? 'QNovel 无法检查更新。' : 'QNovel could not check for updates.',
+        detail: zh ? '请稍后重试。' : 'Please try again later.',
+        buttons: [zh ? '确定' : 'OK'],
         defaultId: 0,
         noLink: true,
       })
@@ -513,10 +515,10 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
     if (result.status === 'up-to-date') {
       await dialog.showMessageBox({
         type: 'info',
-        title: 'DSH Desktop Is Up to Date',
-        message: 'No newer version of DSH Desktop is available.',
-        detail: `Installed version: ${result.currentVersion}`,
-        buttons: ['OK'],
+        title: zh ? 'QNovel 已是最新版本' : 'QNovel Is Up to Date',
+        message: zh ? '当前没有可用的新版本。' : 'No newer version of QNovel is available.',
+        detail: zh ? `当前版本：${result.currentVersion}` : `Installed version: ${result.currentVersion}`,
+        buttons: [zh ? '确定' : 'OK'],
         defaultId: 0,
         noLink: true,
       })
@@ -525,10 +527,10 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
 
     await dialog.showMessageBox({
       type: 'info',
-      title: 'DSH Desktop Update Available',
-      message: `DSH Desktop ${result.latestVersion} is available.`,
-      detail: 'Installer downloads are unavailable in this build.',
-      buttons: ['OK'],
+      title: zh ? 'QNovel 有可用更新' : 'QNovel Update Available',
+      message: zh ? `QNovel ${result.latestVersion} 已发布。` : `QNovel ${result.latestVersion} is available.`,
+      detail: zh ? '此版本暂不支持下载安装包。' : 'Installer downloads are unavailable in this build.',
+      buttons: [zh ? '确定' : 'OK'],
       defaultId: 0,
       noLink: true,
     })
@@ -564,22 +566,25 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
       signal.throwIfAborted()
       await dialog.showMessageBox({
         type: 'info',
-        title: 'DSH Desktop Update Downloaded',
-        message: `DSH Desktop ${version} is ready to install.`,
-        detail: 'The disk image has opened. Replace DSH Desktop in Applications, then reopen it.',
-        buttons: ['OK'],
+        title: this.currentLocale === 'zh' ? 'QNovel 更新已下载' : 'QNovel Update Downloaded',
+        message: this.currentLocale === 'zh' ? `QNovel ${version} 可以安装了。` : `QNovel ${version} is ready to install.`,
+        detail: this.currentLocale === 'zh'
+          ? '磁盘映像已打开。请替换“应用程序”中的 QNovel，然后重新打开。'
+          : 'The disk image has opened. Replace QNovel in Applications, then reopen it.',
+        buttons: [this.currentLocale === 'zh' ? '确定' : 'OK'],
         defaultId: 0,
         noLink: true,
       })
       return
     }
 
+    const zh = this.currentLocale === 'zh'
     const result = await dialog.showMessageBox({
       type: 'info',
-      title: 'DSH Desktop Update Downloaded',
-      message: `DSH Desktop ${version} is ready to install.`,
-      detail: 'Restart DSH Desktop and run the installer now?',
-      buttons: ['Restart and Install', 'Later'],
+      title: zh ? 'QNovel 更新已下载' : 'QNovel Update Downloaded',
+      message: zh ? `QNovel ${version} 可以安装了。` : `QNovel ${version} is ready to install.`,
+      detail: zh ? '现在退出 QNovel 并运行安装程序吗？' : 'Exit QNovel and run the installer now?',
+      buttons: zh ? ['退出并安装', '稍后'] : ['Exit and Install', 'Later'],
       defaultId: 1,
       cancelId: 1,
       noLink: true,
@@ -633,8 +638,8 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
       type: 'question',
       title: zh ? '删除更新安装包' : 'Remove Update Installer',
       message: zh
-        ? `DSH Desktop ${artifact.version} 已安装。`
-        : `DSH Desktop ${artifact.version} has been installed.`,
+        ? `QNovel ${artifact.version} 已安装。`
+        : `QNovel ${artifact.version} has been installed.`,
       detail: zh
         ? `是否删除下载的安装包以释放磁盘空间？\n\n${artifact.path}`
         : `Delete the downloaded installer to free disk space?\n\n${artifact.path}`,

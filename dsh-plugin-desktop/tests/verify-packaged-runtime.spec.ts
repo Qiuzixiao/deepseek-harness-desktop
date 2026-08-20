@@ -14,6 +14,7 @@ import {
   resolvePackagedUnpackedRoot,
   smokePackagedDiagnosticWorker,
   verifyUnpackedArchiveMirror,
+  verifyPackagedQNovelNotice,
   verifyPackagedRuntime,
   type ArchiveLister,
   type FileProbe,
@@ -103,7 +104,7 @@ describe('packaged desktop runtime verification', () => {
     },
   )
 
-  it('runs the static package gate before the diagnostic Worker smoke', async () => {
+  it('runs the static and QNovel notice gates before the diagnostic Worker smoke', async () => {
     const runtimeContext = context('/build', 'win32')
     const calls: string[] = []
 
@@ -111,9 +112,25 @@ describe('packaged desktop runtime verification', () => {
       runtimeContext,
       () => { calls.push('static') },
       async (unpackedRoot) => { calls.push(unpackedRoot) },
+      () => { calls.push('notice') },
     )
 
-    expect(calls).toEqual(['static', resolvePackagedUnpackedRoot(runtimeContext)])
+    expect(calls).toEqual(['static', 'notice', resolvePackagedUnpackedRoot(runtimeContext)])
+  })
+
+  it('requires the QNovel notice in the packaged dynamic client bundle', () => {
+    const unpackedRoot = '/release/app.asar.unpacked'
+    const good = [
+      'WELCOME_NOTICE_VERSION = "2026-08-20.1"',
+      'QNovel 目前仍处于面向早期用户开放测试的阶段',
+      'QNovel is currently in early testing.',
+    ].join('\n')
+
+    expect(() => verifyPackagedQNovelNotice(unpackedRoot, () => good)).not.toThrow()
+    expect(() => verifyPackagedQNovelNotice(unpackedRoot, () => good
+      + '\nDeepSeek Harness 目前的 0.1 版本')).toThrow('contains the upstream notice')
+    expect(() => verifyPackagedQNovelNotice(unpackedRoot, () => 'QNovel'))
+      .toThrow('is missing marker')
   })
 
   it('tracks the ConPTY-only native surface shipped by node-pty 1.2', () => {
