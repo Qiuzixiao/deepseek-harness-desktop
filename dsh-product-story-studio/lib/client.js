@@ -30,6 +30,18 @@ window.__ModuleLoader__.load({
 		react = __toESM(react, 1);
 		let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 		let react_jsx_runtime = require("react/jsx-runtime");
+		//#region src/client/directory-picker.ts
+		/** Select a QNovel root through the Desktop admission path when running on Windows. */
+		async function pickStoryRootDirectory(fallback, search = window.location.search, target = window) {
+			if (new URLSearchParams(search).get("dsh-desktop-platform") !== "win32") return await fallback();
+			const pick = target.__DSH_DESKTOP_PICK_DIRECTORY__;
+			const validate = target.__DSH_DESKTOP_VALIDATE_DIRECTORY__;
+			if (typeof pick !== "function" || typeof validate !== "function") throw new Error("Windows 原生目录选择器不可用");
+			const path = await pick();
+			if (path === null) return null;
+			return await validate(path) ? path : null;
+		}
+		//#endregion
 		//#region src/client/styles.ts
 		const styles = `
 .qNovelBrandOverlay{display:none}
@@ -558,7 +570,7 @@ window.__ModuleLoader__.load({
 			const service = {
 				describe: async () => unwrap(await ctx.connection.rpc.call(CHANNEL, "describe", {})),
 				create: async (projectName) => unwrap(await ctx.connection.rpc.call(CHANNEL, "createProject", { name: projectName })),
-				pickRoot: () => ctx.workspaces.pickDirectory(),
+				pickRoot: () => pickStoryRootDirectory(() => ctx.workspaces.pickDirectory()),
 				configureRoot: async (path) => {
 					const validated = unwrap(await ctx.connection.rpc.call(CHANNEL, "validateProjectRoot", { path }));
 					const response = await ctx.connection.api.settings.mutate({

@@ -8,6 +8,7 @@ import {
   IconCloseOutline16, IconFolderClose16, IconPlusOutline16, Menu, Modal,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import { pickStoryRootDirectory } from './directory-picker.ts'
 import { styles } from './styles.ts'
 
 const CHANNEL = '/story-studio'
@@ -430,7 +431,7 @@ export function apply(ctx: StoryStudioClientContext): void {
   const service: ProjectService = {
     describe: async () => unwrap<StoryStudioDescription>(await ctx.connection.rpc.call(CHANNEL, 'describe', {})),
     create: async projectName => unwrap<CreatedProject>(await ctx.connection.rpc.call(CHANNEL, 'createProject', { name: projectName })),
-    pickRoot: () => ctx.workspaces.pickDirectory(),
+    pickRoot: () => pickStoryRootDirectory(() => ctx.workspaces.pickDirectory()),
     configureRoot: async path => {
       const validated = unwrap<{ projectRoot: string }>(await ctx.connection.rpc.call(CHANNEL, 'validateProjectRoot', { path }))
       const response = await ctx.connection.api.settings.mutate({
