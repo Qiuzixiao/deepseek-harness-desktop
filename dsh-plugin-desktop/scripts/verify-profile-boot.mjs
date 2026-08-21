@@ -231,6 +231,7 @@ try {
   const checkpointResult = await ctx.commands.execute(
     checkpointAgent,
     '/checkpoint note packaged profile smoke',
+    [],
     new AbortController().signal,
   )
   if (checkpointResult?.result?.kind !== 'success'
@@ -240,6 +241,7 @@ try {
   const rewindList = await ctx.commands.execute(
     checkpointAgent,
     '/rewind',
+    [],
     new AbortController().signal,
   )
   if (rewindList?.result?.kind !== 'success' || !rewindList.result.text.includes('packaged profile smoke')) {

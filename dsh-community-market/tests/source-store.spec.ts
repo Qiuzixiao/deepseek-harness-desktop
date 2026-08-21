@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs'
 import type { SettingsScope } from '@deepseek-ai/dsh-settings'
 import { describe, expect, it, vi } from 'vitest'
 import {
+  QNOVEL_CATALOG_SOURCE,
+  QNovelCatalogSourceStore,
   SettingsCatalogSourceStore,
   type MarketSettingsDocument,
 } from '../src/catalog/source-store.js'
@@ -61,5 +63,26 @@ describe('settings-backed catalog source store', () => {
       source,
       { ...secondSource, enabled: false },
     ])
+  })
+})
+
+describe('QNovel managed catalog source store', () => {
+  it('always exposes the official source and ignores legacy settings', async () => {
+    const store = new QNovelCatalogSourceStore()
+
+    await expect(store.load()).resolves.toEqual([QNOVEL_CATALOG_SOURCE])
+    expect(QNOVEL_CATALOG_SOURCE).toMatchObject({
+      providerId: 'com.qnovel.plugins',
+      manifestUrl: 'https://plugins.zenwit.cn/v1/catalog-source.json',
+      enabled: true,
+      order: 0,
+    })
+  })
+
+  it('rejects attempts to mutate the product-managed source', async () => {
+    const store = new QNovelCatalogSourceStore()
+
+    await expect(store.save()).rejects.toThrow('managed by QNovel')
+    await expect(store.load()).resolves.toEqual([QNOVEL_CATALOG_SOURCE])
   })
 })

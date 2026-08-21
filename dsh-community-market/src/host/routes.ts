@@ -28,7 +28,13 @@ import {
 import { DSHFIND_ADAPTER_ID, DSHFIND_HOSTNAME } from '../adapters/dshfind.js'
 import { assertStandardSourceTrustRoot } from '../adapters/standard-http.js'
 import { BUILT_IN_PROVIDERS, DefaultCatalogService, type CatalogFetchScope, type CatalogFullIndex } from '../catalog/service.js'
-import { QNovelCatalogSourceStore, SettingsCatalogSourceStore, type MarketCatalogCache, type MarketSettingsDocument } from '../catalog/source-store.js'
+import {
+  QNOVEL_CATALOG_HOSTNAME,
+  QNovelCatalogSourceStore,
+  SettingsCatalogSourceStore,
+  type MarketCatalogCache,
+  type MarketSettingsDocument,
+} from '../catalog/source-store.js'
 import { MARKET_MEDIA_ASSET_REF_PATTERN } from '../media/ref.js'
 import { createRestrictedImageFetcher } from '../media/restricted-image.js'
 import { createMarketMediaService } from '../media/service.js'
@@ -103,6 +109,14 @@ const dshfindHttpClient = createCachedCatalogHttpClient(
     // This exact hostname is compiled into the reviewed adapter. User-added
     // source hostnames must never inherit this local-proxy exception.
     syntheticProxyHostnames: [DSHFIND_HOSTNAME],
+  }),
+)
+
+const qnovelCatalogHttpClient = createCachedCatalogHttpClient(
+  createRestrictedHttpClient({
+    // This exact hostname is compiled into the managed QNovel source. It may
+    // resolve through a local proxy's RFC 2544 fake-IP range.
+    syntheticProxyHostnames: [QNOVEL_CATALOG_HOSTNAME],
   }),
 )
 
@@ -749,6 +763,7 @@ export function registerMarketRoutes(
   })
   const service = new DefaultCatalogService(store, restrictedHttpClient, {
     adapterHttpClients: new Map([
+      ['market.standard-http-v1', qnovelCatalogHttpClient],
       [DSH_1024STORE_ADAPTER_ID, dsh1024StoreHttpClient],
       [DSHFIND_ADAPTER_ID, dshfindHttpClient],
     ]),

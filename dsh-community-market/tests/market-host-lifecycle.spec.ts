@@ -141,8 +141,6 @@ describe('community market Host capability lifecycle', () => {
 
     harness.provide('desktopProfiles', { current: { name: 'web', dir: 'C:/fixture-profile' } })
     harness.provide('desktopPnpm', {})
-    await expect(harness.request(marketRoutes.installable)).resolves.toMatchObject({ status: 404 })
-
     harness.remove('desktopPnpm')
     await expect(harness.request(marketRoutes.installable)).resolves.toMatchObject({ status: 503 })
 

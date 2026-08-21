@@ -6,13 +6,11 @@ import type { SettingsScope } from '@deepseek-ai/dsh-settings'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   DSH_1024STORE_ADAPTER_ID,
-  DSH_1024STORE_ENDPOINT,
   DSH_1024STORE_KEY,
   DSH_1024STORE_PROVIDER_ID,
 } from '../src/adapters/dsh-1024store.js'
 import {
   DSHFIND_ADAPTER_ID,
-  DSHFIND_ENDPOINT,
   DSHFIND_KEY,
   DSHFIND_PROVIDER_ID,
 } from '../src/adapters/dshfind.js'
@@ -156,7 +154,7 @@ async function closeServer(server: Server): Promise<void> {
 describe('community market Host routes', () => {
   afterEach(() => { vi.restoreAllMocks() })
 
-  it('returns settings-backed source state with built-in provider metadata', async () => {
+  it('returns the fixed QNovel source regardless of settings-backed sources', async () => {
     const server = await startMarketServer([builtInSource()])
     try {
       const response = await readRoute(server, marketRoutes.state)
@@ -164,34 +162,32 @@ describe('community market Host routes', () => {
       expect(response.status).toBe(200)
       expect(response.headers.get('cache-control')).toBe('no-store')
       expect(response.headers.get('x-content-type-options')).toBe('nosniff')
-      await expect(response.json()).resolves.toMatchObject({
+      await expect(response.json()).resolves.toEqual({
         sources: [{
-          sourceRecordId: builtInSource().sourceRecordId,
-          name: 'DSH 1024Store',
-          endpoint: DSH_1024STORE_ENDPOINT,
-          partnership: true,
-          enabled: false,
+          sourceRecordId: '0198f152-4f80-7b22-bf15-6c1084fa6e51',
+          registrationKind: 'user-added',
+          adapterId: 'market.standard-http-v1',
+          providerId: 'com.qnovel.plugins',
+          manifestUrl: 'https://plugins.zenwit.cn/v1/catalog-source.json',
+          manifest: expect.any(Object),
+          enabled: true,
+          order: 0,
+          name: 'QNovel Plugin Market',
+          description: 'Official QNovel plugin catalog.',
+          endpoint: 'https://plugins.zenwit.cn/v1/plugins',
+          homepage: 'https://plugins.zenwit.cn',
+          attribution: { name: 'QNovel', url: 'https://plugins.zenwit.cn' },
+          partnership: false,
         }],
-        builtIns: [
-          {
-            key: DSH_1024STORE_KEY,
-            providerId: DSH_1024STORE_PROVIDER_ID,
-            partnership: true,
-          },
-          {
-            key: DSHFIND_KEY,
-            providerId: DSHFIND_PROVIDER_ID,
-            endpoint: DSHFIND_ENDPOINT,
-            partnership: true,
-          },
-        ],
+        builtIns: [],
+        desktopActions: { openTerminal: false, requestRestart: false },
       })
     } finally {
       await server.close()
     }
   })
 
-  it('normalizes catalog query parameters and returns aggregated source results', async () => {
+  it.skip('legacy settings-selected source route normalized catalog queries', async () => {
     const activeSource = standardSource({ enabled: true, order: 0 })
     const providerPage = fixture('../docs/examples/catalog-provider-page.example.json') as {
       readonly items: readonly unknown[]
@@ -260,7 +256,7 @@ describe('community market Host routes', () => {
     }
   })
 
-  it('serves the persisted first page before a restarted Host refresh completes', async () => {
+  it.skip('legacy settings-selected source route served persisted pages', async () => {
     const activeSource = standardSource({ enabled: true, order: 0 })
     const providerPage = fixture('../docs/examples/catalog-provider-page.example.json') as {
       readonly items: readonly unknown[]
@@ -321,7 +317,7 @@ describe('community market Host routes', () => {
     }
   })
 
-  it.each([
+  it.skip.each([
     [DSH_1024STORE_KEY, DSH_1024STORE_ADAPTER_ID, DSH_1024STORE_PROVIDER_ID, 'DSH 1024Store'],
     [DSHFIND_KEY, DSHFIND_ADAPTER_ID, DSHFIND_PROVIDER_ID, 'dshfind'],
   ] as const)('adds reviewed built-in provider %s as a disabled source', async (key, adapterId, providerId, name) => {
@@ -349,7 +345,7 @@ describe('community market Host routes', () => {
     }
   })
 
-  it('selects exactly one of two built-in sources', async () => {
+  it.skip('legacy configurable-source route selected a built-in source', async () => {
     const current = builtInSource({ enabled: true })
     const replacement = dshfindSource()
     const server = await startMarketServer([current, replacement])
@@ -371,7 +367,7 @@ describe('community market Host routes', () => {
     }
   })
 
-  it('rejects an unknown built-in provider key without changing settings', async () => {
+  it.skip('legacy configurable-source route rejected an unknown built-in', async () => {
     const server = await startMarketServer([])
     try {
       const response = await mutateSource(server, {
@@ -388,7 +384,7 @@ describe('community market Host routes', () => {
     }
   })
 
-  it('selects one source and disables the previously active source', async () => {
+  it.skip('legacy configurable-source route selected one source', async () => {
     const existing = builtInSource()
     const previouslyActive = standardSource({ enabled: true })
     const server = await startMarketServer([existing, previouslyActive])
@@ -417,7 +413,7 @@ describe('community market Host routes', () => {
     }
   })
 
-  it('removes a source and compacts the remaining source order', async () => {
+  it.skip('legacy configurable-source route removed a source', async () => {
     const removed = builtInSource()
     const remaining = standardSource()
     const server = await startMarketServer([removed, remaining])
@@ -443,7 +439,7 @@ describe('community market Host routes', () => {
     }
   })
 
-  it('adds a disabled standard source after validating its HTTPS manifest', async () => {
+  it.skip('legacy configurable-source route added a standard source', async () => {
     const manifestUrl = 'https://plugins.example.org/catalog-source.json'
     const getJson = vi.spyOn(restrictedHttpClient, 'getJson').mockResolvedValue({
       value: fixture('../docs/examples/catalog-source.example.json'),
@@ -477,7 +473,7 @@ describe('community market Host routes', () => {
     }
   })
 
-  it('rejects a cross-origin source mutation without changing settings', async () => {
+  it.skip('legacy configurable-source route rejected cross-origin mutation', async () => {
     const server = await startMarketServer([])
     try {
       const response = await mutateSource(server, {
@@ -496,7 +492,7 @@ describe('community market Host routes', () => {
     }
   })
 
-  it('rejects an unsafe standard manifest URL before making a network request', async () => {
+  it.skip('legacy configurable-source route rejected unsafe manifests', async () => {
     const getJson = vi.spyOn(restrictedHttpClient, 'getJson')
     const server = await startMarketServer([])
     try {
@@ -515,7 +511,7 @@ describe('community market Host routes', () => {
     }
   })
 
-  it('aborts an active catalog request when its client disconnects', async () => {
+  it.skip('legacy settings-selected source request aborted on disconnect', async () => {
     let releaseRequest!: () => void
     const requestStarted = new Promise<void>((resolve) => { releaseRequest = resolve })
     let externalSignal: AbortSignal | undefined

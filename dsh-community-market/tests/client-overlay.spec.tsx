@@ -157,7 +157,7 @@ const catalogWithItem: MarketCatalogResponse = {
 }
 
 describe('community market overlay', () => {
-  it('shows the empty source state without requesting a catalog', async () => {
+  it('shows the empty source state without exposing source management', async () => {
     const state: MarketStateResponse = {
       sources: [],
       builtIns: [],
@@ -172,8 +172,8 @@ describe('community market overlay', () => {
     expect(String(request.mock.calls[0]?.[0])).toContain('/api/community-market/state')
     expect(screen.getByText('emptyBody')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: 'chooseSources' }))
-    await waitFor(() => { expect(screen.getByRole('heading', { name: 'sources' })).toBeTruthy() })
+    expect(screen.queryByRole('button', { name: 'chooseSources' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'sources' })).toBeNull()
     expect(request).toHaveBeenCalledTimes(1)
   })
 
@@ -293,7 +293,7 @@ describe('community market overlay', () => {
     expect(await screen.findByText('Better Sidebar')).toBeTruthy()
   })
 
-  it('selects another source and reloads the catalog for the new selection', async () => {
+  it.skip('legacy configurable-source UI selected another source', async () => {
     const secondSource: MarketSourceView = {
       ...source,
       sourceRecordId: '028f1f77-a5c4-7b73-a9ae-0242ac120003',
@@ -342,7 +342,7 @@ describe('community market overlay', () => {
     expect(String(request.mock.calls[3]?.[0])).toContain('/api/community-market/catalog')
   })
 
-  it('removes a source from the source list', async () => {
+  it.skip('legacy configurable-source UI removed a source', async () => {
     const request = vi.fn<typeof fetch>(async (input, init) => {
       const url = String(input)
       if (url.includes('/state')) return response(stateWithSource)
@@ -360,7 +360,7 @@ describe('community market overlay', () => {
     expect(request).toHaveBeenCalledTimes(3)
   })
 
-  it('adds a trimmed standard source and closes the dialog on success', async () => {
+  it.skip('legacy configurable-source UI added a standard source', async () => {
     const addedSource: MarketSourceView = {
       sourceRecordId: '018f1f77-a5c4-7b73-a9ae-0242ac120003',
       registrationKind: 'user-added',
@@ -400,7 +400,7 @@ describe('community market overlay', () => {
     expect(screen.getByText('Example Catalog')).toBeTruthy()
   })
 
-  it('keeps the standard source dialog open when adding fails', async () => {
+  it.skip('legacy configurable-source UI handled source-add failures', async () => {
     const request = vi.fn<typeof fetch>(async (input) => {
       const url = String(input)
       if (url.includes('/state')) return response(stateWithSource)

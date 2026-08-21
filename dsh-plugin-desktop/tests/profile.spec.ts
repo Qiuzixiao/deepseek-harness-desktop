@@ -169,8 +169,8 @@ describe('desktop profile composition', {
     expect(rows.find(row => row.id === 'ui-layout')?.disabled).toBe(true)
     expect(rows.find(row => row.id === 'community-market')).toEqual(expect.objectContaining({
       name: 'dsh-community-market',
-      disabled: true,
     }))
+    expect(rows.find(row => row.id === 'community-market')?.disabled).not.toBe(true)
     expect(rows).toContainEqual({
       id: 'drop-to-path',
       name: '@dsh-external/dsh-drop-to-path',

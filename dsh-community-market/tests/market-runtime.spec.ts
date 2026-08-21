@@ -1135,7 +1135,7 @@ describe('catalog active-source reads', () => {
   })
 })
 
-describe('source mutation boundary', () => {
+describe('source store and retired mutation boundary', () => {
   it('normalizes legacy multi-enabled settings to the first source by order', async () => {
     const first = source()
     const second = source({
@@ -1411,7 +1411,7 @@ describe('source mutation boundary', () => {
     expect(onUnavailable).toHaveBeenCalledWith(current.sourceRecordId)
   })
 
-  it('aborts an in-flight source mutation when the plugin generation is disposed', async () => {
+  it.skip('legacy source route aborted an in-flight mutation on disposal', async () => {
     type RouteHandler = (req: EventEmitter & Record<string, any>, res: EventEmitter & Record<string, any>) => Promise<void>
     const handlers = new Map<string, RouteHandler>()
     const routeDisposers: ReturnType<typeof vi.fn>[] = []

@@ -303,7 +303,7 @@ describe('MarketSettingsTab', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: en.refresh }).hasAttribute('disabled')).toBe(false))
   })
 
-  it('loads source state on mount and avoids catalog I/O when none are selected', async () => {
+  it('loads source state on mount and hides retired source controls', async () => {
     vi.mocked(readMarketState).mockResolvedValue(emptyState)
     render(<MarketSettingsTab {...props} />)
 
@@ -311,8 +311,8 @@ describe('MarketSettingsTab', () => {
     expect(readMarketState).toHaveBeenCalledOnce()
     expect(readMarketCatalog).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: en.sources }))
-    expect(screen.getByRole('heading', { name: en.sources })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: en.sources })).toBeNull()
+    expect(screen.queryByRole('button', { name: en.addStandard })).toBeNull()
   })
 
   it('renders catalog metadata, forces an explicit refresh, and opens details in the official modal', async () => {
@@ -464,7 +464,7 @@ describe('MarketSettingsTab', () => {
     expect(screen.getByRole('button', { name: en.discover })).toBeTruthy()
     expect(screen.getByRole('button', { name: en.installable })).toBeTruthy()
     expect(screen.getByRole('button', { name: en.installed })).toBeTruthy()
-    expect(screen.getByRole('button', { name: en.sources })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: en.sources })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: en.installable }))
     expect(await screen.findByRole('button', { name: `${en.install}: Available Plugin` })).toBeTruthy()
@@ -1090,7 +1090,7 @@ describe('MarketSettingsTab', () => {
     expect(screen.queryByText('private index failure')).toBeNull()
   })
 
-  it('shows source attribution, endpoint, adapter type, and last result', async () => {
+  it.skip('legacy configurable-source UI showed source inventory metadata', async () => {
     vi.mocked(readMarketState).mockResolvedValue(enabledState)
     vi.mocked(readMarketCatalog).mockResolvedValue(catalog)
     render(<MarketSettingsTab {...props} />)
@@ -1107,7 +1107,7 @@ describe('MarketSettingsTab', () => {
     expect(screen.getByText(en.available)).toBeTruthy()
   })
 
-  it('shows attribution text and notice without creating an unsafe external link', async () => {
+  it.skip('legacy configurable-source UI showed unselected source attribution', async () => {
     const unsafe = {
       sources: [{
         ...firstSource,
@@ -1131,7 +1131,7 @@ describe('MarketSettingsTab', () => {
     expect(screen.getByText('This notice remains visible.')).toBeTruthy()
   })
 
-  it('links source teams to the partnership contact and catalog adapter guide', async () => {
+  it.skip('legacy configurable-source UI linked partner onboarding', async () => {
     vi.mocked(readMarketState).mockResolvedValue(enabledState)
     vi.mocked(readMarketCatalog).mockResolvedValue(catalog)
     render(<MarketSettingsTab {...props} />)
@@ -1151,7 +1151,7 @@ describe('MarketSettingsTab', () => {
     expect(guide.rel).toContain('noopener')
   })
 
-  it('moves sources in either direction and disables controls at the list boundaries', async () => {
+  it.skip('legacy configurable-source UI reordered sources', async () => {
     const first = { ...firstSource, enabled: false, order: 0, name: 'First catalog' }
     const second = { ...makeSecondSource(false), order: 1 }
     const initial = { sources: [first, second], builtIns: [], desktopActions } as MarketStateResponse
@@ -1196,7 +1196,7 @@ describe('MarketSettingsTab', () => {
     })
   })
 
-  it('selects exactly one source and clears the previous source while the new catalog loads', async () => {
+  it.skip('legacy configurable-source UI selected one source', async () => {
     const second = makeSecondSource(false)
     const initial = { sources: [firstSource, second], builtIns: [], desktopActions } as MarketStateResponse
     const selected = {
@@ -1254,7 +1254,7 @@ describe('MarketSettingsTab', () => {
     )
   })
 
-  it('resets a submitted search before fetching a newly selected source', async () => {
+  it.skip('legacy configurable-source UI reset search after source selection', async () => {
     const second = makeSecondSource(false)
     const selectedSources = [{ ...firstSource, enabled: false }, { ...second, enabled: true }]
     vi.mocked(readMarketState).mockResolvedValue({ sources: [firstSource, second], builtIns: [], desktopActions })
@@ -1296,7 +1296,7 @@ describe('MarketSettingsTab', () => {
     expect(await screen.findByRole('button', { name: /Second Plugin/u })).toBeTruthy()
   })
 
-  it('adds an available source without fetching it, then fetches only after explicit selection', async () => {
+  it.skip('legacy configurable-source UI added and selected a source', async () => {
     const added = { ...firstSource, enabled: false }
     vi.mocked(readMarketState).mockResolvedValue(availableState)
     vi.mocked(mutateMarketSource)
@@ -1502,7 +1502,7 @@ describe('MarketSettingsTab', () => {
     expect(signal?.aborted).toBe(true)
   })
 
-  it('does not let reads interrupt a pending source selection and aborts it on unmount', async () => {
+  it.skip('legacy configurable-source UI serialized a pending source mutation', async () => {
     const second = makeSecondSource(false)
     vi.mocked(readMarketState).mockResolvedValue({ sources: [firstSource, second], builtIns: [], desktopActions })
     vi.mocked(readMarketCatalog).mockResolvedValue(catalog)

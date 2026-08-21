@@ -5,20 +5,22 @@ import { validateLocalSourceRecords } from '../contracts/validate.js'
 import type { CatalogSourceStore, LocalSourceRecord } from '../contracts/types.js'
 
 /** The desktop product ships one reviewed catalog, not a user-configurable source list. */
+export const QNOVEL_CATALOG_HOSTNAME = 'plugins.zenwit.cn'
+
 export const QNOVEL_CATALOG_SOURCE: LocalSourceRecord = {
   sourceRecordId: '0198f152-4f80-7b22-bf15-6c1084fa6e51',
   registrationKind: 'user-added',
   adapterId: 'market.standard-http-v1',
   providerId: 'com.qnovel.plugins',
-  manifestUrl: 'https://plugins.zenwit.cn/v1/catalog-source.json',
+  manifestUrl: `https://${QNOVEL_CATALOG_HOSTNAME}/v1/catalog-source.json`,
   manifest: {
     manifestVersion: '1.0.0',
     providerId: 'com.qnovel.plugins',
     name: 'QNovel Plugin Market',
     description: 'Official QNovel plugin catalog.',
-    homepage: 'https://plugins.zenwit.cn',
-    attribution: { name: 'QNovel', url: 'https://plugins.zenwit.cn' },
-    transport: { kind: 'https-json', endpoint: 'https://plugins.zenwit.cn/v1/plugins', method: 'GET' },
+    homepage: `https://${QNOVEL_CATALOG_HOSTNAME}`,
+    attribution: { name: 'QNovel', url: `https://${QNOVEL_CATALOG_HOSTNAME}` },
+    transport: { kind: 'https-json', endpoint: `https://${QNOVEL_CATALOG_HOSTNAME}/v1/plugins`, method: 'GET' },
     query: { supported: ['q', 'category', 'cursor', 'limit'], defaultLimit: 50, maxLimit: 100, sorts: [] },
   },
   enabled: true,
