@@ -1,29 +1,11 @@
 import Schema from "@deepseek-ai/schemastery";
-import { Service } from "@deepseek-ai/cordis";
+import { settingsNamespace } from "@deepseek-ai/dsh-settings";
 import { access, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { constants } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, normalize, resolve, sep } from "node:path";
 import { stringify } from "yaml";
 import { fileURLToPath } from "node:url";
-/**
-* Service Definition for the user-settings capability seam (`ctx.settings`). Providers store one raw document of
-* per-namespace sections; plugins register a namespace schema and read the
-* resolved value, which layers schema defaults, the registrant's composition
-* `base`, and the user document section, in that order.
-* @module @deepseek-ai/dsh-settings
-*/
-const NAMESPACE_PATTERN = /^[a-z][a-z0-9-]*$/;
-/**
-* Brand a raw string as a {@link SettingsNamespace}.
-* @param value - candidate namespace; lowercase kebab-case, as in plugin short names.
-* @returns the branded namespace.
-*/
-function settingsNamespace(value) {
-	if (!NAMESPACE_PATTERN.test(value)) throw new TypeError(`settings namespace "${value}" must match ${String(NAMESPACE_PATTERN)}`);
-	return value;
-}
-Service.init;
 const DEFAULT_PROJECTS_DIRECTORY = "QNovel作品";
 const requiredDirectories = [
 	"故事设定/人物",

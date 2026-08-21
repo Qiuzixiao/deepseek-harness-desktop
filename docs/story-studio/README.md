@@ -1,7 +1,7 @@
 # QNovel Beta 规划文档
 
 状态：**MVP 工作台与真实创作闭环已落地**
-基线：DSH `0.1.0-rc.7`，DSH Desktop `2.0.1`  
+基线：DSH `0.1.1-rc.1`，QNovel Desktop `1.0.2`
 更新日期：2026-08-18
 
 QNovel 是基于 DSH Desktop 的内部 AI 编剧平台，面向短剧编剧、小说编剧和编导。产品的首要目标不是建立一套新的 Agent Runtime，而是把 DSH 官方能力、经过验证的社区插件、产品 Preset、Skills 和动态 Workflow 组合成稳定的创作工作台。`Story Studio` 仅保留为内部 Profile、Preset 和包名技术标识。
@@ -28,7 +28,7 @@ QNovel 是基于 DSH Desktop 的内部 AI 编剧平台，面向短剧编剧、�
 4. 首个 MVP 只交付一个内部 Story Studio Preset，通过 Skills 区分短剧、小说、参考拆解和审校，用户可见产品名统一为 QNovel Beta。
 5. 创作内容以工作区内的 Markdown/YAML 为唯一事实源；SQLite、向量索引和 UI 状态只能是可重建的派生数据。
 6. 文件树、编辑器、预览、Git、文档读取和回退优先复用现有插件；专业 DOCX/PDF 排版导出不属于当前 MVP。
-7. 社区市场只用于发现候选插件。任何候选进入产品 Profile 前都必须经过固定版本、代码审计、许可证、`rc.7` Loader、桌面模式和打包验证。
+7. 社区市场只用于发现候选插件。任何候选进入产品 Profile 前都必须经过固定版本、代码审计、许可证、当前 DSH Loader、桌面模式和打包验证。
 8. MVP 不开发付费、账号、云同步、多人协同或开放插件市场安装器。
 9. MVP 使用 `dsh-drop-to-path` 作为拖拽/粘贴文件进入对话的统一入口；文件进入工作区后，再由文档读取工具按路径解析。
 
@@ -39,7 +39,7 @@ QNovel 是基于 DSH Desktop 的内部 AI 编剧平台，面向短剧编剧、�
 - 左侧官方 Logo 位置显示 QNovel，左侧保留唯一“新建作品”入口，右上角重复入口删除；中间官方对话区和右侧当前项目 Workbench 保持不变；
 - 新建项目使用中文物理目录和 Markdown 合同（`项目配置.yml`、`项目说明.md`、`故事设定/`、`故事大纲/`、`正文草稿/`、`审校记录/`），旧英文项目只读兼容、不自动重命名；
 - Preset 内置 `story-intake`、`story-project`、`short-drama-writing`、`novel-writing`、`reference-analysis` 和 `story-review` 六个首批 Skills；
-- Electron 安装包内置 `dsh-product-story-studio`、`dsh-workbench`（含 Monaco 资源）、固定 commit 的 `dsh-drop-to-path`、`dsh-rich-file-reader@0.3.1`、经过本仓库 `rc.7` 兼容补丁的 `dsh-checkpoint-rewind@0.5.1` 和 Story Studio 资源；首次启动自动创建 `story-studio` Profile，不需要运行安装命令或访问 GitHub；
+- Electron 安装包内置 `dsh-product-story-studio`、`dsh-workbench`（含 Monaco 资源）、固定 commit 的 `dsh-drop-to-path`、`dsh-rich-file-reader@0.3.1`、经过本仓库 `0.1.1-rc.1` 兼容补丁的 `dsh-checkpoint-rewind@0.5.1` 和 Story Studio 资源；首次启动自动创建 `story-studio` Profile，不需要运行安装命令或访问 GitHub；
 - `read_rich_file`、文件树/编辑器/Git diff、`checkpoint`、`/checkpoint` 和 `/rewind` 随产品 Profile 装配；当前文档输入验收只覆盖 DOCX 与文本层 PDF，Excel、PPT 和扫描 PDF 的完整生产不在本轮范围；
 - 短剧正文、小说正文、参考拆解和审校均由已打包 Skills 提供，创作文件以 Story Studio 项目合同落盘。
 - 真实模型验收已完成一部 12 章中文现实悬疑短篇，从 brief/Bible/大纲到正文、两轮审校和返修均通过实际 Agent 会话写入项目目录。
@@ -50,9 +50,9 @@ QNovel 是基于 DSH Desktop 的内部 AI 编剧平台，面向短剧编剧、�
 
 本方案基于以下证据形成：
 
-- 当前仓库固定的 DeepSeek Harness `0.1.0-rc.7` 源码和能力文档；
+- 当前仓库固定的 DeepSeek Harness `0.1.1-rc.1` 源码和能力文档；
 - DSH Desktop 的 Profile、Host/Client、Desktop service 和打包实现；
-- 已打包并通过 `rc.7` Profile 验证的四个产品插件；
+- 已打包的四个产品插件，以及本轮通过 `0.1.1-rc.1` 临时 Web Profile 验证的社区插件组合；
 - 已在 DSH `0.1.0-rc.7` 临时 Web Profile 中启动的 `@dsh-external/dsh-drop-to-path@0.1.0`；
 - DSH 1024Store 目录与 GitHub 候选仓库；
 - 对候选插件的 `package.json`、Cordis patch、README、源码结构、测试目录和许可证的静态检查；

@@ -6,7 +6,7 @@
 
 1. 是否真的提供 `dsh.bundle`、`dsh.client` 或合法 Skill，而不是只使用 DSH 关键词；
 2. 是否有固定版本、release/tarball 或可复现 commit；
-3. 是否声明兼容当前 DSH `0.1.0-rc.7`；
+3. 是否声明兼容当前 DSH `0.1.1-rc.1`；
 4. 是否会复制官方 service、改变 Profile、直接调用模型或建立平行数据源；
 5. 是否有清楚的 Host/Client 权限、网络、原生依赖和卸载边界；
 6. 是否包含许可证、第三方声明、测试和可构建发布物；
@@ -15,7 +15,7 @@
 选型状态定义：
 
 - **采用**：已通过当前基线运行和发行门禁，可进入固定产品清单；
-- **优先试验**：能力匹配，但仍缺 `rc.7` 或桌面发行证据；
+- **优先试验**：能力匹配，但仍缺当前 DSH 或桌面发行证据；
 - **延后评估**：有价值，但 MVP 不需要或成本过高；
 - **可选工具**：允许内部用户自行安装，不进入产品事实源；
 - **仅作参考**：借鉴功能与测试，不作为运行时依赖；
@@ -62,7 +62,7 @@
 - DSH 声明：`0.1.0-rc.6`。
 - 能力：`read_rich_file`、`ocr_pdf`、Word/Excel/PPT/PDF/图片读取，以及 Web composer 的“导入文档”入口。
 - 正面证据：有 Host/Client 双面清单、Office/PDF 测试、本地 OCR、附件机制和输入大小限制。
-- 风险：依赖 `office-oxide`、Tesseract、Canvas 等原生或重型运行时；中文 OCR 语言包可能首次联网；未声明 `rc.7`。
+- 风险：依赖 `office-oxide`、Tesseract、Canvas 等原生或重型运行时；中文 OCR 语言包可能首次联网；未声明 `0.1.1-rc.1`。
 - 决策：**MVP 预装**。不作为主要文件输入入口；当前只验收按工作区路径读取 DOCX 和文本层 PDF。Excel、PPT 和扫描 PDF 的完整生产不进入本轮验收。
 - 淘汰条件：无法在 packaged app 中稳定装载、原生依赖不可复现、composer 与其他插件冲突，或真实剧本文档提取质量不可接受。
 
@@ -92,8 +92,8 @@
 - 能力：工作区、会话游标和配置三态 checkpoint；Git 仓库使用无引用对象快照，非 Git 目录使用 copy provider；回退前确认和守护 checkpoint。
 - 正面证据：默认不移动 HEAD、不修改 Git 历史或索引；有单元测试、headless 集成流程和明确安全文档。
 - 风险：会监听写入工具和 session 事件；`rc.6` 对自定义 session event 有已知限制；默认每步 checkpoint 可能影响大项目性能和存储。
-- 决策：**MVP 预装并维护兼容补丁**。本仓库补齐 `rc.7` Settings schema 和配置热更新时的工具单例注册；生产配置保持 `workspaceRestore: restore`，回退前必须确认，不启用 `reset-hard`。
-- 淘汰条件：`rc.7` session 语义不兼容、与 Git 插件互相干扰、恢复无法保持未跟踪文件和用户索引边界，或大型项目性能不达标。
+- 决策：**MVP 预装并维护兼容补丁**。本仓库补齐当前 DSH Settings schema 和配置热更新时的工具单例注册；生产配置保持 `workspaceRestore: restore`，回退前必须确认，不启用 `reset-hard`。
+- 淘汰条件：当前 DSH session 语义不兼容、与 Git 插件互相干扰、恢复无法保持未跟踪文件和用户索引边界，或大型项目性能不达标。
 
 ## 4. 第二阶段候选
 

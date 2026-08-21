@@ -188,7 +188,7 @@ export async function runWebProfile(env, expectedClients, inspect) {
     const response = await fetch(url, { signal: AbortSignal.timeout(10_000) })
     const html = await response.text()
     if (!response.ok) throw new Error(`Web profile returned HTTP ${response.status}`)
-    const boot = html.match(/window\.__DSH_BOOT__ = (\{.*?\})<\/script>/u)?.[1]
+    const boot = html.match(/(?:window\.__DSH_BOOT__|globalThis\["__DSH_BOOT__"\])\s*=\s*(\{.*?\})<\/script>/u)?.[1]
     if (boot === undefined) throw new Error('Web profile root has no client manifest')
     const manifest = JSON.parse(boot)
     const clients = new Set(manifest.entries.map(entry => entry.id))

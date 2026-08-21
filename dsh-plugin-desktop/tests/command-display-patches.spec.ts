@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const commandsPatch = readFileSync(new URL('../../patches/dsh-client-ui-commands@0.1.0-rc.7.patch', import.meta.url), 'utf8')
-const inputTriggerPatch = readFileSync(new URL('../../patches/dsh-client-ui-input-trigger@0.1.0-rc.7.patch', import.meta.url), 'utf8')
+const commandsPatch = readFileSync(new URL('../../patches/dsh-client-ui-commands@0.1.1-rc.1.patch', import.meta.url), 'utf8')
+const inputTriggerPatch = readFileSync(new URL('../../patches/dsh-client-ui-input-trigger@0.1.1-rc.1.patch', import.meta.url), 'utf8')
 
 describe('desktop command display patches', () => {
   it('adds a display-only label while retaining the command name', () => {

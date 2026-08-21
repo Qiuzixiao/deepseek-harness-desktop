@@ -63,7 +63,7 @@ QNovel 以专用 DSH Profile 交付，组合官方 Workspace、Session、Agent�
 - 作品 Markdown/YAML 是唯一事实源；隐藏数据库和向量索引必须可重建。
 - DSH Session、Git 和 Checkpoint 分别保存过程、长期版本和短期恢复点。
 - 使用官方 Workspace、Session、fs、attachments、presets、skills、subagents、workflow、jobs、questions、web 和 Client Slots。
-- 文档导入、文件编辑/Git 和回退先评估现有插件，未通过 `rc.7` 与桌面发行门禁前不预装。
+- 文档导入、文件编辑/Git 和回退先评估现有插件，未通过当前 DSH 与桌面发行门禁前不预装。
 - 项目合同解析、验证、迁移和状态推导设计为可独立测试的深模块。
 - 项目工作台使用产品 Client Slot 实现名称创建与作品选择，并复用 Better Sidebar 的文件树、编辑器和预览。
 - 首次启动必须选择全局作品目录；Settings 可以更改该目录；新建作品只输入名称并写入当前配置根目录，不自动搬迁已有作品。
@@ -102,6 +102,6 @@ QNovel 以专用 DSH Profile 交付，组合官方 Workspace、Session、Agent�
 ## Further Notes
 
 - 用户现有 `script-studio` Preset 是能力回归夹具，不是产品需求或最终架构。
-- 当前第三方候选多数只声明兼容 DSH `rc.6`，产品基线为 `rc.7`。
+- 当前第三方候选多数只声明兼容 DSH `rc.6`，产品基线为 `0.1.1-rc.1`；因此仍需独立 runtime smoke。
 - 产品实现应按纵向交付切片推进：先跑通创作流程，再增加项目状态、导出和长篇知识能力。
 - 详细技术方案、插件证据和验收标准分别见本目录其他文档。

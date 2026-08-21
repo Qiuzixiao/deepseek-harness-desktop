@@ -3,7 +3,7 @@ import Schema from '@deepseek-ai/schemastery';
 import { type StoryProjectConfig } from './project.ts';
 export declare const name = "dsh-product-story-studio";
 export declare const inject: string[];
-export declare const QNOVEL_SETTINGS_NAMESPACE: import("@deepseek-ai/dsh-settings").SettingsNamespace;
+export declare const QNOVEL_SETTINGS_NAMESPACE: Branded<"SettingsNamespace">;
 export interface QNovelSettings {
     /** User-selected parent directory containing all QNovel works. */
     projectsRoot: string;

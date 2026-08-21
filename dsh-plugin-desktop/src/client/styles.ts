@@ -46,8 +46,7 @@ body[data-dsh-desktop-mode="advanced"] { margin: 0; background: transparent !imp
 [role="dialog"], [aria-modal="true"] { -webkit-app-region: no-drag !important; }
 html:has([aria-modal="true"]) .dshDesktopWindowsCaptionRow::before,
 html:has([aria-modal="true"]) .dshDesktopMacCaptionRow::before,
-html:has([aria-modal="true"]) .dshDesktopSidebarSurface,
-html:has([aria-modal="true"]) .dshDesktopSidebarSurface::before { -webkit-app-region: no-drag !important; }
+html:has([aria-modal="true"]) .dshDesktopSidebarSurface { -webkit-app-region: no-drag !important; }
 @media (prefers-reduced-motion: reduce) {
   .dshDesktopFrame,
   .dshDesktopResizeHandle { transition: none !important; }

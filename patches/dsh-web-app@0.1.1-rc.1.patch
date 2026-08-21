@@ -16,3 +16,16 @@ index 285727092554d6fe2c70e56dd3f0eefabf8e2ed8..e494b944e104f61d46c161bd5ad00714
 +			...scrubbedParentEnv(),
 +			ELECTRON_RUN_AS_NODE: "1"
 +		},
+diff --git a/cordis.patch.yml b/cordis.patch.yml
+--- a/cordis.patch.yml
++++ b/cordis.patch.yml
+@@ -138,8 +138,8 @@
+     - id: web-runtime
+       name: '@deepseek-ai/dsh-web-app'
+       inject: [webStartup]
+       config:
+-        openBrowser: !!js ctx.webStartup.openBrowser
++        openBrowser: false
+         printUrl: true
+         surfaceContext: true
+         trustedHosts: !!js ctx.webStartup.trustedHosts

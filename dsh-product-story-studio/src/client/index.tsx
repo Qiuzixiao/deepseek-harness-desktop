@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { ClientContext, WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
+import type { ConnectionHandle, SettingsNamespaceView } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import {
@@ -376,7 +376,7 @@ function unwrap<T>(result: unknown): T {
 async function readQNovelRoot(connection: ConnectionHandle): Promise<string> {
   const response = await connection.api.settings.describe({})
   if (!response.result.ok) throw new Error(response.result.error.message)
-  const namespace = response.result.value.namespaces.find(item => item.ns === 'qnovel')
+  const namespace = response.result.value.namespaces.find((item: SettingsNamespaceView) => item.ns === 'qnovel')
   const value = namespace?.value
   if (typeof value !== 'object' || value === null || !('projectsRoot' in value)) return ''
   const root = (value as { projectsRoot?: unknown }).projectsRoot
