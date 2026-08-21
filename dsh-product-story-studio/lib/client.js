@@ -57,21 +57,16 @@ window.__ModuleLoader__.load({
 [class*="logoRow"] [class*="toggle"]:has([class*="railFish"])::before{content:"";display:block;width:24px;height:24px;background:url("/wb/qnovel/icon-qnovel.svg") center/contain no-repeat}
 [class*="logoRow"] [class*="toggle"]:has([class*="railFish"]) [class*="railFish"]{display:none!important}
 [class*="logoRow"] [class*="toggle"]:has([class*="railFish"]):hover::before{display:none}
-/* The upstream slot is technically rendered in the footer, but QNovel's
-   product contract is explicit: New Session and New Work are one top action
-   row directly below the wordmark. Position the slot's wrapper (rather than
-   only its button) against the official sidebar geometry, so the footer
-   cannot leave a second visible copy at the bottom. The 74px offset is the
-   upstream sidebar's 6px top padding + 60px logo row + 8px logo margin. */
+/* QNovel's product contract puts New Session and New Work in one top action
+   row. The root is the positioning context for the product-owned action only;
+   other sidebar.footer.action occupants must remain in the shared footer. */
 [class~="hHd-Xa_root"]{position:relative}
 [class~="hHd-Xa_root"]:not([class~="hHd-Xa_collapsed"]) [class~="hHd-Xa_newSession"]{width:calc(50% - 6px);margin-right:auto}
-/* The footer slot is mounted after the workspace region by the upstream
-   sidebar. Pull only that slot up into the same 38px action row as New
-   Session; it must never render as a second bottom action. */
-[class~="hHd-Xa_root"]:not([class~="hHd-Xa_collapsed"]) [class~="hHd-Xa_footerActions"]{position:absolute;z-index:4;top:74px;left:calc(50% + 2px);right:14px;width:auto;height:38px;display:flex;align-items:stretch}
-[class~="hHd-Xa_root"]:not([class~="hHd-Xa_collapsed"]) [class~="hHd-Xa_footerActions"] > *{width:100%;height:38px}
-.qNovelCreateSlotHost{position:static;width:100%;height:38px}
-.qNovelCreateSlotHost[data-wide=true]{display:block}
+/* The create action is rendered through the footer slot but leaves that flow
+   by itself. The 74px offset is the upstream 6px root padding + 60px logo row
+   + 8px logo margin. */
+.qNovelCreateSlotHost{width:100%;height:38px}
+.qNovelCreateSlotHost[data-wide=true]{position:absolute;z-index:4;top:74px;left:calc(50% + 2px);right:14px;width:auto;display:block}
 .qNovelCreateSlotHost:not([data-wide=true]){display:none}
 .storyStudioCreateAction{box-sizing:border-box;display:flex;align-items:center;justify-content:center;width:100%;height:38px;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-button-elevated-fill);color:var(--dsw-alias-label-primary);cursor:pointer;transition:background-color 120ms ease,color 120ms ease,border-color 120ms ease}
 .storyStudioCreateAction:hover{background:var(--dsw-alias-button-floating-hover);border-color:var(--dsw-alias-border-l2);color:var(--dsw-alias-label-primary)}

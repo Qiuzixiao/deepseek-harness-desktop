@@ -2,12 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { styles } from '../src/client/styles.ts'
 
 describe('QNovel sidebar and brand presentation contract', () => {
-  it('keeps the only product action in the top row beside New Session', () => {
+  it('moves only the product action beside New Session and leaves shared footer actions pinned below', () => {
     expect(styles).toContain('[class~="hHd-Xa_root"]:not([class~="hHd-Xa_collapsed"]) [class~="hHd-Xa_newSession"]')
-    expect(styles).toContain('[class~="hHd-Xa_root"]:not([class~="hHd-Xa_collapsed"]) [class~="hHd-Xa_footerActions"]')
-    expect(styles).toContain('[class~="hHd-Xa_footerActions"] > *{width:100%;height:38px}')
-    expect(styles).toContain('top:74px')
-    expect(styles).toContain('left:calc(50% + 2px)')
+    expect(styles).not.toContain('[class~="hHd-Xa_footerActions"]{position:absolute')
+    expect(styles).toContain('.qNovelCreateSlotHost[data-wide=true]{position:absolute')
+    expect(styles).toContain('.qNovelCreateSlotHost[data-wide=true]{position:absolute;z-index:4;top:74px;left:calc(50% + 2px)')
     expect(styles).toContain('.qNovelCreateSlotHost:not([data-wide=true]){display:none}')
   })
 
