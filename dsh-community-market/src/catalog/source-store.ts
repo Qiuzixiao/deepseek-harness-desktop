@@ -4,6 +4,27 @@ import type { CatalogSnapshot } from '../contracts/generated/catalog-snapshot.js
 import { validateLocalSourceRecords } from '../contracts/validate.js'
 import type { CatalogSourceStore, LocalSourceRecord } from '../contracts/types.js'
 
+/** The desktop product ships one reviewed catalog, not a user-configurable source list. */
+export const QNOVEL_CATALOG_SOURCE: LocalSourceRecord = {
+  sourceRecordId: '0198f152-4f80-7b22-bf15-6c1084fa6e51',
+  registrationKind: 'user-added',
+  adapterId: 'market.standard-http-v1',
+  providerId: 'com.qnovel.plugins',
+  manifestUrl: 'https://plugins.zenwit.cn/v1/catalog-source.json',
+  manifest: {
+    manifestVersion: '1.0.0',
+    providerId: 'com.qnovel.plugins',
+    name: 'QNovel Plugin Market',
+    description: 'Official QNovel plugin catalog.',
+    homepage: 'https://plugins.zenwit.cn',
+    attribution: { name: 'QNovel', url: 'https://plugins.zenwit.cn' },
+    transport: { kind: 'https-json', endpoint: 'https://plugins.zenwit.cn/v1/plugins', method: 'GET' },
+    query: { supported: ['q', 'category', 'cursor', 'limit'], defaultLimit: 50, maxLimit: 100, sorts: [] },
+  },
+  enabled: true,
+  order: 0,
+}
+
 export interface MarketCatalogCache {
   readonly version: 1
   readonly sourceRecordId: string
@@ -51,6 +72,17 @@ export class SettingsCatalogSourceStore implements CatalogSourceStore {
     const normalized = normalizeActiveSourceRecords(records)
     validateLocalSourceRecords(normalized)
     await this.scope.update({ sources: normalized })
+  }
+}
+
+/** Ignores legacy source settings so QNovel always loads its official catalog. */
+export class QNovelCatalogSourceStore implements CatalogSourceStore {
+  async load(): Promise<readonly LocalSourceRecord[]> {
+    return [QNOVEL_CATALOG_SOURCE]
+  }
+
+  async save(): Promise<void> {
+    throw new Error('QNovel plugin catalog is managed by QNovel')
   }
 }
 

@@ -14,7 +14,6 @@ import {
   IconRefreshOutline16,
   IconRightUpOutline16,
   IconSearchOutline16,
-  IconSettingsOutline16,
   IconTrashOutline16,
   Input,
   Modal,
@@ -39,7 +38,6 @@ import type {
 import { marketMediaAssetUrl } from '../media/ref.js'
 import {
   executeMarketOperation,
-  mutateMarketSource,
   openMarketTerminal,
   previewMarketOperation,
   readMarketCatalog,
@@ -51,24 +49,16 @@ import {
 } from './api.js'
 
 type MarketItem = CatalogSnapshot['items'][number]
-export type MarketView = 'discover' | 'installable' | 'installed' | 'sources'
+export type MarketView = 'discover' | 'installable' | 'installed'
 const INSTALLABLE_PAGE_SIZE = 50
 const INSTALL_REQUIREMENTS_DOCS = {
   en: 'https://github.com/Qiuzixiao/deepseek-harness-desktop/blob/master/dsh-community-market/docs/install-and-uninstall.md',
   zh: 'https://github.com/Qiuzixiao/deepseek-harness-desktop/blob/master/dsh-community-market/docs/install-and-uninstall.zh.md',
 } as const
-const CATALOG_ADAPTER_GUIDE_DOCS = {
-  en: 'https://github.com/Qiuzixiao/deepseek-harness-desktop/blob/master/dsh-community-market/docs/catalog-adapter-guide.md',
-  zh: 'https://github.com/Qiuzixiao/deepseek-harness-desktop/blob/master/dsh-community-market/docs/catalog-adapter-guide.zh.md',
-} as const
 const DSH_DESKTOP_ISSUES_URL = 'https://github.com/Qiuzixiao/deepseek-harness-desktop/issues'
 
 function installRequirementsUrl(locale: string): string {
   return locale.toLowerCase().startsWith('zh') ? INSTALL_REQUIREMENTS_DOCS.zh : INSTALL_REQUIREMENTS_DOCS.en
-}
-
-function catalogAdapterGuideUrl(locale: string): string {
-  return locale.toLowerCase().startsWith('zh') ? CATALOG_ADAPTER_GUIDE_DOCS.zh : CATALOG_ADAPTER_GUIDE_DOCS.en
 }
 
 interface VisibleItem {
@@ -239,10 +229,7 @@ export function MarketSurface({ initialView = 'installable', readLocale, t, show
   const [error, setError] = useState<string>()
   const [loadMoreError, setLoadMoreError] = useState<string>()
   const [selected, setSelected] = useState<VisibleItem>()
-  const [addOpen, setAddOpen] = useState(false)
-  const [manifestUrl, setManifestUrl] = useState('')
-  const [mutationError, setMutationError] = useState<string>()
-  const [mutationPending, setMutationPending] = useState(false)
+  const mutationPending = false
   const [installations, setInstallations] = useState<readonly MarketInstallationView[]>([])
   const [installableIndex, setInstallableIndex] = useState<MarketInstallableResponse>()
   const [installableQuery, setInstallableQuery] = useState('')
@@ -522,67 +509,6 @@ export function MarketSurface({ initialView = 'installable', readLocale, t, show
       && hint.itemId === selected.item.id
     ))
   }, [catalog, installableIndex, selected, view])
-
-  const mutate = async (mutation: MarketSourceMutation): Promise<boolean> => {
-    if (mutationRequest.current !== undefined) return false
-    readRequest.current?.abort()
-    pageRequest.current?.abort()
-    installableRequest.current?.abort()
-    readRequest.current = undefined
-    pageRequest.current = undefined
-    installableRequest.current = undefined
-    setLoading(false)
-    setLoadingMore(false)
-    setLoadMoreError(undefined)
-    const request = new AbortController()
-    mutationRequest.current = request
-    setMutationPending(true)
-    setMutationError(undefined)
-    try {
-      const sources = await mutateMarketSource(mutation, request.signal)
-      if (request.signal.aborted || mutationRequest.current !== request) return false
-      const next: MarketStateResponse = {
-        sources,
-        builtIns: state?.builtIns ?? [],
-        desktopActions: state?.desktopActions ?? { openTerminal: false, requestRestart: false },
-      }
-      const sourceChanged = selectedSource(state?.sources ?? [])?.sourceRecordId
-        !== selectedSource(sources)?.sourceRecordId
-      setState(next)
-      if (sourceChanged) {
-        setCatalog(undefined)
-        setInstallableIndex(undefined)
-        setInstallableLoaded(false)
-        setInstallableLoading(false)
-        setInstallableUnavailable(false)
-        setInstallableError(undefined)
-        setInstallableQuery('')
-        setAppliedInstallableQuery('')
-        setInstallableCategories([])
-        setInstallableLimit(INSTALLABLE_PAGE_SIZE)
-        setQuery('')
-        setAppliedQuery('')
-        setCategoryOptions([])
-        setSelectedCategories([])
-        selectedKeyRef.current = undefined
-        setSelected(undefined)
-      } else {
-        setCatalog(current => retainEnabledCatalog(current, sources))
-      }
-      mutationRequest.current = undefined
-      setMutationPending(false)
-      await loadCatalog(next, sourceChanged ? '' : appliedQuery, sourceChanged ? [] : selectedCategories)
-      return true
-    } catch {
-      if (!request.signal.aborted && mutationRequest.current === request) setMutationError(t('sourceError'))
-      return false
-    } finally {
-      if (mutationRequest.current === request) {
-        mutationRequest.current = undefined
-        setMutationPending(false)
-      }
-    }
-  }
 
   const toggleCategory = (category: string) => {
     if (state === undefined) return
@@ -935,9 +861,6 @@ export function MarketSurface({ initialView = 'installable', readLocale, t, show
           <Pill active={view === 'installed'} aria-pressed={view === 'installed'} onClick={() => selectMarketView('installed')}>
             <IconCheckOutline16 size={14} /><span>{t('installed')}</span>
           </Pill>
-          <Pill active={view === 'sources'} aria-pressed={view === 'sources'} onClick={() => selectMarketView('sources')}>
-            <IconSettingsOutline16 size={14} /><span>{t('sources')}</span>
-          </Pill>
         </div>
         <Pill className="dshMarketCurrentSource">
           {currentSource === undefined
@@ -972,7 +895,6 @@ export function MarketSurface({ initialView = 'installable', readLocale, t, show
             onToggleCategory={toggleCategory}
             onLoadMore={() => { void loadMore() }}
             hasMore={pageTarget !== undefined}
-            onSources={() => selectMarketView('sources')}
             onSelect={openItem}
             t={t}
           />
@@ -1004,7 +926,6 @@ export function MarketSurface({ initialView = 'installable', readLocale, t, show
             }}
             onLoadMore={() => setInstallableLimit(current => current + INSTALLABLE_PAGE_SIZE)}
             onRetry={() => { void loadInstallable() }}
-            onSources={() => selectMarketView('sources')}
             onInstall={openItem}
             t={t}
           />
@@ -1028,18 +949,7 @@ export function MarketSurface({ initialView = 'installable', readLocale, t, show
             }}
             t={t}
           />
-        ) : (
-          <SourcesView
-            state={state}
-            catalog={catalog}
-            error={mutationError}
-            pending={mutationPending}
-            adapterGuideHref={catalogAdapterGuideUrl(readLocale())}
-            onMutation={mutation => { void mutate(mutation) }}
-            onAddStandard={() => setAddOpen(true)}
-            t={t}
-          />
-        )}
+        ) : null}
       </main>
       {selected !== undefined && (
         <ItemActionModal
@@ -1105,42 +1015,6 @@ export function MarketSurface({ initialView = 'installable', readLocale, t, show
           t={t}
         />
       )}
-      <Modal
-        open={addOpen}
-        className="dshMarketModal dshMarketSourceModal"
-        contentClassName="dshMarketModalContent"
-        onClose={() => { if (!mutationPending) setAddOpen(false) }}
-        title={t('addStandard')}
-        closeLabel={t('cancel')}
-        description={t('sourceNotice')}
-        footer={<div className="dshMarketModalActions">
-          <Button variant="ghost" disabled={mutationPending} onClick={() => setAddOpen(false)}>{t('cancel')}</Button>
-          <Button
-            variant="primary"
-            icon={<IconPlusOutline16 />}
-            disabled={mutationPending || !manifestUrl.trim()}
-            onClick={() => {
-              void mutate({ action: 'add-standard', manifestUrl: manifestUrl.trim() }).then(succeeded => {
-                if (!succeeded) return
-                setManifestUrl('')
-                setAddOpen(false)
-              })
-            }}
-          >{t('confirmAdd')}</Button>
-        </div>}
-      >
-        <div className="dshMarketModalField">
-          <label htmlFor="dsh-market-manifest">{t('standardSource')}</label>
-          <Input
-            id="dsh-market-manifest"
-            value={manifestUrl}
-            disabled={mutationPending}
-            placeholder={t('manifestPlaceholder')}
-            onChange={event => setManifestUrl(event.currentTarget.value)}
-          />
-          {mutationError !== undefined && <div className="dshMarketError" role="alert">{mutationError}</div>}
-        </div>
-      </Modal>
     </section>
   )
 }
@@ -1172,7 +1046,6 @@ function DiscoverView(props: {
   onRefresh: () => void
   onToggleCategory: (category: string) => void
   onLoadMore: () => void
-  onSources: () => void
   onSelect: (value: VisibleItem) => void
   t: MarketSettingsTabProps['t']
 }) {
@@ -1182,7 +1055,6 @@ function DiscoverView(props: {
       <div className="dshMarketEmptyIcon"><IconGlobeOutline14 size={24} /></div>
       <h2>{props.t('emptyTitle')}</h2>
       <p>{props.t('emptyBody')}</p>
-      <Button variant="primary" icon={<IconSettingsOutline16 />} onClick={props.onSources}>{props.t('chooseSources')}</Button>
     </div>
   )
   return (
@@ -1287,7 +1159,6 @@ function InstallableView(props: {
   onToggleCategory: (category: string) => void
   onLoadMore: () => void
   onRetry: () => void
-  onSources: () => void
   onInstall: (value: VisibleItem) => void
   t: MarketSettingsTabProps['t']
 }) {
@@ -1297,7 +1168,6 @@ function InstallableView(props: {
       <div className="dshMarketEmptyIcon"><IconGlobeOutline14 size={24} /></div>
       <h2>{props.t('emptyTitle')}</h2>
       <p>{props.t('emptyBody')}</p>
-      <Button variant="primary" icon={<IconSettingsOutline16 />} onClick={props.onSources}>{props.t('chooseSources')}</Button>
     </div>
   )
   if (props.unavailable) return (
@@ -1649,7 +1519,7 @@ function ItemSourceRow({ source, t }: {
   )
 }
 
-function SourcesView({ state, catalog, error, pending, adapterGuideHref, onMutation, onAddStandard, t }: {
+export function SourcesView({ state, catalog, error, pending, adapterGuideHref, onMutation, onAddStandard, t }: {
   state?: MarketStateResponse | undefined
   catalog?: MarketCatalogResponse | undefined
   error?: string | undefined

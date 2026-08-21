@@ -8,7 +8,6 @@ import type { CatalogSourceManifest } from '../contracts/index.js'
 import { parseCatalogSnapshot, parseCatalogSource, validateLocalSourceRecords } from '../contracts/validate.js'
 import type { CatalogHttpClient } from '../contracts/types.js'
 import type {
-  MarketBuiltInProvider,
   MarketCatalogMetadata,
   MarketCatalogResponse,
   MarketInstallationView,
@@ -29,7 +28,7 @@ import {
 import { DSHFIND_ADAPTER_ID, DSHFIND_HOSTNAME } from '../adapters/dshfind.js'
 import { assertStandardSourceTrustRoot } from '../adapters/standard-http.js'
 import { BUILT_IN_PROVIDERS, DefaultCatalogService, type CatalogFetchScope, type CatalogFullIndex } from '../catalog/service.js'
-import { SettingsCatalogSourceStore, type MarketCatalogCache, type MarketSettingsDocument } from '../catalog/source-store.js'
+import { QNovelCatalogSourceStore, SettingsCatalogSourceStore, type MarketCatalogCache, type MarketSettingsDocument } from '../catalog/source-store.js'
 import { MARKET_MEDIA_ASSET_REF_PATTERN } from '../media/ref.js'
 import { createRestrictedImageFetcher } from '../media/restricted-image.js'
 import { createMarketMediaService } from '../media/service.js'
@@ -362,30 +361,6 @@ function mutationAllowed(req: IncomingMessage, expectedPort: number): boolean {
   })
 }
 
-function asMutation(value: unknown): MarketSourceMutation {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) throw new Error('invalid mutation')
-  const mutation = value as Record<string, unknown>
-  if (
-    mutation.action === 'add-builtin'
-    && typeof mutation.key === 'string'
-    && mutation.key.length > 0
-    && mutation.key.length <= 64
-  ) return { action: 'add-builtin', key: mutation.key }
-  if (mutation.action === 'add-standard' && typeof mutation.manifestUrl === 'string') return { action: 'add-standard', manifestUrl: mutation.manifestUrl }
-  if (mutation.action === 'select' && typeof mutation.sourceRecordId === 'string') {
-    return { action: 'select', sourceRecordId: mutation.sourceRecordId }
-  }
-  if (
-    mutation.action === 'move'
-    && typeof mutation.sourceRecordId === 'string'
-    && (mutation.direction === 'up' || mutation.direction === 'down')
-  ) {
-    return { action: 'move', sourceRecordId: mutation.sourceRecordId, direction: mutation.direction }
-  }
-  if (mutation.action === 'remove' && typeof mutation.sourceRecordId === 'string') return { action: 'remove', sourceRecordId: mutation.sourceRecordId }
-  throw new Error('unsupported mutation')
-}
-
 type MarketOperationPreviewRequest =
   | { readonly action: 'install'; readonly sourceRecordId: string; readonly itemId: string }
   | { readonly action: 'uninstall'; readonly receiptId: string }
@@ -574,10 +549,6 @@ function reconcileInstallations(
           packageName: bundle.packageName,
         }]
   })
-}
-
-function viewBuiltIns(): readonly MarketBuiltInProvider[] {
-  return BUILT_IN_PROVIDERS.map(provider => ({ ...provider }))
 }
 
 export async function readStandardSourceManifest(
@@ -769,7 +740,7 @@ export function registerMarketRoutes(
       enablePreviews.delete(oldest)
     }
   }
-  const store = new SettingsCatalogSourceStore(scope)
+  const store = new QNovelCatalogSourceStore()
   const media = createMarketMediaService({
     fetchImage: createRestrictedImageFetcher({
       // These are compiled-in adapter hosts, not names supplied by a remote source.
@@ -786,13 +757,6 @@ export function registerMarketRoutes(
   })
   const servedCatalogPreviews = new Set<string>()
   const catalogPreviewKey = (sourceRecordId: string, locale: string) => `${sourceRecordId}\0${locale}`
-  const mutateSource = createMarketSourceMutator(scope, sourceRecordId => {
-    service.invalidateSource(sourceRecordId)
-    for (const key of servedCatalogPreviews) {
-      if (key.startsWith(`${sourceRecordId}\0`)) servedCatalogPreviews.delete(key)
-    }
-    installProvider?.get()?.invalidateSource(sourceRecordId)
-  })
   const buildCatalogResponse = (
     index: CatalogFullIndex | undefined,
     query: Record<string, unknown>,
@@ -835,7 +799,7 @@ export function registerMarketRoutes(
         const desktopActions = desktopActionsProvider?.get()
         const response: MarketStateResponse = {
           sources: await service.listSources(),
-          builtIns: viewBuiltIns(),
+          builtIns: [],
           desktopActions: {
             openTerminal: desktopActions !== undefined,
             requestRestart: desktopActions !== undefined
@@ -980,26 +944,6 @@ export function registerMarketRoutes(
         res.end(asset.body)
       } catch {
         if (!signal.aborted && !res.destroyed) sendJson(res, 404, { error: 'market media unavailable' })
-      } finally {
-        stopWatching()
-      }
-    }}),
-    ctx.webServer.register({ kind: 'exact', path: ROUTE_SOURCES, handler: async (req, res) => {
-      if (req.method !== 'POST' || !mutationAllowed(req, expectedPort)) {
-        sendJson(res, 405, { error: 'source changes require a local same-origin POST' })
-        return
-      }
-      const controller = new AbortController()
-      const signal = AbortSignal.any([controller.signal, generationController.signal])
-      const stopWatching = abortOnDisconnect(req, res, controller)
-      try {
-        const mutation = asMutation(await readJson(req, signal))
-        await mutateSource(mutation, signal)
-        if (!signal.aborted && !res.destroyed) sendJson(res, 200, { sources: await service.listSources() })
-      } catch (cause) {
-        if (!signal.aborted && !res.destroyed) {
-          sendJson(res, 400, { error: cause instanceof Error ? cause.message : 'source change failed' })
-        }
       } finally {
         stopWatching()
       }
