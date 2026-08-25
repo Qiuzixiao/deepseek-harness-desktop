@@ -41,10 +41,24 @@ try {
     'node_modules',
     HOST_SERVICE_PLUGIN_NAME,
   )
+  // The Zenwit profile composes its product-owned screenplay host directly
+  // from the repository. Keep this headless smoke self-contained instead of
+  // relying on a developer's persistent ~/.dsh-dev profile or a pre-existing
+  // node_modules symlink.
+  const screenplayHostPluginDir = join(
+    prepared.profile.dir,
+    'node_modules',
+    'dsh-short-drama',
+  )
   mkdirSync(join(prepared.profile.dir, 'node_modules'), { recursive: true })
   cpSync(
     fileURLToPath(new URL('../tests/fixtures/desktop-host-services-smoke-plugin/', import.meta.url)),
     hostServicePluginDir,
+    { recursive: true, force: false, errorOnExist: true },
+  )
+  cpSync(
+    fileURLToPath(new URL('../../dsh-short-drama/', import.meta.url)),
+    screenplayHostPluginDir,
     { recursive: true, force: false, errorOnExist: true },
   )
   const patches = [

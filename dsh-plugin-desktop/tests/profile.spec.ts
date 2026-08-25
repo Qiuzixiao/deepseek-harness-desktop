@@ -684,6 +684,22 @@ virtualStoreDirMaxLength: 60
     expect(desktopShellModeFromSettings({ unrelated: { enabled: true } })).toBe('compatibility')
   })
 
+  it('applies the isolated development port when the desktop namespace is absent', () => {
+    const previous = process.env.DSH_DESKTOP_WEB_PORT
+    process.env.DSH_DESKTOP_WEB_PORT = '43121'
+    try {
+      expect(desktopStartupSettingsFromSettings({ unrelated: { enabled: true } })).toEqual({
+        mode: 'compatibility',
+        port: 43_121,
+        macosMaterial: 'transparent',
+        windowsMaterial: 'acrylic',
+      })
+    } finally {
+      if (previous === undefined) delete process.env.DSH_DESKTOP_WEB_PORT
+      else process.env.DSH_DESKTOP_WEB_PORT = previous
+    }
+  })
+
   it('rejects invalid settings roots, sections, modes, and YAML', () => {
     expect(() => desktopShellModeFromSettings([])).toThrow('must be a map')
     expect(() => desktopShellModeFromSettings({ 'dsh-desktop': true })).toThrow('settings must be a map')

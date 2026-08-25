@@ -55,6 +55,18 @@ describe('ui-layout client apply', () => {
     expect(slots.spec('conversation')).toBeUndefined()
   })
 
+  it('keeps the layout service and theme presenter but releases root ownership in Zenwit mode', async () => {
+    const { ctx, slots } = await bench()
+    const fiber = ctx.plugin({ inject: [...inject], apply }, { zenwit: true })
+    await fiber.await()
+
+    expect(ctx.get('layout')).toBeInstanceOf(LayoutController)
+    expect(slots.entries('root')).toHaveLength(0)
+    expect(slots.spec('sidebar')).toBeUndefined()
+    expect(slots.spec('details')).toBeUndefined()
+    expect(document.documentElement.style.colorScheme).toBe('light')
+  })
+
   it('injects no business face and attaches the layout actions', async () => {
     const { ctx, slots } = await bench()
     const fiber = ctx.plugin({ inject: [...inject], apply })

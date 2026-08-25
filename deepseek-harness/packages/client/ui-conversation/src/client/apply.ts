@@ -446,16 +446,23 @@ export function apply(ctx: Context): void {
   // registration path into the input dock declared above.
   ctx.plugin(queueDockEntry)
 
-  slots.register({
-    name: 'details',
-    locale: NS,
-    children: {
-      'conversation.details.tool': { kind: 'single', scope: 'session' },
-    },
-    store: chatStore,
-    inject: (): DetailsInjected => ({
-      closeDetails: () => { layout.closeDetails() },
-    }),
-  }, DetailsPanel)
+  // Zenwit owns a focused three-pane workspace and does not render the
+  // upstream floating details panel. Keep the native panel for ordinary Web
+  // shells, but do not make the product boot depend on an unrendered slot.
+  const zenwit = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('dsh-desktop-mode') === 'compatibility'
+  if (!zenwit) {
+    slots.inject('details', () => slots.register({
+      name: 'details',
+      locale: NS,
+      children: {
+        'conversation.details.tool': { kind: 'single', scope: 'session' },
+      },
+      store: chatStore,
+      inject: (): DetailsInjected => ({
+        closeDetails: () => { layout.closeDetails() },
+      }),
+    }, DetailsPanel))
+  }
 
 }

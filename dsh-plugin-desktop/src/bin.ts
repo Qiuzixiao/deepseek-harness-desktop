@@ -87,8 +87,18 @@ async function launchElectron(): Promise<number> {
     return 1
   }
   const mainPath = fileURLToPath(new URL('./main.js', import.meta.url))
+  // Isolated-dev support: DSH_DESKTOP_USER_DATA gives the dev instance its own
+  // Electron user-data directory so it can run beside an installed DSH Desktop.
+  const electronArgs = [mainPath]
+  const userDataDir = process.env.DSH_DESKTOP_USER_DATA
+  if (userDataDir !== undefined && userDataDir.length > 0) {
+    // One argv token ('--user-data-dir=<path>'): Chromium only recognizes the
+    // equals form, so splitting the flag and its value would fall through to
+    // the default user-data directory and collide with an installed DSH Desktop.
+    electronArgs.push(`--user-data-dir=${userDataDir}`)
+  }
   return new Promise<number>((resolveExit, reject) => {
-    const child = spawn(electronPath, [mainPath], { stdio: 'inherit', env: process.env })
+    const child = spawn(electronPath, electronArgs, { stdio: 'inherit', env: process.env })
     child.once('error', reject)
     child.once('exit', (code, signal) => {
       resolveExit(code ?? (signal === null ? 1 : 128))

@@ -37,8 +37,7 @@ export function apply(ctx: ClientContext): void {
     startSession: (workspaceId) => { ctx.workspaces.startSession(workspaceId) },
     toggleSidebar: () => { ctx.layout.toggleSidebar() },
   })
-  ctx.effect(
-    () => ctx.slots.register({
+  ctx.slots.inject('sidebar', () => ctx.slots.register({
       name: 'sidebar',
       locale: NS,
       // The shell owns geometry; ui-workspace registers the whole browsing
@@ -50,7 +49,5 @@ export function apply(ctx: ClientContext): void {
         'sidebar.footer.action': { kind: 'list', scope: 'root' },
       },
       inject: injectProps,
-    }, SidebarRoot),
-    'ui-sidebar: slot registration',
-  )
+    }, SidebarRoot))
 }

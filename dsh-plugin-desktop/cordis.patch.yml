@@ -26,3 +26,16 @@
     printUrl: false
     surfaceContext: true
     trustedHosts: []
+# The current Web shell installs the slot renderer through its shell-owned
+# app-shell entry. Older installed Web bundles still contribute ui-renderer;
+# disable that legacy installer when the mixed profile is composed so the
+# renderer is installed exactly once.
+- id: ui-renderer
+  disabled: true
+
+# Zenwit owns the root shell and mounts the native sidebar settings owner in a
+# hidden host. Keep ui-layout's service/theme presenter, but release AppFrame's
+# root declaration so it cannot collide with Zenwit's sidebar child seat.
+- id: ui-layout
+  config:
+    zenwit: true

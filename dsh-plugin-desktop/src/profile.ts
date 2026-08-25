@@ -113,6 +113,14 @@ export function parseDesktopShellMode(value: unknown): DesktopShellMode {
 
 /** Parse the requested loopback Web port and reject values Node cannot listen on. */
 export function parseDesktopPort(value: unknown): number {
+  // Isolated-dev support: DSH_DESKTOP_WEB_PORT overrides the settings port so a
+  // dev instance can run beside an installed DSH Desktop on a different port.
+  const envPort = process.env.DSH_DESKTOP_WEB_PORT
+  if (envPort !== undefined && envPort.length > 0) {
+    const parsed = Number(envPort)
+    if (Number.isInteger(parsed) && parsed >= 0 && parsed <= 65_535) return parsed
+    throw new Error(`${BIN_NAME}: DSH_DESKTOP_WEB_PORT must be an integer from 0 through 65535`)
+  }
   if (value === undefined) return DEFAULT_DESKTOP_PORT
   if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 65_535) return value
   throw new Error(`${BIN_NAME}: ${DESKTOP_SETTINGS_NAMESPACE}.port must be an integer from 0 through 65535`)
@@ -144,7 +152,14 @@ export function desktopStartupSettingsFromSettings(document: unknown): DesktopSt
   }
   const section = (document as Record<string, unknown>)[DESKTOP_SETTINGS_NAMESPACE]
   if (section === undefined) {
-    return { ...DEFAULT_DESKTOP_STARTUP_SETTINGS }
+    // Keep the isolated-dev override effective even when the user has never
+    // written a `dsh-desktop` section.  Calling the same parser used for an
+    // explicit section is important here: the old fast path returned the
+    // compile-time default (43120) before `DSH_DESKTOP_WEB_PORT` was read.
+    return {
+      ...DEFAULT_DESKTOP_STARTUP_SETTINGS,
+      port: parseDesktopPort(undefined),
+    }
   }
   if (typeof section !== 'object' || section === null || Array.isArray(section)) {
     throw new Error(`${BIN_NAME}: ${DESKTOP_SETTINGS_NAMESPACE} settings must be a map`)

@@ -107,6 +107,8 @@ export interface SidebarOwnerProps {
   collapsed: boolean
   /** Rendered column width in px (SIDEBAR_COLLAPSED when collapsed). */
   width: number
+  /** Alternate product shells can mount only the sidebar's native settings seat. */
+  settingsOnly?: boolean
 }
 
 /** Conversation owner share: business state and actions belong to the registrant. */
@@ -118,6 +120,12 @@ export interface DetailsOwnerProps {}
 /** Required services (cordis fiber inject — the loader passes all module exports as an object plugin). */
 export const inject = ['slots', 'theme']
 
+/** Presentation switch for product shells that replace AppFrame. */
+export interface LayoutConfig {
+  /** Let a product-owned root frame claim the sidebar/conversation seats. */
+  zenwit?: boolean
+}
+
 /**
  * Client plugin body: provide ctx.layout, then one register() call — AppFrame
  * into 'root' with the three child-slot declarations (sidebar, details,
@@ -125,29 +133,42 @@ export const inject = ['slots', 'theme']
  * store's bound actions to the service.
  * @param ctx - client root context.
  */
-export function apply(ctx: ClientContext): void {
+export function apply(ctx: ClientContext, config: LayoutConfig = {}): void {
   const layout = new LayoutController()
+  // Desktop compatibility mode is the Zenwit product shell in this checkout.
+  // Loader config is host-only, so the browser half cannot receive
+  // `config.zenwit` from the desktop patch. Derive the same decision from the
+  // explicit desktop launch marker and release AppFrame's root declaration;
+  // ui-short-drama owns that root and its sidebar/conversation children.
+  const zenwit = config.zenwit === true
+    || (typeof window !== 'undefined'
+      && new URLSearchParams(window.location.search).get('dsh-desktop-mode') === 'compatibility')
   ctx.effect(() => {
     const disposeService = ctx.reflect.provide('layout', layout)
-    const disposeRegistration = ctx.slots.register({
-      name: 'root',
-      children: {
-        'sidebar': { kind: 'single', scope: 'root' },
-        'details': { kind: 'single', scope: 'session' },
-        'shell.overlay': { kind: 'list', scope: 'root' },
-      },
-      // Exclusive store: the factory itself — the framework instantiates per
-      // entry and delivers useStore/actions to AppFrame as standard props.
-      store: createLayoutStore,
-      // The hook's only side effect connects the root store to ctx.layout;
-      // conversation business actions belong to their registrants.
-      inject: (actions: PanelActions) => {
-        layout.attachPanels(actions)
-        return {}
-      },
-    }, AppFrame)
+    // Zenwit owns the root frame and declares its own sidebar/conversation
+    // children. The layout service and theme presenter remain available to
+    // native registrants, but AppFrame must not claim root in that mode.
+    const disposeRegistration = zenwit
+      ? undefined
+      : ctx.slots.register({
+        name: 'root',
+        children: {
+          'sidebar': { kind: 'single', scope: 'root' },
+          'details': { kind: 'single', scope: 'session' },
+          'shell.overlay': { kind: 'list', scope: 'root' },
+        },
+        // Exclusive store: the factory itself — the framework instantiates per
+        // entry and delivers useStore/actions to AppFrame as standard props.
+        store: createLayoutStore,
+        // The hook's only side effect connects the root store to ctx.layout;
+        // conversation business actions belong to their registrants.
+        inject: (actions: PanelActions) => {
+          layout.attachPanels(actions)
+          return {}
+        },
+      }, AppFrame)
     return () => {
-      disposeRegistration()
+      disposeRegistration?.()
       // provide()'s disposer settles asynchronously; teardown is synchronous fire-and-forget.
       void disposeService()
     }
