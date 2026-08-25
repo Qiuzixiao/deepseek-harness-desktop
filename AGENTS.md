@@ -1,12 +1,12 @@
 # DSH Desktop repository rules
 
-This repository owns the desktop product around an unmodified DeepSeek Harness checkout.
+This repository owns the desktop product and the integrated DeepSeek Harness source tree.
 
 ## Prerequisites and setup
 
 - Use Node.js `^22.19.0` or `>=24.0.0` and the root Yarn `4.18.0` release through Corepack.
-- Initialize the pinned upstream checkout with `git submodule update --init --recursive`.
 - Install root dependencies with `corepack yarn install --immutable`.
+- Install integrated Harness dependencies with `corepack yarn source:install`.
 
 ## Build, run, and verify
 
@@ -15,9 +15,9 @@ This repository owns the desktop product around an unmodified DeepSeek Harness c
 - Run unit tests with `corepack yarn test`.
 - Run type checking with `corepack yarn typecheck`.
 - Run the complete headless gate with `corepack yarn check`.
-- Run upstream operations through the root scripts, such as `corepack yarn upstream:build`.
+- Build the integrated Harness source through `corepack yarn source:build`; use `source:bundle` or `source:watch` for focused client iteration.
 
-- `deepseek-harness/` is a pinned upstream Git submodule. Never edit files inside it from a desktop feature branch.
+- `deepseek-harness/` is integrated product source. It retains its internal pnpm workspace for now, but its files are owned and editable from this repository.
 - `dsh-plugin-desktop/` owns the Cordis Host and Client faces, Electron bootstrap, packaging, and release tests.
 - `dsh-community-fabric/` owns the community interoperability RFC. Until schemas and a reviewed reference adapter exist, it remains a private documentation scaffold and must not declare loadable DSH or package entry points.
 - `dsh-community-market/` owns the community-market shell. Until its runtime is implemented, it remains a private documentation scaffold and must not declare loadable DSH or package entry points.

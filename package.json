@@ -71,15 +71,16 @@
     "check:architecture": "yarn test:architecture-gates && node scripts/verify-market-dependency-direction.mjs",
     "check:layout": "yarn check:bilingual-docs && yarn check:architecture && node scripts/verify-layout.mjs",
     "check": "yarn check:layout && yarn workspace dsh-community-fabric check && yarn workspace dsh-community-market check && yarn workspace dsh-plugin-desktop check",
-    "dev": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dev",
+    "dev": "yarn workspace dsh-community-market build && yarn source:build && yarn workspace dsh-plugin-desktop dev",
     "start": "yarn workspace dsh-plugin-desktop start",
     "package:dir": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop package:dir",
     "dist:mac": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac",
     "dist:mac-smoke": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac-smoke",
     "dist:win": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win",
     "dist:win-portable": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win-portable",
-    "upstream:version": "cd deepseek-harness && corepack pnpm --version",
-    "upstream:install": "cd deepseek-harness && corepack pnpm install --frozen-lockfile",
-    "upstream:build": "cd deepseek-harness && corepack pnpm run build"
+    "source:install": "cd deepseek-harness && corepack pnpm install --frozen-lockfile",
+    "source:build": "cd deepseek-harness && corepack pnpm run build && cd .. && node scripts/link-local-client.mjs",
+    "source:bundle": "cd deepseek-harness && corepack pnpm --filter @deepseek-ai/dsh-client-ui-short-drama bundle && cd .. && node scripts/link-local-client.mjs",
+    "source:watch": "cd deepseek-harness && corepack pnpm --filter @deepseek-ai/dsh-client-ui-short-drama watch"
   }
 }

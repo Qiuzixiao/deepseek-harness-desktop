@@ -12,11 +12,10 @@ const run = (command, args, cwd = root) => execFileSync(command, args, {
 const fail = message => { throw new Error(`verify-layout: ${message}`) }
 
 const workspace = readJson('package.json')
-const upstream = readJson('upstream.json')
 const plugin = readJson('dsh-plugin-desktop/package.json')
 const fabric = readJson('dsh-community-fabric/package.json')
 const market = readJson('dsh-community-market/package.json')
-const upstreamPackage = readJson('deepseek-harness/package.json')
+const harnessPackage = readJson('deepseek-harness/package.json')
 
 if (workspace.packageManager !== 'yarn@4.18.0') {
   fail('the product workspace must pin yarn@4.18.0')
@@ -59,14 +58,8 @@ for (const legacyFile of [
 ]) {
   if (existsSync(resolve(root, legacyFile))) fail(`${legacyFile} must not exist`)
 }
-if (run('git', ['config', '-f', '.gitmodules', '--get', 'submodule.deepseek-harness.path']) !== 'deepseek-harness') {
-  fail('the upstream submodule path must be deepseek-harness')
-}
-if (run('git', ['config', '-f', '.gitmodules', '--get', 'submodule.deepseek-harness.url']) !== upstream.repository) {
-  fail('the upstream submodule URL differs from upstream.json')
-}
-if (typeof upstreamPackage.packageManager !== 'string' || !upstreamPackage.packageManager.startsWith('pnpm@')) {
-  fail('the upstream checkout must retain its pnpm package manager')
+if (typeof harnessPackage.packageManager !== 'string' || !harnessPackage.packageManager.startsWith('pnpm@')) {
+  fail('the integrated Harness source tree must retain its pnpm package manager')
 }
 
 for (const [owner, manifest] of [
@@ -86,27 +79,7 @@ for (const [owner, manifest] of [
   }
 }
 
-const [mode, object] = run('git', ['ls-files', '--stage', '--', 'deepseek-harness']).split(/\s+/u)
-if (mode !== '160000') fail('deepseek-harness must be tracked as a Git submodule')
-if (object !== upstream.commit) fail(`submodule index is ${object}, expected ${upstream.commit}`)
-
-const upstreamDir = resolve(root, 'deepseek-harness')
-if (run('git', ['rev-parse', 'HEAD'], upstreamDir) !== upstream.commit) {
-  fail('checked-out upstream commit differs from upstream.json')
-}
-if (run('git', ['status', '--porcelain'], upstreamDir) !== '') {
-  fail('deepseek-harness contains local changes')
-}
-if (run('git', ['remote', 'get-url', 'origin'], upstreamDir) !== upstream.repository) {
-  fail('deepseek-harness origin differs from upstream.json')
-}
-if (upstreamPackage.version !== upstream.sourceVersion) {
-  fail('deepseek-harness package version differs from upstream.json')
-}
-for (const name of Object.keys(plugin.dependencies).filter(name => name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-'))) {
-  if (plugin.dependencies[name] !== upstream.runtimePackageVersion) {
-    fail(`${name} must use the recorded DSH runtime package family`)
-  }
-}
-
-process.stdout.write(`verify-layout: Yarn workspace and upstream ${upstream.commit.slice(0, 10)} are consistent\n`)
+const [mode] = run('git', ['ls-files', '--stage', '--', 'deepseek-harness']).split(/\s+/u)
+if (mode === '160000') fail('deepseek-harness must be an integrated source directory, not a Git submodule')
+if (existsSync(resolve(root, 'deepseek-harness/.git'))) fail('deepseek-harness must not retain a nested Git metadata file')
+process.stdout.write(`verify-layout: Yarn workspace and integrated Harness source (${harnessPackage.version}) are consistent\n`)

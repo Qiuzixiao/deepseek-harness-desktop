@@ -1,0 +1,161 @@
+/**
+ * Zenwit product shell, browser half: one register() call shadows the shipped
+ * AppFrame in the runtime's built-in 'root' slot (priority -1, rank ascending,
+ * lowest renders) and seats ZenwitFrame as the product frame.
+ *
+ * ZenwitFrame owns both surface states: no current session renders the home
+ * project library; a current session renders the three-pane screenplay
+ * workspace (structure tree | editor | AI chat).
+ */
+import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
+import type { ProjectSummary } from '@deepseek-ai/dsh-screenplay-project-library/types'
+import type {} from '@deepseek-ai/dsh-screenplay-project-library/remote'
+import { ZenwitFrame } from './ZenwitFrame.tsx'
+
+// The product frame declares no child slots in M1; additive seats
+// (structure tree, editor toolbar, chat panel) arrive in M2/M3.
+declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface SlotMap {
+    // The official conversation slot, declared by the shipped AppFrame as its
+    // center column. Zenwit re-declares it here because it now owns the root
+    // frame and renders the official DSH conversation UI in its right pane.
+    'conversation': { kind: 'single'; scope: 'session-maybe' }
+  }
+}
+
+/** Required services (cordis fiber inject — the loader passes all module exports as an object plugin). */
+// ui-conversation now injects on the 'conversation' slot (order-independent),
+// so this frame can depend on 'theme' again to offer a light/dark switch.
+export const inject = ['slots', 'theme']
+
+/**
+ * Demo fallback rows used while the running desktop has not yet mounted the
+ * projectLibrary Remote (the api-remotes assembly that mounts it ships later).
+ */
+const DEMO_PROJECTS: ProjectSummary[] = [
+  { name: '外卖员的千万现金', path: 'demo-1', layout: 'zh-CN-v1', phase: 'Ready', revision: 3, updatedAt: Date.now(), hasContract: true, writing: { completed: 3, total: 24 } },
+  { name: '重生之我是外卖骑手', path: 'demo-2', layout: 'zh-CN-v1', phase: 'Intake', revision: 0, updatedAt: Date.now() - 86400000, hasContract: false },
+]
+
+/**
+ * Client plugin body: register ZenwitFrame into 'root' with a lower shadow
+ * priority than the shipped AppFrame (default 0), replacing the whole shell,
+ * and inject the project-library read/write faces (falling back to demo data
+ * when the running desktop has not mounted the Remote yet).
+ * @param ctx - client root context.
+ */
+const PROJECT_LIBRARY_API = '/api/desktop/projects'
+
+export function apply(ctx: ClientContext): void {
+  // The DSH Desktop serves a private loopback project-library API; when it is
+  // absent (e.g. an unpatched installed desktop) the faces fall back to demo data.
+  const list = async (): Promise<ProjectSummary[]> => {
+    try {
+      const res = await fetch(PROJECT_LIBRARY_API)
+      if (!res.ok) return DEMO_PROJECTS
+      const body = await res.json() as { projects?: ProjectSummary[] }
+      return body.projects ?? []
+    } catch {
+      return DEMO_PROJECTS
+    }
+  }
+  const create = async (name: string): Promise<ProjectSummary> => {
+    try {
+      const res = await fetch(PROJECT_LIBRARY_API, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name }) })
+      if (!res.ok) throw new Error('projectLibrary.create failed: ' + res.status)
+      const body = await res.json() as { project: ProjectSummary }
+      return body.project
+    } catch {
+      return { name, path: 'demo-' + name, layout: 'zh-CN-v1', phase: 'Intake', revision: 0, updatedAt: Date.now(), hasContract: false }
+    }
+  }
+  // Open a project: register its directory as a Workspace and connect its
+  // blank/reusable session, so ZenwitFrame flips to the three-pane workspace.
+  const openProject = async (projectPath: string): Promise<void> => {
+    const workspaces = (ctx as unknown as { get: (name: string) => {
+      create(input: { path: string }): Promise<{ workspaceId: string }>
+      connectWorkspace(workspaceId: string): Promise<unknown>
+    } }).get('workspaces')
+    const sessions = (ctx as unknown as { get: (name: string) => {
+      open(id: string): void
+      list: { getSnapshot(): { ids: string[], byId: Record<string, { id: string, cwd?: string, blank?: boolean, updatedAt?: number, agentPreset?: string }> } }
+    } }).get('sessions')
+    // create is idempotent; retry the whole sequence while the workspace list
+    // snapshot or the renderer-host connection catch up.
+    let lastError: unknown
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      try {
+        const view = await workspaces.create({ path: projectPath })
+        if (typeof view.workspaceId !== 'string' || view.workspaceId.length === 0) {
+          throw new Error('workspaces.create 未返回 workspaceId')
+        }
+        // Reuse the project's bound screenplay session (cwd === projectPath). Zenwit
+        // is a screenplay product, so ONLY a session that actually ran the
+        // screenplay agent (screenplay-v1) is reusable: a legacy 'standard'
+        // session carries no DLKJB instruction and would silently regress the
+        // output format, so it is never reused. Among screenplay-v1 sessions we
+        // prefer one with a real conversation (non-blank), newest among them;
+        // if none exists, the connectWorkspace fall-through creates one from the
+        // deployment's default preset (screenplay-v1).
+        const list = sessions.list.getSnapshot()
+        let best: { id: string, blank?: boolean, updatedAt?: number, agentPreset?: string } | undefined
+        for (const id of list.ids) {
+          const summary = list.byId[id]
+          if (summary === undefined || summary.cwd !== projectPath) continue
+          if (summary.agentPreset !== 'screenplay-v1') continue
+          if (best === undefined) { best = summary; continue }
+          if (summary.blank === false && best.blank !== false) { best = summary; continue }
+          if (summary.blank === true && best.blank === false) continue
+          if ((summary.updatedAt ?? 0) > (best.updatedAt ?? 0)) best = summary
+        }
+        if (best !== undefined) {
+          sessions.open(best.id)
+          return
+        }
+        const connected = await workspaces.connectWorkspace(view.workspaceId)
+        if (typeof connected !== 'string' || connected.length === 0) {
+          throw new Error('connectWorkspace 未返回 sessionId: ' + JSON.stringify(connected))
+        }
+        // connectWorkspace creates/reuses the session but does NOT select it;
+        // selecting it is what flips ZenwitFrame to the workspace surface.
+        sessions.open(connected)
+        return
+      } catch (error) {
+        lastError = error
+        await new Promise(resolve => setTimeout(resolve, 300))
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error(String(lastError))
+  }
+
+  const closeProject = (): Promise<void> => {
+    const sessions = (ctx as unknown as { get: (name: string) => { clear(): void } }).get('sessions')
+    sessions.clear()
+    return Promise.resolve()
+  }
+
+  ctx.effect(() => {
+    const dispose = ctx.slots.register({
+      name: 'root',
+      priority: -1,
+      children: {
+        'conversation': { kind: 'single', scope: 'session-maybe' },
+      },
+      inject: () => ({
+        list,
+        create,
+        openProject,
+        closeProject,
+        theme: {
+          current: () => ((ctx as unknown as { theme: { getTheme(): { active: { colorScheme: string } } } }).theme.getTheme().active.colorScheme),
+          set: (id: string) => (ctx as unknown as { theme: { setTheme(id: string): void } }).theme.setTheme(id),
+          subscribe: (cb: (id: string) => void) => (ctx as unknown as { on(name: string, fn: (snap: { active: { colorScheme: string } }) => void): () => void }).on('theme/change', snap => cb(snap.active.colorScheme)),
+        },
+      }),
+    }, ZenwitFrame)
+    return () => {
+      dispose()
+    }
+  }, 'ui-short-drama: Zenwit root registration')
+}
