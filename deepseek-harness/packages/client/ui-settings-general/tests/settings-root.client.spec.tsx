@@ -95,6 +95,13 @@ describe('SettingsRoot trigger', () => {
     const { renderSlot } = mount({ wide: false })
     expect(renderSlot).toHaveBeenCalledWith('settings.trigger', { wide: false })
   })
+
+  it('opens the native panel when the product shell dispatches the global settings event', () => {
+    mount()
+    act(() => { window.dispatchEvent(new Event('dsh:settings-open')) })
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Settings', expanded: true })).toBeTruthy()
+  })
 })
 
 describe('SettingsPanel chrome seats', () => {

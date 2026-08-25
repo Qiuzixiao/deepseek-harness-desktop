@@ -21,7 +21,7 @@ afterEach(() => {
 // props share; stub them as never-called functions.
 const neverHook = (() => { throw new Error('shell must not read global hooks') }) as never
 
-function mountShell({ collapsed = false, width = 300 }: { collapsed?: boolean; width?: number } = {}) {
+function mountShell({ collapsed = false, width = 300, settingsOnly = false }: { collapsed?: boolean; width?: number; settingsOnly?: boolean } = {}) {
   const startSession = vi.fn()
   const toggleSidebar = vi.fn()
   let regionOwner: SidebarSectionOwnerProps | undefined
@@ -30,7 +30,7 @@ function mountShell({ collapsed = false, width = 300 }: { collapsed?: boolean; w
   let current = { collapsed, width }
   const root = () => (
     <SidebarRoot
-      collapsed={current.collapsed} width={current.width}
+      collapsed={current.collapsed} width={current.width} settingsOnly={settingsOnly}
       useSessions={neverHook} useWorkspaces={neverHook}
       startSession={startSession} toggleSidebar={toggleSidebar} t={t}
       renderSlot={((
@@ -115,5 +115,12 @@ describe('SidebarRoot shell', () => {
     const b = mountShell({ collapsed: true })
     expect(b.regionOwner().wide).toBe(false)
     expect(screen.getByRole('button', { name: 'Open sidebar' })).toBeTruthy()
+  })
+
+  it('can mount only the native settings seat for an alternate product frame', () => {
+    mountShell({ settingsOnly: true })
+    expect(screen.getByTestId('settings-seat')).toBeTruthy()
+    expect(screen.queryByTestId('region')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'New session' })).toBeNull()
   })
 })

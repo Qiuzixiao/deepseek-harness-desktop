@@ -132,6 +132,18 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
     setCompletedOnboarding(new Set())
   }, [onboardingActive])
 
+  // Product shells may expose their own top-level settings affordance while
+  // still reusing this native settings owner. Keep the event boundary global
+  // and presentation-neutral so the regular sidebar trigger remains unchanged.
+  useEffect(() => {
+    const openFromProductShell = () => {
+      setActiveId(undefined)
+      setOpen(true)
+    }
+    window.addEventListener('dsh:settings-open', openFromProductShell)
+    return () => { window.removeEventListener('dsh:settings-open', openFromProductShell) }
+  }, [])
+
   const completeOnboardingStep = useCallback((id: string) => {
     setCompletedOnboarding((previous) => {
       if (previous.has(id)) return previous

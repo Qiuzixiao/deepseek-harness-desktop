@@ -22,6 +22,27 @@
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
+/* Zenwit keeps the native settings owner mounted without rendering a second
+   sidebar. The trigger is removed from layout; SettingsRoot's full-viewport
+   panel remains a sibling and becomes interactive when opened by the product
+   shell event. */
+.settingsOnlyRoot {
+  position: fixed;
+  inset: 0 auto auto 0;
+  width: 0;
+  height: 0;
+  z-index: 1001;
+  pointer-events: none;
+}
+
+.settingsOnlyRoot > button {
+  display: none;
+}
+
+.settingsOnlyRoot > div {
+  pointer-events: auto;
+}
+
 /* Rail geometry (figma rail spec): 36x36 control boxes centered in the 56px
    rail (10px side padding), 12px vertical rhythm, 18px from the rail top to
    the whale's box (24px to the 24-wide whale glyph itself). */

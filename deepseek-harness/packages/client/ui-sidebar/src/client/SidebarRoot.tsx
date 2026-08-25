@@ -44,6 +44,7 @@ const SCROLLBAR_LINGER_MS = 2000
 export function SidebarRoot({
   collapsed,
   width,
+  settingsOnly = false,
   startSession,
   toggleSidebar,
   t,
@@ -112,6 +113,14 @@ export function SidebarRoot({
       cancelLinger()
     }
   }, [pointerInside])
+
+  if (settingsOnly) {
+    return (
+      <div className={css.settingsOnlyRoot}>
+        {renderSlot('sidebar.settings', { wide: true })}
+      </div>
+    )
+  }
 
   return (
     <div
