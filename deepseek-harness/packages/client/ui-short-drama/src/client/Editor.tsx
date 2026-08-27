@@ -52,29 +52,35 @@ export function Editor({ initialDoc, onChange, onSelectionChange, mode = 'markdo
   onSelectionChangeRef.current = onSelectionChange
 
   useEffect(() => {
-    const updateListener = EditorView.updateListener.of(updateEvent => {
-      if (updateEvent.docChanged) onChangeRef.current(updateEvent.state.doc.toString())
-      if (!updateEvent.selectionSet) return
-      const { main } = updateEvent.state.selection
+    let pointerSelecting = false
+    let selectionTimer: number | undefined
+    const emitSelection = (view: EditorView): void => {
+      const { main } = view.state.selection
       if (main.empty) {
         onSelectionChangeRef.current?.(null)
         return
       }
-      const document = updateEvent.state.doc
-      const fromRect = updateEvent.view.coordsAtPos(main.from)
-      const toRect = updateEvent.view.coordsAtPos(main.to)
+      const fromRect = view.coordsAtPos(main.from)
+      const toRect = view.coordsAtPos(main.to)
       if (fromRect === null || toRect === null) {
         onSelectionChangeRef.current?.(null)
         return
       }
-      onSelectionChangeRef.current?.({
-        text: document.sliceString(main.from, main.to),
-        from: main.from,
-        to: main.to,
-        startLine: document.lineAt(main.from).number,
-        endLine: document.lineAt(main.to).number,
-        rect: selectionRect(fromRect, toRect),
-      })
+      const document = view.state.doc
+      onSelectionChangeRef.current?.({ text: document.sliceString(main.from, main.to), from: main.from, to: main.to, startLine: document.lineAt(main.from).number, endLine: document.lineAt(main.to).number, rect: selectionRect(fromRect, toRect) })
+    }
+    const scheduleSelection = (view: EditorView): void => {
+      if (pointerSelecting) return
+      if (selectionTimer !== undefined) window.clearTimeout(selectionTimer)
+      selectionTimer = window.setTimeout(() => {
+        selectionTimer = undefined
+        emitSelection(view)
+      }, 180)
+    }
+    const updateListener = EditorView.updateListener.of(updateEvent => {
+      if (updateEvent.docChanged) onChangeRef.current(updateEvent.state.doc.toString())
+      if (!updateEvent.selectionSet) return
+      scheduleSelection(updateEvent.view)
     })
     const view = new EditorView({
       doc: initialDoc,
@@ -82,9 +88,24 @@ export function Editor({ initialDoc, onChange, onSelectionChange, mode = 'markdo
       parent: host.current!,
     })
     const clearSelection = (): void => onSelectionChangeRef.current?.(null)
+    const beginPointerSelection = (): void => {
+      pointerSelecting = true
+      if (selectionTimer !== undefined) window.clearTimeout(selectionTimer)
+    }
+    const endPointerSelection = (): void => {
+      pointerSelecting = false
+      window.requestAnimationFrame(() => emitSelection(view))
+    }
     view.dom.addEventListener('blur', clearSelection)
+    view.dom.addEventListener('pointerdown', beginPointerSelection)
+    view.dom.addEventListener('pointerup', endPointerSelection)
+    view.dom.addEventListener('pointercancel', endPointerSelection)
     return () => {
+      if (selectionTimer !== undefined) window.clearTimeout(selectionTimer)
       view.dom.removeEventListener('blur', clearSelection)
+      view.dom.removeEventListener('pointerdown', beginPointerSelection)
+      view.dom.removeEventListener('pointerup', endPointerSelection)
+      view.dom.removeEventListener('pointercancel', endPointerSelection)
       view.destroy()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -103,30 +124,40 @@ interface VisualEditorProps {
 function VisualEditorInner({ initialDoc, onChange, onSelectionChange }: VisualEditorProps) {
   const onChangeRef = useRef(onChange)
   const onSelectionChangeRef = useRef(onSelectionChange)
+  const selectionTimer = useRef<number | undefined>(undefined)
   onChangeRef.current = onChange
   onSelectionChangeRef.current = onSelectionChange
+  useEffect(() => () => {
+    if (selectionTimer.current !== undefined) window.clearTimeout(selectionTimer.current)
+  }, [])
   useEditor((root) => MilkdownEditor.make()
     .config(ctx => {
       ctx.set(rootCtx, root)
       ctx.set(defaultValueCtx, initialDoc)
       ctx.get(listenerCtx).markdownUpdated((_ctx, markdownText) => onChangeRef.current(markdownText))
       ctx.get(listenerCtx).selectionUpdated((selectionCtx, selection) => {
-        if (selection.empty) {
-          onSelectionChangeRef.current?.(null)
-          return
-        }
-        const view = selectionCtx.get(editorViewCtx)
-        const { from, to } = selection
-        onSelectionChangeRef.current?.({
-          text: view.state.doc.textBetween(from, to, '\n'),
-          from,
-          to,
-          startLine: view.state.doc.textBetween(0, from, '\n').split('\n').length,
-          endLine: view.state.doc.textBetween(0, to, '\n').split('\n').length,
-          rect: selectionRect(view.coordsAtPos(from), view.coordsAtPos(to)),
-        })
+        if (selectionTimer.current !== undefined) window.clearTimeout(selectionTimer.current)
+        selectionTimer.current = window.setTimeout(() => {
+          selectionTimer.current = undefined
+          if (selection.empty) {
+            onSelectionChangeRef.current?.(null)
+            return
+          }
+          const view = selectionCtx.get(editorViewCtx)
+          const { from, to } = selection
+          onSelectionChangeRef.current?.({
+            text: view.state.doc.textBetween(from, to, '\n'), from, to,
+            startLine: view.state.doc.textBetween(0, from, '\n').split('\n').length,
+            endLine: view.state.doc.textBetween(0, to, '\n').split('\n').length,
+            rect: selectionRect(view.coordsAtPos(from), view.coordsAtPos(to)),
+          })
+        }, 180)
       })
-      ctx.get(listenerCtx).blur(() => onSelectionChangeRef.current?.(null))
+      ctx.get(listenerCtx).blur(() => {
+        if (selectionTimer.current !== undefined) window.clearTimeout(selectionTimer.current)
+        selectionTimer.current = undefined
+        onSelectionChangeRef.current?.(null)
+      })
     })
     .use(commonmark)
     .use(listener), [])

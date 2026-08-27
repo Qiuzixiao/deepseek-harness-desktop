@@ -7,7 +7,9 @@
  * project library; a current session renders the three-pane screenplay
  * workspace (structure tree | editor | AI chat).
  */
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { WorkspaceId } from '@deepseek-ai/dsh-api-remotes/client'
+import type { InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { ProjectSummary } from '@deepseek-ai/dsh-screenplay-project-library/types'
 import type {} from '@deepseek-ai/dsh-screenplay-project-library/remote'
@@ -20,7 +22,7 @@ import { registerProjectFileSource } from './project-file-source.ts'
 
 /** Required services (cordis fiber inject — the loader passes all module exports as an object plugin). */
 // ui-conversation now injects on the 'conversation' slot (order-independent).
-export const inject = ['slots', 'inputTriggers', 'sessions']
+export const inject = ['slots', 'inputTriggers', 'sessions', 'conversation']
 
 /**
  * Demo fallback rows used while the running desktop has not yet mounted the
@@ -42,6 +44,22 @@ const PROJECT_LIBRARY_API = '/api/desktop/projects'
 
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => registerProjectFileSource(ctx), 'ui-short-drama: @ project-file source')
+  ctx.effect(() => {
+    const source: InputTriggerSource = {
+      trigger: '@', name: 'local-selection', order: -1,
+      candidates: async () => [],
+      onPick: () => undefined,
+      codec: {
+        clipboardText: () => '选中文本',
+        async serialize(ref) {
+          const value = JSON.parse(ref) as { text?: unknown }
+          if (typeof value.text !== 'string') throw new Error('局部选区引用无效')
+          return value.text
+        },
+      },
+    }
+    return (ctx as unknown as { get: (name: string) => { registerSource(source: InputTriggerSource): () => void } }).get('inputTriggers').registerSource(source)
+  }, 'ui-short-drama: local selection reference source')
   // The DSH Desktop serves a private loopback project-library API; when it is
   // absent (e.g. an unpatched installed desktop) the faces fall back to demo data.
   const list = async (): Promise<ProjectSummary[]> => {
@@ -158,6 +176,30 @@ export function apply(ctx: ClientContext): void {
     workspaces.startSession(workspaceId)
   }
 
+  /** Put an explicit local-edit context into a session draft without submitting it. */
+  const addSelectionToConversation = async (target: 'current' | 'new', context: string): Promise<void> => {
+    const sessions = ctx.sessions
+    const workspaces = (ctx as unknown as { get: (name: string) => {
+      list: { getSnapshot(): { items: Array<{ workspaceId: WorkspaceId, sessionIds: readonly SessionId[] }> } }
+    } }).get('workspaces')
+    const conversation = (ctx as unknown as { get: (name: string) => {
+      input: { for(scope: ClientContext): { state: { getSnapshot(): { draft: string } }, setDraft(text: string): void, appendReference(reference: { source: string, ref: string, label: string, clipboardText: string, title?: string }): void } }
+    } }).get('conversation')
+    const current = sessions.list.getSnapshot().current
+    const workspace = workspaces.list.getSnapshot().items.find(item => current !== undefined && item.sessionIds.includes(current))
+    const id = target === 'current'
+      ? current
+      : workspace === undefined ? undefined : await sessions.create({ workspaceId: workspace.workspaceId })
+    if (id === undefined) throw new Error('没有可用对话可添加选中文本')
+    const scope = sessions.scope(id)
+    if (scope === undefined) throw new Error('新对话尚未就绪')
+    const input = conversation.input.for(scope)
+    const draft = input.state.getSnapshot().draft
+    if (draft !== '') input.setDraft(draft + '\n')
+    input.appendReference({ source: 'local-selection', ref: JSON.stringify({ text: context }), label: '选中文本', clipboardText: '选中文本', title: context })
+    if (target === 'new') sessions.open(id)
+  }
+
   ctx.effect(() => {
     const dispose = ctx.slots.register({
       name: 'root',
@@ -172,6 +214,7 @@ export function apply(ctx: ClientContext): void {
         openProject,
         openSession,
         startSession,
+        addSelectionToConversation,
         closeProject,
       }),
     }, ZenwitFrame)

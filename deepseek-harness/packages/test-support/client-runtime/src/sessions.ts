@@ -4,7 +4,7 @@ import type { AttachmentIdType } from '@deepseek-ai/dsh-attachment'
 import { createScope, scopeOf, SessionProvideChannel } from '@deepseek-ai/dsh-client-runtime/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
-  AgentContext, ConversationSnapshot, ISessions, ObservableSnapshot, ProjectionsFace, SessionFace, SessionId,
+  AgentContext, ConversationSnapshot, ISessions, ObservableSnapshot, ProjectionsFace, SessionFace, SessionId, WorkspaceId,
   SessionListState, SessionProvideDescriptor, SessionSearchResultItem, SessionSummary, SnapshotStore,
   SubagentAddress,
 } from '@deepseek-ai/dsh-client-runtime/client'
@@ -217,6 +217,12 @@ export class TestSessions implements ISessions {
     this.currentProvideInfo = this.channel.currentProvideInfo
     // The projection follows every current write, as in production.
     this.list.subscribe(() => { this.channel.publishCurrent() })
+  }
+
+  /** Create a distinct blank fixture session for New Session flows. */
+  async create(_opts: { workspaceId: WorkspaceId }): Promise<SessionId> {
+    const id = `created-${this.records.size + 1}`
+    return this.add({ id, summary: { blank: true } })
   }
 
   /**

@@ -598,20 +598,17 @@ export function InputBar({
       if (b.kind === 'chip') {
         const chip = b.chip
         backdrop.push(
-          // The cell's ::before renders U+FFFC itself so its advance equals the
-          // textarea's placeholder exactly (same char, same font); the label is
-          // a clipped overlay that never affects layout.
-          <span
-            key={`chip-${chip.occurrenceId}`}
-            className={clsx(css.chip, chip.icon !== undefined && css.chipWithIcon, chip.invalid && css.chipInvalid)}
-            data-decoration="chip"
-            data-occurrence={chip.occurrenceId}
-            data-invalid={chip.invalid || undefined}
-            title={chip.title ?? chip.label}
-          >
-            {chip.icon !== undefined && <span className={css.chipIcon} aria-hidden="true">{chip.icon}</span>}
-            <span className={css.chipLabel}>{chip.label}</span>
-          </span>,
+          <Tooltip key={`chip-${chip.occurrenceId}`} label={chip.title ?? chip.label} side="top" delayMs={280} maxWidth={380}>
+            <span
+              className={clsx(css.chip, chip.icon !== undefined && css.chipWithIcon, chip.invalid && css.chipInvalid)}
+              data-decoration="chip"
+              data-occurrence={chip.occurrenceId}
+              data-invalid={chip.invalid || undefined}
+            >
+              {chip.icon !== undefined && <span className={css.chipIcon} aria-hidden="true">{chip.icon}</span>}
+              <span className={css.chipLabel}>{chip.label}</span>
+            </span>
+          </Tooltip>,
         )
         cursor = chip.offset + 1 // the placeholder char the chip stands for
       } else {

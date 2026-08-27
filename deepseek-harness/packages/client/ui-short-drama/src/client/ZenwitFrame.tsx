@@ -45,6 +45,7 @@ export type ZenwitFrameProps = GlobalStandardProps
     closeProject: () => Promise<void>
     openSession: (id: string) => void
     startSession: (workspaceId: string) => void
+    addSelectionToConversation: (target: 'current' | 'new', context: string) => Promise<void>
   }
 
 /** Root-slot frame (see module doc). */
@@ -58,6 +59,7 @@ export function ZenwitFrame({
   closeProject,
   openSession,
   startSession,
+  addSelectionToConversation,
 }: ZenwitFrameProps) {
   const sessionsState = useSessions(s => s)
   const current = sessionsState.current
@@ -95,6 +97,7 @@ export function ZenwitFrame({
               useWorkspaces={useWorkspaces}
               openSession={openSession}
               startSession={startSession}
+              addSelectionToConversation={addSelectionToConversation}
             />
           )
         : <HomePage list={list} create={create} openProject={handleOpen} />

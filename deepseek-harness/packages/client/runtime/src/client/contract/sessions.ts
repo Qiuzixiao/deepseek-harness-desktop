@@ -9,7 +9,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type {
-  RpcResult, SessionId, SubagentAddress,
+  RpcResult, SessionId, SubagentAddress, WorkspaceId,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { HostObservable, SessionMaybeProvideInfo } from '@deepseek-ai/dsh-client-ui-slots'
 import type { AgentContext } from '../agents/scope.ts'
@@ -73,6 +73,13 @@ export interface ISessions {
   noteAgentPreset(sessionId: SessionId, agentPreset: string): void
   /** Clear the current selection into the no-session view state. */
   clear(): void
+  /**
+   * Create a new, distinct session in a Workspace. Unlike workspace
+   * connection, this never reuses an existing blank session.
+   * @param opts - owning workspace for the new session.
+   * @returns the new session id, ready for scope-addressed input setup.
+   */
+  create(opts: { workspaceId: WorkspaceId }): Promise<SessionId>
   /**
    * Search the Host's visible message-content index. Results stay
    * request-local; the list snapshot remains the metadata authority.

@@ -298,6 +298,16 @@ export class SessionInputShell implements SessionInput {
     return this.core.state.draftRev !== before
   }
 
+  /** Append a reference chip at the end of the current draft. */
+  appendReference(reference: ReferenceInsert): void {
+    const snapshot = this.core.state
+    this.run(this.core.dispatch({
+      type: 'insert-ref',
+      reference,
+      span: { start: snapshot.draft.length, end: snapshot.draft.length, draftRev: snapshot.draftRev },
+    }))
+  }
+
   /**
    * Consume one command token after business success (scoped consume-token
    * event listener body). Span guard: revision CAS then splice; bare-token

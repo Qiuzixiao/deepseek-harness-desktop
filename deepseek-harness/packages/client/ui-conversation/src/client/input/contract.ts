@@ -31,6 +31,8 @@ export interface InputTarget {
 
 /** Per-session input facade owned by the conversation wiring layer. */
 export interface SessionInput extends InputTarget {
+  /** Append one owner-backed reference chip to the draft. */
+  appendReference(reference: ReferenceInsert): void
   /** Single write path for draft text (all mutation rides machine events). */
   setDraft(text: string): void
   /** Append ordered browser-owned image ids; busy admission phases refuse. */

@@ -12,7 +12,7 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
 
 vi.mock('../src/client/Editor.tsx', () => ({
   Editor: () => <div data-testid="editor" />,
-  VisualEditor: ({ initialDoc }: { initialDoc: string }) => <div data-testid="visual-editor">{initialDoc}</div>,
+  VisualEditor: ({ initialDoc, onSelectionChange }: { initialDoc: string, onSelectionChange?: (selection: unknown) => void }) => <div data-testid="visual-editor">{initialDoc}<button type="button" onClick={() => onSelectionChange?.({ text: '第一集', from: 2, to: 5, startLine: 1, endLine: 1, rect: { left: 10, top: 10, right: 40, bottom: 30 } })}>选择文本</button></div>,
 }))
 
 afterEach(() => {
@@ -27,6 +27,7 @@ beforeEach(() => {
 function mountWorkspace() {
   const openSession = vi.fn()
   const startSession = vi.fn()
+  const addSelectionToConversation = vi.fn(async () => {})
   const state = {
     current: 'session-1' as SessionId,
     phase: 'ready',
@@ -73,8 +74,9 @@ function mountWorkspace() {
     useWorkspaces: (selector: (value: typeof workspaceState) => unknown) => selector(workspaceState),
     openSession,
     startSession,
+    addSelectionToConversation,
   } as unknown as WorkspaceProps
-  return { ...render(<Workspace {...props} />), openSession, startSession }
+  return { ...render(<Workspace {...props} />), openSession, startSession, addSelectionToConversation }
 }
 
 describe('Zenwit workspace layout', () => {
@@ -114,6 +116,17 @@ describe('Zenwit workspace layout', () => {
     expect(screen.getByTestId('editor')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '可视化' }))
     expect(screen.getByTestId('visual-editor')).toBeTruthy()
+  })
+
+  it('adds a selected passage to the current conversation draft without sending', async () => {
+    const view = mountWorkspace()
+    fireEvent.click(await screen.findByRole('treeitem', { name: '剧本' }))
+    fireEvent.click(await screen.findByText('episode-1.md'))
+    fireEvent.click(await screen.findByRole('button', { name: '选择文本' }))
+    const dialog = await screen.findByRole('dialog', { name: '局部编辑' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '添加到当前对话' }))
+    await waitFor(() => expect(view.addSelectionToConversation).toHaveBeenCalledWith('current', expect.not.stringContaining('用户指令')))
+    expect(view.addSelectionToConversation).toHaveBeenCalledWith('current', expect.stringContaining('文件：/project/剧本/episode-1.md'))
   })
 
   it('keeps multiple documents in independent tabs and reuses an existing tab', async () => {

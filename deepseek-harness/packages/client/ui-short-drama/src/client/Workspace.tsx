@@ -14,7 +14,7 @@ import {
   ArrowLeft, ChevronDown, ChevronRight, File, FileJson, FileText,
   Folder, FolderOpen, ScrollText, X,
 } from 'lucide-react'
-import { Editor, VisualEditor } from './Editor.tsx'
+import { Editor, VisualEditor, type DocumentSelection } from './Editor.tsx'
 import css from './zenwit.module.css'
 
 /** One real tree node: a directory or file under the project root. */
@@ -61,6 +61,7 @@ export interface WorkspaceProps {
   useWorkspaces: GlobalStandardProps['useWorkspaces']
   openSession: (id: string) => void
   startSession: (workspaceId: string) => void
+  addSelectionToConversation: (target: 'current' | 'new', context: string) => Promise<void>
 }
 
 const LEFT_DEFAULT = 240
@@ -143,6 +144,7 @@ function ResizeHandle({ label, value, onStart, onDrag }: ResizeHandleProps) {
 /** Three-pane workspace (see module doc). */
 export function Workspace({
   projectPath, closeProject, renderSlot, useSessions, useWorkspaces, openSession, startSession,
+  addSelectionToConversation,
 }: WorkspaceProps) {
   const sessionsState = useSessions(s => s)
   const currentSessionId = sessionsState.current
@@ -169,6 +171,9 @@ export function Workspace({
   const tabsRestoredRef = useRef(false)
   documentsRef.current = documents
   const activeDocument = documents.find(document => document.path === activePath) ?? null
+  const [selection, setSelection] = useState<(DocumentSelection & { path: string }) | null>(null)
+  const [selectionBusy, setSelectionBusy] = useState(false)
+  const selectionPopoverRef = useRef<HTMLDivElement>(null)
 
   const reloadStructure = async (): Promise<StructureResponse | null> => {
     try {
@@ -184,6 +189,40 @@ export function Workspace({
   }
 
   useEffect(() => { void reloadStructure() }, [projectPath])
+
+  useEffect(() => {
+    if (selection?.path !== activePath) setSelection(null)
+  }, [activePath, selection?.path])
+
+  useEffect(() => {
+    if (selection === null) return
+    const closeOnOutsidePointer = (event: PointerEvent): void => {
+      if (selectionPopoverRef.current?.contains(event.target as Node)) return
+      setSelection(null)
+    }
+    window.addEventListener('pointerdown', closeOnOutsidePointer)
+    return () => window.removeEventListener('pointerdown', closeOnOutsidePointer)
+  }, [selection])
+
+  const selectionContext = selection === null || activeDocument === null ? '' : [
+    `文件：${selection.path}`,
+    `范围：第 ${selection.startLine}-${selection.endLine} 行`,
+    '选中内容：',
+    '---',
+    selection.text,
+    '---',
+  ].join('\n')
+
+  const submitSelection = async (target: 'current' | 'new'): Promise<void> => {
+    if (selection === null || selectionBusy) return
+    setSelectionBusy(true)
+    try {
+      await addSelectionToConversation(target, selectionContext)
+      setSelection(null)
+    } finally {
+      setSelectionBusy(false)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -453,9 +492,17 @@ export function Workspace({
         {activeDocument === null ? (
           <div className={css.editorPlaceholder}>点击左侧文件打开，或展开目录查看内容</div>
         ) : activeDocument.visualMode ? (
-          <VisualEditor key={activeDocument.path} initialDoc={activeDocument.draft} onChange={doc => setDocuments(previous => previous.map(document => document.path === activeDocument.path ? { ...document, draft: doc, dirty: true, saveStatus: null } : document))} />
+          <VisualEditor key={activeDocument.path} initialDoc={activeDocument.draft} onSelectionChange={next => { if (next !== null) setSelection({ ...next, path: activeDocument.path }) }} onChange={doc => setDocuments(previous => previous.map(document => document.path === activeDocument.path ? { ...document, draft: doc, dirty: true, saveStatus: null } : document))} />
         ) : (
-          <Editor key={activeDocument.path} initialDoc={activeDocument.draft} mode={activeDocument.path.includes('/剧本/') || /episode-\d+\.md$/.test(activeDocument.path) ? 'dlkjb' : 'markdown'} onChange={doc => setDocuments(previous => previous.map(document => document.path === activeDocument.path ? { ...document, draft: doc, dirty: true, saveStatus: null } : document))} />
+          <Editor key={activeDocument.path} initialDoc={activeDocument.draft} mode={activeDocument.path.includes('/剧本/') || /episode-\d+\.md$/.test(activeDocument.path) ? 'dlkjb' : 'markdown'} onSelectionChange={next => { if (next !== null) setSelection({ ...next, path: activeDocument.path }) }} onChange={doc => setDocuments(previous => previous.map(document => document.path === activeDocument.path ? { ...document, draft: doc, dirty: true, saveStatus: null } : document))} />
+        )}
+        {selection !== null && activeDocument !== null && (
+          <div ref={selectionPopoverRef} className={css.selectionPopover} style={{ left: `clamp(12px, ${selection.rect.left}px, calc(100% - 372px))`, top: `clamp(58px, ${selection.rect.bottom + 8}px, calc(100% - 118px))` }} role="dialog" aria-label="局部编辑">
+            <div className={css.selectionPopoverActions}>
+              <button type="button" onClick={() => void submitSelection('current')} disabled={selectionBusy}>添加到当前对话</button>
+              <button type="button" onClick={() => void submitSelection('new')} disabled={selectionBusy}>在新会话打开</button>
+            </div>
+          </div>
         )}
         {activeDocument?.saveStatus !== null && activeDocument !== null && <div className={css.saveStatus}>{activeDocument.saveStatus}</div>}
         {pendingClosePath !== null && (
