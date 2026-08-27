@@ -70,12 +70,13 @@ export function HomePage({ list, create, openProject }: { list: () => Promise<Pr
     <div className={css.home}>
       <div className={css.homeNoise} aria-hidden="true" />
       <div className={css.homeGlow} aria-hidden="true" />
+      <div className={css.particleField} aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /></div>
       <header className={css.homeHero}>
         <div className={css.heroCopy}>
-          <div className={css.eyebrow}><span className={css.liveDot} /> CREATIVE NAV // 08.25</div>
-          <h2 className={css.heroTitle}>让故事<br /><em>开始流动。</em></h2>
-          <p className={css.homeIntro}>你的下一部短剧，从一个微小的念头开始。</p>
-          <div className={css.heroMeta}><span>ZENWIT / STORY OS</span><span>● 系统在线</span></div>
+          <div className={css.eyebrow}><span className={css.liveDot} /> ZENWIT / CREATIVE SYSTEM</div>
+          <h2 className={css.heroTitle}>让灵感，<br /><em>成片。</em></h2>
+          <p className={css.homeIntro}>从一粒微光开始，搭建你的下一部故事。</p>
+          <div className={css.heroMeta}><span>STORY OS · 01</span><span>● 系统在线</span></div>
         </div>
         <div className={css.orbitStage} aria-hidden="true">
           <div className={`${css.orbit} ${css.orbitOne}`} />
@@ -91,7 +92,11 @@ export function HomePage({ list, create, openProject }: { list: () => Promise<Pr
       </div>
       <main className={css.projectGrid}>
         {projects === null ? (
-          <div className={css.homeFooter}>正在同步创作舱…</div>
+          <>
+            <div className={css.projectSkeleton} />
+            <div className={css.projectSkeleton} />
+            <div className={css.projectSkeleton} />
+          </>
         ) : projects.length === 0 ? (
           <div className={css.emptyState}>还没有项目<br /><span>打开一个新的叙事坐标</span></div>
         ) : projects.map(project => (

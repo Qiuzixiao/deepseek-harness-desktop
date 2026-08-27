@@ -136,6 +136,7 @@
       name: '@deepseek-ai/dsh-web-app'
       inject: [webStartup]
       config:
+        openBrowser: false
         printUrl: true
         surfaceContext: true
         trustedHosts: !!js ctx.webStartup.trustedHosts

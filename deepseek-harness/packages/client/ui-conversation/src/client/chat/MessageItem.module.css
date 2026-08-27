@@ -28,6 +28,34 @@
   color: var(--dsw-alias-label-primary);
 }
 
+.fileReferenceCard {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.fileReferenceIcon {
+  flex: none;
+  color: var(--dsw-alias-interactive-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fileReferencePath {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .contextRow {
   padding: 2px 0;
 }

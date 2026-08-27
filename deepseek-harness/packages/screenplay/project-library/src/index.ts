@@ -162,3 +162,8 @@ export class ProjectLibraryService extends TypertRemoteService {
     return { project }
   }
 }
+
+// Cordis loader entries resolve the package's default export as the plugin
+// callback. Keep the named export for typed consumers and expose the service
+// class as the runtime plugin entry used by the host profile.
+export default ProjectLibraryService

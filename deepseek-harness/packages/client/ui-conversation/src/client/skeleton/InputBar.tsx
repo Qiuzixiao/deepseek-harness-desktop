@@ -603,12 +603,13 @@ export function InputBar({
           // a clipped overlay that never affects layout.
           <span
             key={`chip-${chip.occurrenceId}`}
-            className={clsx(css.chip, chip.invalid && css.chipInvalid)}
+            className={clsx(css.chip, chip.icon !== undefined && css.chipWithIcon, chip.invalid && css.chipInvalid)}
             data-decoration="chip"
             data-occurrence={chip.occurrenceId}
             data-invalid={chip.invalid || undefined}
-            title={chip.label}
+            title={chip.title ?? chip.label}
           >
+            {chip.icon !== undefined && <span className={css.chipIcon} aria-hidden="true">{chip.icon}</span>}
             <span className={css.chipLabel}>{chip.label}</span>
           </span>,
         )

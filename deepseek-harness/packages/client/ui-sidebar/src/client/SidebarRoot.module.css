@@ -22,25 +22,40 @@
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
-/* Zenwit keeps the native settings owner mounted without rendering a second
-   sidebar. The trigger is removed from layout; SettingsRoot's full-viewport
-   panel remains a sibling and becomes interactive when opened by the product
-   shell event. */
+/* Alternate product frames keep the native settings owner without rendering
+   a second sidebar. The native rail trigger floats above their content while
+   SettingsRoot's full-viewport panel remains unchanged. */
 .settingsOnlyRoot {
   position: fixed;
-  inset: 0 auto auto 0;
-  width: 0;
-  height: 0;
+  inset: auto auto 18px 18px;
+  width: 36px;
+  height: 36px;
   z-index: 1001;
-  pointer-events: none;
+  border: 1px solid var(--dsw-alias-separator-primary);
+  border-radius: 50%;
+  background: var(--dsw-alias-bg-layer-2);
+  box-shadow: var(--dsw-shadow-lv2);
+  color: var(--dsw-alias-label-primary);
 }
 
 .settingsOnlyRoot > button {
-  display: none;
+  margin: 0;
 }
 
-.settingsOnlyRoot > div {
-  pointer-events: auto;
+.settingsOnlyInline {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: 44px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  box-shadow: var(--dsw-shadow-lv1);
+}
+
+.settingsOnlyInline > button {
+  width: 100%;
+  height: 42px;
+  padding-inline: 14px;
 }
 
 /* Rail geometry (figma rail spec): 36x36 control boxes centered in the 56px

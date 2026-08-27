@@ -87,12 +87,16 @@ On macOS the advanced window uses a hidden-inset title bar, positioned traffic l
 
 ## Development
 
-This package is managed by the Yarn workspace at the repository root. The sibling `deepseek-harness/` checkout remains an independent upstream pnpm project and is not part of the Yarn workspace. Install and verify DSH Desktop from the repository root:
+This package is managed by the Yarn workspace at the repository root. The sibling `deepseek-harness/` directory is repository-owned integrated product source; it retains an independent pnpm workspace and is not a Yarn workspace member. Install, build the integrated source, and verify DSH Desktop from the repository root:
 
 ```sh
-yarn install
-yarn check
+corepack yarn install --immutable
+corepack yarn source:install
+corepack yarn dev
+corepack yarn check
 ```
+
+`source:build` and `dev` materialize the locally changed client bundles, Web frontend, Web composition, and Zenwit project-library package as physical files under this package's Yarn installation. They preserve the installed `0.1.1-rc.2` package manifests and never symlink pnpm source packages into this `node_modules`; crossing that realpath boundary loads duplicate React declarations and incompatible Cordis augmentations. Development launch defaults `DSH_HOME` to `~/.dsh-dev`. The ordinary `start` command preserves normal DSH home semantics.
 
 The check verifies that every required first-party peer in the production graph is declared by the desktop deploy root. Headless Loader smokes activate the launcher-owned desktop row and a profile-local third-party row, then boot the published Web profile and inspect its loopback root and client manifest. Unit and type tests cover both profile compositions, restart fencing, client environment validation, desktop layout state, and platform-native window options.
 
@@ -192,8 +196,8 @@ WSL2 is suitable for Linux headless build, typecheck, and unit-test coverage fro
 
 ```bash
 source ~/.nvm/nvm.sh
-git submodule update --init --recursive
 corepack yarn install --immutable
+corepack yarn source:install
 corepack yarn workspace dsh-plugin-desktop typecheck
 corepack yarn workspace dsh-plugin-desktop test
 corepack yarn build
@@ -206,8 +210,8 @@ Commands run from `/mnt/<drive>` are valid but slower than a checkout stored on 
 Use a native Windows x64 machine with Git and x64 Node `22.23.2` (the same release used by CI). The packaging command accepts Node `22.19+` and Node `24.x`, whose official distributions include the required Corepack command. From PowerShell in a fresh `v2` checkout, run:
 
 ```powershell
-git submodule update --init --recursive
 corepack.cmd yarn install --immutable
+corepack.cmd yarn source:install
 corepack.cmd yarn dist:win
 ```
 
@@ -249,5 +253,5 @@ None. The same DSH Host and client feature plugins assemble model requests.
 - `dshmarket@1.2.3` remains an optional user-installed third-party package, not a bundled marketplace. Preinstallation is deferred until an audited release consumes the optional Desktop services while preserving ordinary DSH fallback and includes the complete license notice required for redistribution.
 - The update handoff validates the download container, not publisher identity. macOS still requires the user to replace the application from the opened DMG; Windows runs the downloaded NSIS installer but the local `dist:win` artifact is unsigned. Signed artifacts, Authenticode/publisher verification, SmartScreen reputation, and native upgrade testing remain release gates.
 - The shared carrier is loopback HTTP and WebSocket, not Electron IPC. Replacing it requires transport extension points in upstream DSH and is outside this standalone package.
-- This project pins both the published DSH `0.1.1-rc.2` family and the corresponding official `deepseek-harness/` release source. Product builds still resolve published package interfaces rather than linking the source checkout.
+- The Desktop installation and all materialized DSH package manifests are pinned to `0.1.1-rc.2`; locally changed Zenwit outputs are copied over those physical packages without source symlinks. Some manifests in the integrated Harness source tree still carry the imported `0.1.0-rc.5` label, so that label must not be treated as proof that the source synchronization is complete. See the RC2 development-boundary decision.
 - `package:dir` is an unpacked smoke artifact. `dist:win` adds an unsigned NSIS test installer but does not establish Authenticode identity or SmartScreen reputation. Installation and upgrade behavior, native notifications and terminals, the Windows ACL sandbox, and native-material appearance remain target-platform verification boundaries.

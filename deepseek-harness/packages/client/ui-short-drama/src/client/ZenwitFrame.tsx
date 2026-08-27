@@ -1,132 +1,108 @@
 /**
  * Zenwit product frame: the root-slot occupant replacing AppFrame.
- * A persistent top bar carries the brand plus the theme toggle and settings
- * surface (light/dark/system) on every surface, so preference controls are
- * never hidden behind a shadowed AppFrame. Pure component — everything arrives
- * through framework standard props plus the injected project-library + theme
- * faces. The home/workspace switch is Zenwit's own state, but it restores a
- * restored DSH session's workspace on a reload instead of dropping to home.
+ * It keeps the native DSH settings owner mounted without adding a second
+ * product bar. Pure component — everything arrives through framework standard
+ * props plus the injected project-library faces. The current surface is renderer-scoped:
+ * a reload keeps the page the user was viewing, while a new app process starts
+ * at the project library even if the DSH runtime restores a session.
  */
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { GlobalStandardProps, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ProjectSummary } from '@deepseek-ai/dsh-screenplay-project-library/types'
 import { HomePage } from './HomePage.tsx'
 import { Workspace } from './Workspace.tsx'
 import css from './zenwit.module.css'
 
-/** Theme face: read the resolved light/dark, switch, and subscribe to changes. */
-interface ThemeFace {
-  current: () => string
-  set: (id: string) => void
-  subscribe: (cb: (id: string) => void) => () => void
+const SURFACE_STORAGE_KEY = 'zenwit.surface'
+
+type Surface = 'home' | 'workspace'
+
+function readSurface(): Surface {
+  try {
+    return window.sessionStorage.getItem(SURFACE_STORAGE_KEY) === 'workspace' ? 'workspace' : 'home'
+  } catch {
+    // Storage can be unavailable in privacy-restricted renderer contexts. A
+    // safe default is the project library, not an implicitly opened session.
+    return 'home'
+  }
 }
 
-/** Full composed props: global standard kit + injected project-library + theme faces. */
+function writeSurface(surface: Surface): void {
+  try {
+    window.sessionStorage.setItem(SURFACE_STORAGE_KEY, surface)
+  } catch {
+    // Storage can be unavailable in privacy-restricted renderer contexts.
+  }
+}
+
+/** Full composed props: global standard kit + injected project-library faces. */
 export type ZenwitFrameProps = GlobalStandardProps
-  & PropsRenderSlots<'conversation'>
+  & PropsRenderSlots<'conversation' | 'sidebar'>
   & {
     list: () => Promise<ProjectSummary[]>
     create: (name: string) => Promise<ProjectSummary>
     openProject: (projectPath: string) => Promise<void>
     closeProject: () => Promise<void>
-    theme: ThemeFace
+    openSession: (id: string) => void
+    startSession: (workspaceId: string) => void
   }
-
-const THEME_OPTIONS = [
-  { id: 'light', label: '亮色' },
-  { id: 'dark', label: '暗色' },
-  { id: 'system', label: '跟随系统' },
-] as const
 
 /** Root-slot frame (see module doc). */
 export function ZenwitFrame({
   useSessions,
+  useWorkspaces,
   renderSlot,
   list,
   create,
   openProject,
   closeProject,
-  theme,
+  openSession,
+  startSession,
 }: ZenwitFrameProps) {
   const sessionsState = useSessions(s => s)
   const current = sessionsState.current
-  const [showWorkspace, setShowWorkspace] = useState(false)
-  const [projectPath, setProjectPath] = useState('')
-  const [restored, setRestored] = useState(false)
-  const [themeMode, setThemeMode] = useState('light')
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const projectPath = current === undefined ? undefined : sessionsState.byId[current]?.cwd
+  const [surface, setSurface] = useState<Surface>(readSurface)
 
-  useEffect(() => {
-    setThemeMode(theme.current())
-    return theme.subscribe(setThemeMode)
-  }, [theme])
-
-  // A page reload (or app restart) restores the current DSH session; enter the
-  // workspace bound to its cwd instead of dropping back to the home library.
-  useEffect(() => {
-    if (restored || current === undefined) return
-    const cwd = sessionsState.byId[current]?.cwd
-    if (cwd === undefined || cwd === '') return
-    setProjectPath(cwd)
-    setShowWorkspace(true)
-    setRestored(true)
-    // Re-select the project's main session (non-blank, most recent) rather than
-    // trusting the restored 'current', which may be an empty left-over session.
-    void openProject(cwd)
-  }, [current, restored, sessionsState, openProject])
-
-  const handleOpen = async (projectPath: string) => {
-    await openProject(projectPath)
-    setProjectPath(projectPath)
-    setShowWorkspace(true)
+  const handleOpen = async (path: string): Promise<void> => {
+    await openProject(path)
+    writeSurface('workspace')
+    setSurface('workspace')
   }
-  const handleClose = async () => {
+
+  const handleClose = async (): Promise<void> => {
     await closeProject()
-    setShowWorkspace(false)
-    setProjectPath('')
-    setRestored(false)
+    writeSurface('home')
+    setSurface('home')
   }
-  const toggleTheme = () => { theme.set(themeMode === 'light' ? 'dark' : 'light') }
+
+  const content = surface === 'home'
+    ? <HomePage list={list} create={create} openProject={handleOpen} />
+    : sessionsState.phase === 'pending'
+      ? (
+          <main className={css.restoreSurface} aria-live="polite">
+            <span className={css.restoreIndicator} aria-hidden="true" />
+            <span>正在恢复创作现场</span>
+          </main>
+        )
+      : projectPath !== undefined && projectPath !== ''
+        ? (
+            <Workspace
+              projectPath={projectPath}
+              closeProject={handleClose}
+              renderSlot={renderSlot}
+              useSessions={useSessions}
+              useWorkspaces={useWorkspaces}
+              openSession={openSession}
+              startSession={startSession}
+            />
+          )
+        : <HomePage list={list} create={create} openProject={handleOpen} />
 
   return (
     <div className={css.frame}>
-      <div className={css.topbar}>
-        <h1 className={css.brand}>Zenwit</h1>
-        <span className={css.brandSub}>短剧创作工作台</span>
-        <div className={css.topbarSpacer} />
-        <button className={css.topButton} type="button" onClick={toggleTheme}>
-          {themeMode === 'light' ? '暗色' : '亮色'}
-        </button>
-        <button className={css.topButton} type="button" onClick={() => setSettingsOpen(true)}>
-          设置
-        </button>
-      </div>
-      {showWorkspace && current !== undefined
-        ? <Workspace projectPath={projectPath} closeProject={handleClose} renderSlot={renderSlot} />
-        : <HomePage list={list} create={create} openProject={handleOpen} />}
-
-      {settingsOpen && (
-        <div className={css.modalOverlay} onClick={() => setSettingsOpen(false)}>
-          <div className={css.modal} onClick={e => e.stopPropagation()}>
-            <h2 className={css.modalTitle}>设置</h2>
-            <label className={css.settingsLabel}>主题</label>
-            <div className={css.settingsRow}>
-              {THEME_OPTIONS.map(opt => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  className={themeMode === opt.id ? css.settingsActive : css.settingsOption}
-                  onClick={() => theme.set(opt.id)}>
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-            <div className={css.modalActions}>
-              <button className={css.modalCancel} type="button" onClick={() => setSettingsOpen(false)}>关闭</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {content}
+      {surface !== 'workspace' && renderSlot('sidebar', { collapsed: true, width: 0, settingsOnly: true })}
     </div>
   )
 }

@@ -1,0 +1,8 @@
+# dsh-short-drama 短剧创作 Agent 预设（screenplay-v1）。
+# 宿主持有持久化与状态；本预设只贡献模型可见的提示词/上下文/领域工具。
+- id: screenplay-agent
+  name: dsh-short-drama/agent
+
+# 使用既有 DSH 提问通道，让用户决策渲染为可点选项而非需要手打的文字。
+- id: tool-ask-user
+  name: '@deepseek-ai/dsh-tool-ask-user'

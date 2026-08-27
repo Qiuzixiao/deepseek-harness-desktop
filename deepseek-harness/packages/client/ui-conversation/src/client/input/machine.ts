@@ -226,6 +226,8 @@ export class InputMachine {
       offset,
       label: reference.label,
       clipboardText: reference.clipboardText,
+      ...(reference.icon === undefined ? {} : { icon: reference.icon }),
+      ...(reference.title === undefined ? {} : { title: reference.title }),
     }
   }
 

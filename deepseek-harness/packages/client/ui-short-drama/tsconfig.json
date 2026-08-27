@@ -21,7 +21,19 @@
       "path": "../ui-theme"
     },
     {
+      "path": "../ui-layout"
+    },
+    {
+      "path": "../ui-input-trigger"
+    },
+    {
+      "path": "../ui-sidebar"
+    },
+    {
       "path": "../../runtime-diagnostics/invariants"
+    },
+    {
+      "path": "../../screenplay/project-library"
     }
   ]
 }

@@ -1802,7 +1802,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@deepseek-ai/dsh-client-ui-reference@npm:^0.1.1-rc.2":
+"@deepseek-ai/dsh-client-ui-reference@npm:0.1.1-rc.2, @deepseek-ai/dsh-client-ui-reference@npm:^0.1.1-rc.2":
   version: 0.1.1-rc.2
   resolution: "@deepseek-ai/dsh-client-ui-reference@npm:0.1.1-rc.2"
   peerDependencies:
@@ -2338,7 +2338,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@deepseek-ai/dsh-file-reference-local@npm:^0.1.1-rc.2":
+"@deepseek-ai/dsh-file-reference-local@npm:0.1.1-rc.2, @deepseek-ai/dsh-file-reference-local@npm:^0.1.1-rc.2":
   version: 0.1.1-rc.2
   resolution: "@deepseek-ai/dsh-file-reference-local@npm:0.1.1-rc.2"
   dependencies:
@@ -3030,6 +3030,19 @@ __metadata:
     "@deepseek-ai/cordis": ^4.0.1
     "@deepseek-ai/dsh-invariants": ^0.1.1-rc.2
   checksum: 10c0/e933484ec7c8e3d00f97cf501996049e91146cd8690276fc4feb93cc397b4332dca00994f63a438a263b8c50f12dca4c4331f4a59aa1e75a7add9165f0dafc8b
+  languageName: node
+  linkType: hard
+
+"@deepseek-ai/dsh-screenplay-project-library@file:../deepseek-harness/packages/screenplay/project-library::locator=dsh-plugin-desktop%40workspace%3Adsh-plugin-desktop":
+  version: 0.1.1-rc.2
+  resolution: "@deepseek-ai/dsh-screenplay-project-library@file:../deepseek-harness/packages/screenplay/project-library#../deepseek-harness/packages/screenplay/project-library::hash=91997d&locator=dsh-plugin-desktop%40workspace%3Adsh-plugin-desktop"
+  dependencies:
+    zod: "npm:^4.4.3"
+  peerDependencies:
+    "@deepseek-ai/cordis": 4.0.1
+    "@deepseek-ai/dsh-invariants": 0.1.1-rc.2
+    "@deepseek-ai/dsh-typert-protocol": 0.1.1-rc.2
+  checksum: 10c0/0be4f0d2439426f33b1f536ebbdabb17df28eb07714748ec793f8c2c25d351181b7f459fd2e70c364b1eda0cbaeccd2fac9143b3a612aea1cf25ac95295630be
   languageName: node
   linkType: hard
 
@@ -8255,6 +8268,7 @@ __metadata:
     "@deepseek-ai/dsh-client-ui-input-trigger": "npm:0.1.1-rc.2"
     "@deepseek-ai/dsh-client-ui-layout": "npm:0.1.1-rc.2"
     "@deepseek-ai/dsh-client-ui-primitives": "npm:0.1.1-rc.2"
+    "@deepseek-ai/dsh-client-ui-reference": "npm:0.1.1-rc.2"
     "@deepseek-ai/dsh-client-ui-renderer": "npm:0.1.1-rc.2"
     "@deepseek-ai/dsh-client-ui-settings": "npm:0.1.1-rc.2"
     "@deepseek-ai/dsh-client-ui-sidebar": "npm:0.1.1-rc.2"
@@ -8271,6 +8285,7 @@ __metadata:
     "@deepseek-ai/dsh-cordis-host-runner": "npm:0.1.1-rc.2"
     "@deepseek-ai/dsh-credentials": "npm:0.1.1-rc.2"
     "@deepseek-ai/dsh-file-reference": "npm:0.1.1-rc.2"
+    "@deepseek-ai/dsh-file-reference-local": "npm:0.1.1-rc.2"
     "@deepseek-ai/dsh-fs": "npm:0.1.1-rc.2"
     "@deepseek-ai/dsh-fs-local": "npm:0.1.1-rc.2"
     "@deepseek-ai/dsh-goal": "npm:0.1.1-rc.2"
@@ -8295,6 +8310,7 @@ __metadata:
     "@deepseek-ai/dsh-sandbox-policy": "npm:0.1.1-rc.2"
     "@deepseek-ai/dsh-sandbox-windows-acl": "npm:0.1.1-rc.2"
     "@deepseek-ai/dsh-scope": "npm:0.1.1-rc.2"
+    "@deepseek-ai/dsh-screenplay-project-library": "file:../deepseek-harness/packages/screenplay/project-library"
     "@deepseek-ai/dsh-session": "npm:0.1.1-rc.2"
     "@deepseek-ai/dsh-session-persistence": "npm:0.1.1-rc.2"
     "@deepseek-ai/dsh-session-projection": "npm:0.1.1-rc.2"

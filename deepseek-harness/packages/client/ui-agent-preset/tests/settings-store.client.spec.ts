@@ -350,6 +350,30 @@ describe('the new-session chip controller', () => {
     expect(writes).toEqual([{ ns: 'select', patch: 'minimal' }])
   })
 
+  it('does not read a session context after its stage was already spent', async () => {
+    const controller = new AgentPresetSeatController({} as IApiClient, () => {
+      throw new Error('cannot get required service "sessions" in inactive context')
+    })
+
+    // List notifications can still contain a just-disposed subscriber. Once
+    // there is no staged choice, apply has no work and must not touch that
+    // subscriber's session context.
+    await expect(controller.apply()).resolves.toBeUndefined()
+  })
+
+  it('does not read a session context after the owning scope disposed, even with a pending stage', async () => {
+    const controller = new AgentPresetSeatController({} as IApiClient, () => {
+      throw new Error('cannot get required service "sessions" in inactive context')
+    })
+
+    // A same-tick list notification can still be in flight when the scope
+    // that subscribed to it disposes. With a pick still staged, `apply()`
+    // would otherwise reach `currentSession()` and read the dead scope.
+    controller.stage('cordis')
+    controller.dispose()
+    await expect(controller.apply()).resolves.toBeUndefined()
+  })
+
   it('drops the stage against a session that already started', async () => {
     const writes: Recorded[] = []
     const controller = chip(ROSTER, { id: 's1', blank: false, agentPreset: 'standard' }, { writes })

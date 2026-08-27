@@ -135,15 +135,15 @@ Also, and you.
 
 ## Development
 
-Desktop source lives in `dsh-plugin-desktop/`. The outer repository uses Yarn, while the pinned `deepseek-harness/` submodule keeps its own pnpm workspace. From the repository root:
+Desktop source lives in `dsh-plugin-desktop/`. Zenwit customization and the Harness source it depends on live in the repository-owned `deepseek-harness/` integrated source tree. The outer repository uses Yarn 4; the integrated source tree retains its pnpm workspace. Their dependency graphs must remain separate, and pnpm source packages must never be symlinked into the Desktop Yarn `node_modules`. From the repository root:
 
 ```sh
-git submodule update --init --recursive
 corepack yarn install --immutable
+corepack yarn source:install
 corepack yarn dev
 ```
 
-Use `corepack yarn check` for the headless gate. The [architecture](docs/architecture.en.md) and package [`README`](dsh-plugin-desktop/README.md) describe the full build, test, and release boundaries. See [CONTRIBUTING.en.md](CONTRIBUTING.en.md) for how to contribute.
+`corepack yarn dev` builds the integrated source, materializes the Zenwit build outputs as physical files inside the Desktop RC2 installation tree, and defaults to `~/.dsh-dev`; it does not read the `~/.dsh` home used by a normal start. Use `corepack yarn check` for the headless gate. The [architecture](docs/architecture.en.md), [RC2 pinning decision](.agents/notes/implemented/process/2026-08-26-integrated-harness-rc2-development-boundary.md), and package [`README`](dsh-plugin-desktop/README.md) describe the full build, test, and release boundaries. See [CONTRIBUTING.en.md](CONTRIBUTING.en.md) for how to contribute.
 
 ## Community
 

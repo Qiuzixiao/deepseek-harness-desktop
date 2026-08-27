@@ -175,6 +175,36 @@ function projectUserText(text: string): ReactNode {
   return <>{parts}</>
 }
 
+interface FileReferenceProjection {
+  readonly path: string
+  readonly body: string
+}
+
+interface UserTextProjection {
+  readonly text: string
+  readonly files: readonly FileReferenceProjection[]
+}
+
+/** Split serialized file context from the human-facing part of a user message. */
+function projectFileReferences(text: string): UserTextProjection {
+  const re = /<file_reference\s+path="([^"]+)">([\s\S]*?)<\/file_reference>/gu
+  const files: FileReferenceProjection[] = []
+  const body = text.replace(re, (_match, path: string, content: string) => {
+    files.push({ path, body: content.trim() })
+    return ''
+  }).replace(/[ \t]{2,}/gu, ' ').trim()
+  return { text: body, files }
+}
+
+function FileReferenceCard({ path }: { path: string }): ReactNode {
+  return (
+    <div className={css.fileReferenceCard} title={path} data-file-reference={path}>
+      <span className={css.fileReferenceIcon} aria-hidden="true">M</span>
+      <span className={css.fileReferencePath}>{path}</span>
+    </div>
+  )
+}
+
 /** Right-aligned bubble shared by user and steering rows. */
 function UserStyleBubble({
   content, imageLoader, actions, pending = false, t,
@@ -187,19 +217,22 @@ function UserStyleBubble({
   pending?: boolean
   t: ChatViewSlotProps['t']
 }): ReactNode {
-  const { text, images, rest } = contentParts(content)
+  const { text: rawText, images, rest } = contentParts(content)
+  const projection = projectFileReferences(rawText)
+  const text = projection.text
   const truncated = (total: number): string => t('json.truncated', { total })
   const showBubble = text !== '' || rest.length > 0
   return (
     <div className={css.userRow} data-pending-steering={pending || undefined} data-time-hover-root>
       <div className={css.userStack}>
         <ImageGallery images={images} load={imageLoader} align="end" labels={messageImageLabels(t)} />
+        {projection.files.map((file, index) => <FileReferenceCard key={`${file.path}:${index}`} path={file.path} />)}
         {showBubble && <div className={css.bubble}>
           {projectUserText(text)}
           {rest.map((block, i) => <JsonBlock key={i} label={t('message.extraBlock')} payload={block} truncatedLabel={truncated} />)}
         </div>}
       </div>
-      {actions?.(text)}
+      {actions?.(rawText)}
     </div>
   )
 }

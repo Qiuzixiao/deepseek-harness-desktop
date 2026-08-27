@@ -69,6 +69,10 @@ export interface ReferenceInsert {
   readonly label: string
   /** Clipboard / persistence projection, e.g. `/name` (never the model form). */
   readonly clipboardText: string
+  /** Optional visual hint for the owning chip (for example a file icon). */
+  readonly icon?: string
+  /** Optional full reference path shown only as a hover tooltip. */
+  readonly title?: string
 }
 
 /** Settled result of a command submit transaction. */

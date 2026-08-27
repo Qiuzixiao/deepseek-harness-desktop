@@ -1,6 +1,10 @@
 # Desktop Host operations compose around the existing Web bundle. Compatibility
 # mode keeps upstream ownership of the browser carrier and rendered UI.
 - insert:
+    # Zenwit screenplay kernel (host plane): provides ctx.screenplayProjects,
+    # the session-keyed state machine the screenplay-v1 preset's tools drive.
+    - id: screenplay-host
+      name: dsh-short-drama
     - id: desktop-shell
       name: dsh-plugin-desktop
       config:
@@ -19,13 +23,13 @@
     - id: desktop-updates
       name: dsh-plugin-desktop/updates
 
-# A desktop launch has no terminal operator waiting for the Web readiness line.
-- id: web-runtime
+# Zenwit: every session is a screenplay session — default the agent preset to
+# the screenplay kernel's preset (screenplay-v1). The user can still override
+# the default through the agent-preset settings surface.
+- id: agent-presets
   config:
-    openBrowser: false
-    printUrl: false
-    surfaceContext: true
-    trustedHosts: []
+    default: screenplay-v1
+
 # The current Web shell installs the slot renderer through its shell-owned
 # app-shell entry. Older installed Web bundles still contribute ui-renderer;
 # disable that legacy installer when the mixed profile is composed so the
@@ -33,9 +37,28 @@
 - id: ui-renderer
   disabled: true
 
-# Zenwit owns the root shell and mounts the native sidebar settings owner in a
-# hidden host. Keep ui-layout's service/theme presenter, but release AppFrame's
-# root declaration so it cannot collide with Zenwit's sidebar child seat.
+# Zenwit owns the root shell. Keep ui-layout's service/theme presenter, but
+# release AppFrame's root declaration so it cannot collide with Zenwit's
+# conversation seat.
 - id: ui-layout
   config:
     zenwit: true
+
+# Legacy user-profile plugins built against the previous Harness client ABI
+# must not enter the fixed Zenwit renderer graph.
+- id: drop-to-path
+  disabled: true
+- id: rich-file-reader
+  disabled: true
+- id: better-sidebar
+  disabled: true
+- id: checkpoint-rewind
+  disabled: true
+
+# A desktop launch has no terminal operator waiting for the Web readiness line.
+- id: web-runtime
+  config:
+    openBrowser: false
+    printUrl: false
+    surfaceContext: true
+    trustedHosts: []

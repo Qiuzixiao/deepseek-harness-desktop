@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-screenplay-project-library",
   "description": "Zenwit project library: scan the configurable project root for screenplay projects and create new ones (Remote-only service)",
-  "version": "0.1.0-rc.5",
+  "version": "0.1.1-rc.2",
   "publishConfig": { "access": "public" },
   "repository": { "type": "git", "url": "git+https://github.com/deepseek-ai/deepseek-harness.git", "directory": "packages/screenplay/project-library" },
   "type": "module",
@@ -23,10 +23,13 @@
     "lib/typert.remote-client.js", "lib/typert.remote-client.d.ts"
   ],
   "license": "MIT",
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
   "peerDependencies": {
-    "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-typert-protocol": "workspace:^",
-    "@deepseek-ai/cordis": "workspace:^"
+    "@deepseek-ai/dsh-invariants": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-typert-protocol": "0.1.1-rc.2",
+    "@deepseek-ai/cordis": "4.0.1"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-invariants": "workspace:^",

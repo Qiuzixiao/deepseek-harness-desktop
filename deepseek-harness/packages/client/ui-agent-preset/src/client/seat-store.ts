@@ -62,6 +62,14 @@ export class AgentPresetSeatController {
   /** Set while a pick is waiting for a session; cleared once applied. */
   private staged: string | undefined
 
+  /**
+   * Set once the owning scope tears down. A list notification can already be
+   * queued when disposal runs synchronously in the same tick — `apply()`
+   * checks this before touching `currentSession()` so a post-disposal
+   * invocation is a documented no-op instead of reading a dead scope.
+   */
+  private disposed = false
+
   constructor(
     private readonly api: Pick<IApiClient, 'agentPresets'>,
     /** The session the hero is about to hand over to, when there is one. */
@@ -142,6 +150,16 @@ export class AgentPresetSeatController {
   }
 
   /**
+   * Mark the owning scope torn down. Call synchronously from the scope's
+   * disposal, before or alongside unsubscribing `currentSession`'s source, so
+   * an `apply()` already in flight from a same-tick notification stops
+   * before it reads that scope.
+   */
+  dispose(): void {
+    this.disposed = true
+  }
+
+  /**
    * Hand the staged choice to the current session, if there is one to take it.
    *
    * Called both by `select()` and by whoever observes the current session
@@ -149,9 +167,15 @@ export class AgentPresetSeatController {
    * @returns once the switch settled, or immediately when there is nothing to do.
    */
   async apply(): Promise<void> {
+    // A list notification can already be queued when the conversation scope
+    // that subscribed to it disposes synchronously in the same tick; reading
+    // `currentSession()` past that point throws "sessions in inactive
+    // context" and aborts the renderer's session transition.
+    if (this.disposed) return
     const staged = this.staged
+    if (staged === undefined) return
     const session = this.currentSession()
-    if (staged === undefined || session === undefined) return
+    if (session === undefined) return
     // A started session's history was produced under its own composition; the
     // host refuses the swap, so the stage is no longer meaningful.
     if (!session.blank || session.agentPreset === staged) {

@@ -8,26 +8,19 @@
  * workspace (structure tree | editor | AI chat).
  */
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
-import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { ProjectSummary } from '@deepseek-ai/dsh-screenplay-project-library/types'
 import type {} from '@deepseek-ai/dsh-screenplay-project-library/remote'
 import { ZenwitFrame } from './ZenwitFrame.tsx'
+import { registerProjectFileSource } from './project-file-source.ts'
 
-// The product frame declares no child slots in M1; additive seats
-// (structure tree, editor toolbar, chat panel) arrive in M2/M3.
-declare module '@deepseek-ai/dsh-client-ui-slots' {
-  interface SlotMap {
-    // The official conversation slot, declared by the shipped AppFrame as its
-    // center column. Zenwit re-declares it here because it now owns the root
-    // frame and renders the official DSH conversation UI in its right pane.
-    'conversation': { kind: 'single'; scope: 'session-maybe' }
-  }
-}
+// The product frame owns the two runtime children it renders. Their SlotMap
+// contracts come from ui-layout's type-only client import above; only the
+// runtime declaration below lives in this product shell.
 
 /** Required services (cordis fiber inject — the loader passes all module exports as an object plugin). */
-// ui-conversation now injects on the 'conversation' slot (order-independent),
-// so this frame can depend on 'theme' again to offer a light/dark switch.
-export const inject = ['slots', 'theme']
+// ui-conversation now injects on the 'conversation' slot (order-independent).
+export const inject = ['slots', 'inputTriggers', 'sessions']
 
 /**
  * Demo fallback rows used while the running desktop has not yet mounted the
@@ -48,6 +41,7 @@ const DEMO_PROJECTS: ProjectSummary[] = [
 const PROJECT_LIBRARY_API = '/api/desktop/projects'
 
 export function apply(ctx: ClientContext): void {
+  ctx.effect(() => registerProjectFileSource(ctx), 'ui-short-drama: @ project-file source')
   // The DSH Desktop serves a private loopback project-library API; when it is
   // absent (e.g. an unpatched installed desktop) the faces fall back to demo data.
   const list = async (): Promise<ProjectSummary[]> => {
@@ -79,8 +73,25 @@ export function apply(ctx: ClientContext): void {
     } }).get('workspaces')
     const sessions = (ctx as unknown as { get: (name: string) => {
       open(id: string): void
-      list: { getSnapshot(): { ids: string[], byId: Record<string, { id: string, cwd?: string, blank?: boolean, updatedAt?: number, agentPreset?: string }> } }
+      list: {
+        getSnapshot(): { ids: string[], byId: Record<string, { id: string, cwd?: string, blank?: boolean, updatedAt?: number, agentPreset?: string }>, phase: string }
+        subscribe(fn: () => void): () => void
+      }
     } }).get('sessions')
+    // The list starts 'pending' until the host baseline lands; scanning it
+    // before then always finds nothing and misreads "not yet loaded" as "no
+    // prior session", silently opening a fresh one over the project's real
+    // history. Wait for 'ready' once, the same subscribe-and-recheck idiom
+    // startInitialSelection uses, before doing any reuse scan below.
+    if (sessions.list.getSnapshot().phase !== 'ready') {
+      await new Promise<void>((resolve) => {
+        const unsubscribe = sessions.list.subscribe(() => {
+          if (sessions.list.getSnapshot().phase !== 'ready') return
+          unsubscribe()
+          resolve()
+        })
+      })
+    }
     // create is idempotent; retry the whole sequence while the workspace list
     // snapshot or the renderer-host connection catch up.
     let lastError: unknown
@@ -135,23 +146,33 @@ export function apply(ctx: ClientContext): void {
     return Promise.resolve()
   }
 
+  // Switch the current session without leaving the workspace surface, so the
+  // history list (Workspace.tsx) can reopen a past session for this project.
+  const openSession = (id: string): void => {
+    const sessions = (ctx as unknown as { get: (name: string) => { open(id: string): void } }).get('sessions')
+    sessions.open(id)
+  }
+
+  const startSession = (workspaceId: string): void => {
+    const workspaces = (ctx as unknown as { get: (name: string) => { startSession(id: string): void } }).get('workspaces')
+    workspaces.startSession(workspaceId)
+  }
+
   ctx.effect(() => {
     const dispose = ctx.slots.register({
       name: 'root',
       priority: -1,
       children: {
+        'sidebar': { kind: 'single', scope: 'root' },
         'conversation': { kind: 'single', scope: 'session-maybe' },
       },
       inject: () => ({
         list,
         create,
         openProject,
+        openSession,
+        startSession,
         closeProject,
-        theme: {
-          current: () => ((ctx as unknown as { theme: { getTheme(): { active: { colorScheme: string } } } }).theme.getTheme().active.colorScheme),
-          set: (id: string) => (ctx as unknown as { theme: { setTheme(id: string): void } }).theme.setTheme(id),
-          subscribe: (cb: (id: string) => void) => (ctx as unknown as { on(name: string, fn: (snap: { active: { colorScheme: string } }) => void): () => void }).on('theme/change', snap => cb(snap.active.colorScheme)),
-        },
       }),
     }, ZenwitFrame)
     return () => {

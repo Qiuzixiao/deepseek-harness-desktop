@@ -168,6 +168,8 @@ export interface Occurrence {
   readonly label: string
   /** Clipboard / persistence projection, e.g. `/name` (insert-time cache, never the model form). */
   readonly clipboardText: string
+  readonly icon?: string
+  readonly title?: string
   /** Owner-resolution failure flag: chip renders invalid; serialization must fail. */
   readonly invalid?: boolean
 }

@@ -2,6 +2,8 @@
 
 Status: implemented
 
+Superseded for the current repository topology by [Integrated Harness RC2 development boundary](2026-08-26-integrated-harness-rc2-development-boundary.md). This note remains as historical context for the former submodule layout.
+
 English | [中文](2026-08-15-pinned-upstream-and-isolated-yarn-workspace.zh.md)
 
 ## Problem

@@ -118,8 +118,9 @@ describe('SidebarRoot shell', () => {
   })
 
   it('can mount only the native settings seat for an alternate product frame', () => {
-    mountShell({ settingsOnly: true })
+    const shell = mountShell({ collapsed: true, width: 0, settingsOnly: true })
     expect(screen.getByTestId('settings-seat')).toBeTruthy()
+    expect(shell.settingsOwner().wide).toBe(false)
     expect(screen.queryByTestId('region')).toBeNull()
     expect(screen.queryByRole('button', { name: 'New session' })).toBeNull()
   })

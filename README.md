@@ -135,15 +135,15 @@ DSH Desktop 是基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek
 
 ## 开发
 
-桌面端代码位于 `dsh-plugin-desktop/`，外层仓库使用 Yarn，固定的 `deepseek-harness/` 子模块继续使用自己的 pnpm workspace。从仓库根目录执行：
+桌面端代码位于 `dsh-plugin-desktop/`，Zenwit 定制及其依赖的 Harness 源码位于仓库自有的 `deepseek-harness/` 集成源码树。外层仓库使用 Yarn 4；集成源码树保留自己的 pnpm workspace，二者不得合并依赖图，也不得把 pnpm 源码包软链接进 Desktop 的 Yarn `node_modules`。从仓库根目录执行：
 
 ```sh
-git submodule update --init --recursive
 corepack yarn install --immutable
+corepack yarn source:install
 corepack yarn dev
 ```
 
-headless 检查使用 `corepack yarn check`；完整的构建、测试和发布边界见[架构说明](docs/architecture.md)和包级 [`README`](dsh-plugin-desktop/README.md)。如何参与贡献见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+`corepack yarn dev` 会构建集成源码，把 Zenwit 所需的构建产物以实体文件物化到 Desktop 的 RC2 安装树，并默认使用 `~/.dsh-dev`；它不会读取正式启动使用的 `~/.dsh`。headless 检查使用 `corepack yarn check`；完整的构建、测试和发布边界见[架构说明](docs/architecture.md)、[RC2 锁版决策](.agents/notes/implemented/process/2026-08-26-integrated-harness-rc2-development-boundary.zh.md)和包级 [`README`](dsh-plugin-desktop/README.md)。如何参与贡献见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 社区交流
 

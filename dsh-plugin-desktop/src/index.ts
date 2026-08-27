@@ -34,6 +34,10 @@ import {
   DESKTOP_PROFILE_DELETE_PATH,
   DESKTOP_PROFILE_ROLLBACK_PATH,
   DESKTOP_PROFILE_SELECT_PATH,
+  DESKTOP_PROJECT_LIBRARY_PATH,
+  DESKTOP_PROJECT_FILE_PATH,
+  DESKTOP_PROJECT_STRUCTURE_PATH,
+  DESKTOP_PROJECT_RESOURCES_PATH,
   DESKTOP_RESTART_PATH,
   DESKTOP_SETTINGS_PATH,
   DESKTOP_TERMINAL_OPEN_PATH,
@@ -50,6 +54,7 @@ import {
   handleDesktopSettingsRequest,
   handleDesktopTerminalOpenRequest,
 } from './desktop-settings-route.ts'
+import { handleProjectFileRequest, handleProjectLibraryRequest, handleProjectLibraryResourcesRequest, handleProjectLibraryStructureRequest } from './project-library-route.ts'
 import type {} from './desktop-settings-controller.ts'
 import { desktopBootRecoveryInjections } from './desktop-boot-recovery.ts'
 import type { DesktopShellMode } from './runtime.ts'
@@ -148,6 +153,9 @@ export function desktopRendererUrl(
   windowsBuild?: number,
 ): string {
   const url = new URL(`http://127.0.0.1:${String(port)}/`)
+  // One-time migration away from entry responses cached before the Host marked
+  // its runtime-injected boot graph as no-store.
+  url.searchParams.set('dsh-desktop-entry', '3')
   url.searchParams.set('dsh-desktop-mode', mode)
   url.searchParams.set('dsh-desktop-platform', platform)
   url.searchParams.set('dsh-desktop-material', material)
@@ -212,6 +220,10 @@ export function apply(ctx: Context, config: Config): void {
     }
     const settingsRoutes = [
       [DESKTOP_SETTINGS_PATH, handleDesktopSettingsRequest],
+      [DESKTOP_PROJECT_LIBRARY_PATH, handleProjectLibraryRequest],
+      [DESKTOP_PROJECT_STRUCTURE_PATH, handleProjectLibraryStructureRequest],
+      [DESKTOP_PROJECT_RESOURCES_PATH, handleProjectLibraryResourcesRequest],
+      [DESKTOP_PROJECT_FILE_PATH, handleProjectFileRequest],
       [DESKTOP_PROFILE_CREATE_PATH, handleDesktopProfileCreateRequest],
       [DESKTOP_PROFILE_CREATE_WINDOW_PATH, handleDesktopProfileCreateWindowRequest],
       [DESKTOP_PROFILE_DELETE_PATH, handleDesktopProfileDeleteRequest],

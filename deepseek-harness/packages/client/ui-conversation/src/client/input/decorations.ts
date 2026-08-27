@@ -19,6 +19,8 @@ export interface ChipRender {
   /** Placeholder offset in the draft (the chip occupies [offset, offset+1)). */
   readonly offset: number
   readonly label: string
+  readonly icon?: string
+  readonly title?: string
   /** Owner-resolution failure styling bit. */
   readonly invalid: boolean
 }
@@ -98,6 +100,8 @@ export function deriveDecorations(
     occurrenceId: o.occurrenceId,
     offset: o.offset,
     label: o.label,
+    ...(o.icon === undefined ? {} : { icon: o.icon }),
+    ...(o.title === undefined ? {} : { title: o.title }),
     invalid: o.invalid === true,
   }))
   const hint = claimActive && claim.hint !== undefined && draft.slice(claim.token.length).trim() === ''

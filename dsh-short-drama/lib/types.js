@@ -1,0 +1,1 @@
+export const SCREENPLAY_SCHEMA_VERSION = 2;

@@ -109,6 +109,8 @@ export interface SidebarOwnerProps {
   width: number
   /** Alternate product shells can mount only the sidebar's native settings seat. */
   settingsOnly?: boolean
+  /** Render that settings-only seat in normal flow instead of as a floating control. */
+  settingsOnlyInline?: boolean
 }
 
 /** Conversation owner share: business state and actions belong to the registrant. */

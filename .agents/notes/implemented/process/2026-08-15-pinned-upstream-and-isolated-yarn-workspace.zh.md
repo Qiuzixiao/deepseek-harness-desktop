@@ -2,6 +2,8 @@
 
 Status: implemented
 
+当前仓库拓扑已由[集成 Harness RC2 开发边界](2026-08-26-integrated-harness-rc2-development-boundary.zh.md)取代。本记录仅保留为旧 submodule 布局的历史背景。
+
 [English](2026-08-15-pinned-upstream-and-isolated-yarn-workspace.md) | 中文
 
 ## Problem

@@ -45,6 +45,7 @@ export function SidebarRoot({
   collapsed,
   width,
   settingsOnly = false,
+  settingsOnlyInline = false,
   startSession,
   toggleSidebar,
   t,
@@ -116,8 +117,8 @@ export function SidebarRoot({
 
   if (settingsOnly) {
     return (
-      <div className={css.settingsOnlyRoot}>
-        {renderSlot('sidebar.settings', { wide: true })}
+      <div className={clsx(css.settingsOnlyRoot, settingsOnlyInline && css.settingsOnlyInline)}>
+        {renderSlot('sidebar.settings', { wide: !collapsed })}
       </div>
     )
   }

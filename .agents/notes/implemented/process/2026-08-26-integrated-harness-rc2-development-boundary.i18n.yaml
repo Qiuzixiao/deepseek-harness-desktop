@@ -1,0 +1,5 @@
+# Bilingual-pair consistency record: the git blob hash of each side as of the last
+# confirmed-consistent state. Both languages carry equal authority. Update both files
+# and re-record their hashes with git hash-object after editing either side.
+2026-08-26-integrated-harness-rc2-development-boundary.md: c2bfa70f3522dac1b005d7cad52f6320074f934d
+2026-08-26-integrated-harness-rc2-development-boundary.zh.md: cf42972f9e3134351d4ba1ae5affadc758b03b59

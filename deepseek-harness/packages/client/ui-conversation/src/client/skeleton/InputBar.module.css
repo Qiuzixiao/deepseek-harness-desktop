@@ -469,6 +469,26 @@
   transform: translate(-50%, -50%) scale(0.72);
 }
 
+.chipIcon {
+  position: absolute;
+  left: 7px;
+  top: 50%;
+  color: #3d9cff;
+  font-size: 12px;
+  line-height: 1;
+  transform: translateY(-50%);
+}
+
+/* File chips reserve a leading icon cell; keep the filename left-aligned in
+   the remaining fixed-width placeholder instead of centering it underneath. */
+.chipWithIcon .chipLabel {
+  left: 24px;
+  width: calc(100% / 0.62 - 32px);
+  justify-content: flex-start;
+  transform: translateY(-50%) scale(0.62);
+  transform-origin: left center;
+}
+
 .chipInvalid {
   background: rgba(216, 97, 97, 0.2);
   text-decoration: line-through;

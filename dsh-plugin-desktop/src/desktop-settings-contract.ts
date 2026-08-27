@@ -32,6 +32,15 @@ export const DESKTOP_PROFILE_CREATE_WINDOW_PATH = '/api/desktop/profiles/create-
 /** Restore the last successful Profile and its latest healthy configuration. */
 export const DESKTOP_PROFILE_ROLLBACK_PATH = '/api/desktop/profiles/rollback'
 
+/** Zenwit project library: list (GET) and create (POST) screenplay projects. */
+export const DESKTOP_PROJECT_LIBRARY_PATH = '/api/desktop/projects'
+/** Zenwit project structure tree. */
+export const DESKTOP_PROJECT_STRUCTURE_PATH = '/api/desktop/projects/structure'
+/** Zenwit project file read/write. */
+export const DESKTOP_PROJECT_FILE_PATH = '/api/desktop/projects/file'
+/** Zenwit project files available to the @ resource picker. */
+export const DESKTOP_PROJECT_RESOURCES_PATH = '/api/desktop/projects/resources'
+
 /** Renderer-safe projection of one discovered profile. */
 export interface DesktopSettingsProfileView {
   /** Profile name accepted by the launcher. */

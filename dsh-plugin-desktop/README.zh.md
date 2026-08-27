@@ -87,12 +87,16 @@ desktop sidebar surface 会把上游 sidebar-fill token 局部设为透明，因
 
 ## 开发
 
-该包由仓库根目录的 Yarn workspace 管理。相邻的 `deepseek-harness/` checkout 仍是独立的上游 pnpm 项目，不属于 Yarn workspace。请从仓库根目录安装并验证 DSH Desktop：
+该包由仓库根目录的 Yarn workspace 管理。相邻的 `deepseek-harness/` 是仓库自有的集成产品源码；它保留独立的 pnpm workspace，不属于 Yarn workspace。请从仓库根目录安装、构建集成源码并验证 DSH Desktop：
 
 ```sh
-yarn install
-yarn check
+corepack yarn install --immutable
+corepack yarn source:install
+corepack yarn dev
+corepack yarn check
 ```
+
+`source:build` 与 `dev` 会把本地修改的 Client bundle、Web frontend、Web composition 和 Zenwit project-library package 作为实体文件物化到该包的 Yarn 安装树中。物化过程保留已安装的 `0.1.1-rc.2` package manifest，绝不把 pnpm 源码包软链接进这里的 `node_modules`；跨越这个 realpath 边界会同时加载两份 React declaration 和不兼容的 Cordis augmentation。开发启动默认把 `DSH_HOME` 设为 `~/.dsh-dev`，普通 `start` 则保留正常的 DSH home 语义。
 
 该检查会验证生产依赖图中的每个必需第一方 peer 都由 desktop deploy root 声明。Headless Loader smoke 会激活 launcher 拥有的 desktop row 与 profile 本地第三方 row，然后启动已发布 Web profile 并检查其 loopback 根页面与 client manifest。单元和类型测试覆盖两种 profile 组合、重启栅栏、client environment 校验、desktop layout 状态与各平台原生窗口选项。
 
@@ -192,8 +196,8 @@ DSH Desktop 将 UTF-8 日志写入 Electron 用户数据目录：Windows 位于 
 
 ```bash
 source ~/.nvm/nvm.sh
-git submodule update --init --recursive
 corepack yarn install --immutable
+corepack yarn source:install
 corepack yarn workspace dsh-plugin-desktop typecheck
 corepack yarn workspace dsh-plugin-desktop test
 corepack yarn build
@@ -206,8 +210,8 @@ corepack yarn build
 请使用原生 Windows x64 电脑，并安装 Git 与 x64 Node `22.23.2`（与 CI 使用的版本相同）。打包命令接受官方发行版仍包含所需 Corepack 命令的 Node `22.19+` 与 Node `24.x`。在一个最新的 `v2` checkout 中打开 PowerShell，然后执行：
 
 ```powershell
-git submodule update --init --recursive
 corepack.cmd yarn install --immutable
+corepack.cmd yarn source:install
 corepack.cmd yarn dist:win
 ```
 
@@ -249,5 +253,5 @@ corepack.cmd yarn dist:win-portable
 - `dshmarket@1.2.3` 仍是用户可选安装的第三方 package，而不是内置 marketplace。只有重新审计的版本同时消费可选 Desktop service、保留普通 DSH fallback，并包含再分发所需的完整 license notice 后，才会重新评估预装。
 - 更新交接只验证下载容器，不验证 publisher 身份。macOS 仍要求用户从已打开的 DMG 替换应用；Windows 会运行已下载的 NSIS 安装器，但本地 `dist:win` 产物没有签名。签名产物、Authenticode/publisher 校验、SmartScreen 信誉与原生升级测试仍是发布 gate。
 - 共享 carrier 使用 loopback HTTP 与 WebSocket，而不是 Electron IPC。替换它需要上游 DSH 提供 transport 扩展点，不属于该独立包的范围。
-- 该项目同时固定到已发布的 DSH `0.1.1-rc.2` family 及其对应的官方 `deepseek-harness/` release 源码。产品构建仍解析已发布包接口，不会直接链接源码 checkout。
+- Desktop 安装树及所有物化后的 DSH package manifest 都固定为 `0.1.1-rc.2`；Zenwit 的本地构建产物只复制覆盖这些实体 package，不使用源码软链接。集成 Harness 源码树中仍有部分 manifest 保留导入时的 `0.1.0-rc.5` 标记，因此不能把该标记误认为源码同步已经完成；详见 RC2 开发边界决策。
 - `package:dir` 是用于 smoke 的未封装产物。`dist:win` 会额外生成未签名的 NSIS 测试安装包，但不会建立 Authenticode 身份或 SmartScreen 信誉。安装与升级行为、原生通知与终端、Windows ACL sandbox，以及每台目标机器上的原生材质外观仍属于目标平台验证边界。

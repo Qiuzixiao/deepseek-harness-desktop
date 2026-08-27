@@ -101,8 +101,13 @@ export function apply(ctx: ClientContext): void {
   // staged choice belongs to the flow rather than to any one session.
   ctx.inject(['slots', 'conversation', 'sessions', 'workspaces'], (scope: ClientContext) => {
     const api = (scope.get('connection') as ConnectionHandle).api
+    // The callback below can be invoked from the final list notification of a
+    // retiring scope. Keep stable service references while the scope is live;
+    // do not resolve `scope.sessions` from a stale Context getter later.
+    const sessions = scope.get('sessions') as ClientContext['sessions']
+    const workspaces = scope.get('workspaces') as { startSession(): void }
     const seat = new AgentPresetSeatController(api, (): SeatSessionSummary | undefined => {
-      const state = scope.sessions.list.getSnapshot()
+      const state = sessions.list.getSnapshot()
       const summary = state.current === undefined ? undefined : state.byId[state.current]
       return summary === undefined
         ? undefined
@@ -112,7 +117,7 @@ export function apply(ctx: ClientContext): void {
           ...summary.agentPreset === undefined ? {} : { agentPreset: summary.agentPreset },
         }
     }, (sessionId, agentPreset) => {
-      scope.sessions.noteAgentPreset(sessionId as never, agentPreset)
+      sessions.noteAgentPreset(sessionId as never, agentPreset)
     })
 
     const seatInjected = (): AgentPresetSeatInjected => ({
@@ -131,7 +136,7 @@ export function apply(ctx: ClientContext): void {
       // Connecting a workspace either creates a blank session or reuses one,
       // and either way the chip's pick predates it — so the stage is applied
       // when the session arrives, not when it was made.
-      const stop = scope.sessions.list.subscribe(() => { void seat.apply() })
+      const stop = sessions.list.subscribe(() => { void seat.apply() })
       // The chip opens on the deployment default, so a default changed from
       // the settings surface moves it too — otherwise the screen that starts
       // the next session keeps offering the previous default until a reload,
@@ -144,7 +149,7 @@ export function apply(ctx: ClientContext): void {
       // Every tab folds the committed preset into the shared session row; the
       // initiating tab may already have applied the RPC echo, which is idempotent.
       const presetSelected = scope.remote.$on('agent-preset/selected', (sessionId, agentPreset) => {
-        scope.sessions.noteAgentPreset(sessionId, agentPreset)
+        sessions.noteAgentPreset(sessionId, agentPreset)
       })
       // Authoring writes a FILE, not a setting, so nothing on the wire
       // announces it — without this the screen that starts the next session
@@ -160,7 +165,7 @@ export function apply(ctx: ClientContext): void {
         // The introduce cue makes the chip announce the pick the user never
         // made on this screen — the stage happened back in settings.
         seat.stage('cordis', true)
-        scope.workspaces.startSession()
+        workspaces.startSession()
       }
       const chip = scope.slots.register({
         name: 'conversation.hero.agentPreset',
@@ -176,6 +181,10 @@ export function apply(ctx: ClientContext): void {
         inject: labelInjected,
       }, AgentPresetLabel)
       return () => {
+        // First: a same-tick list notification already in flight must see
+        // this before it reaches `currentSession()`, not after `stop()`
+        // merely stops future ones.
+        seat.dispose()
         stop()
         settingsMoved()
         presetSelected()
