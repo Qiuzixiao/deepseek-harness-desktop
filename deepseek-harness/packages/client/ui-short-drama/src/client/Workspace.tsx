@@ -8,13 +8,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { GlobalStandardProps, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import {
-  IconChevronDownOutline14, IconNewChatOutline16, MarkdownText,
+  IconChevronDownOutline14, IconNewChatOutline16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
   ArrowLeft, ChevronDown, ChevronRight, File, FileJson, FileText,
   Folder, FolderOpen, ScrollText,
 } from 'lucide-react'
-import { Editor } from './Editor.tsx'
+import { Editor, VisualEditor } from './Editor.tsx'
 import css from './zenwit.module.css'
 
 /** One real tree node: a directory or file under the project root. */
@@ -137,12 +137,17 @@ export function Workspace({
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<string | null>(null)
-  const [preview, setPreview] = useState(false)
+  const [visualMode, setVisualMode] = useState(true)
+  const [autoSave, setAutoSave] = useState(true)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [leftWidth, setLeftWidth] = useState(LEFT_DEFAULT)
   const [rightWidth, setRightWidth] = useState(RIGHT_DEFAULT)
   const leftDragBase = useRef(LEFT_DEFAULT)
   const rightDragBase = useRef(RIGHT_DEFAULT)
+  const draftRef = useRef(draft)
+  const openFileRef = useRef(openFile)
+  draftRef.current = draft
+  openFileRef.current = openFile
 
   const reloadStructure = async (): Promise<StructureResponse | null> => {
     try {
@@ -168,7 +173,7 @@ export function Workspace({
   }, [projectPath])
 
   const openFilePath = async (path: string, name: string) => {
-    setPreview(false)
+    setVisualMode(true)
     setSaveStatus(null)
     try {
       const res = await fetch('/api/desktop/projects/file?path=' + encodeURIComponent(path))
@@ -201,18 +206,20 @@ export function Workspace({
   }
 
   const onSave = async () => {
-    if (openFile === null || saving) return
+    const file = openFileRef.current
+    const content = draftRef.current
+    if (file === null || saving) return
     setSaving(true)
     setSaveStatus(null)
     try {
       const res = await fetch('/api/desktop/projects/file', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path: openFile.path, content: draft }),
+        body: JSON.stringify({ path: file.path, content }),
       })
       if (!res.ok) throw new Error('save ' + res.status)
-      setOpenFile({ ...openFile, content: draft })
-      setDirty(false)
+      setOpenFile(current => current?.path === file.path ? { ...current, content } : current)
+      if (openFileRef.current?.path === file.path && draftRef.current === content) setDirty(false)
       setSaveStatus('已保存')
       void reloadStructure()
     } catch (e) {
@@ -221,6 +228,12 @@ export function Workspace({
       setSaving(false)
     }
   }
+
+  useEffect(() => {
+    if (!autoSave || !dirty || openFile === null || saving) return
+    const timer = window.setTimeout(() => { void onSave() }, 800)
+    return () => window.clearTimeout(timer)
+  }, [autoSave, dirty, draft, openFile, saving])
 
   const renderFileIcon = (node: TreeNode): ReactNode => {
     const iconProps = { size: 15, strokeWidth: 1.7, 'aria-hidden': true as const }
@@ -322,9 +335,13 @@ export function Workspace({
           <span className={css.paneTitle}>{openFile === null ? '文档编辑器' : openFile.name}</span>
           {openFile !== null && (
             <div className={css.editorHeaderActions}>
-              <button className={css.toggleButton} type="button" onClick={() => setPreview(value => !value)}>
-                {preview ? '编辑' : '预览'}
+              <button className={css.toggleButton} type="button" onClick={() => setVisualMode(value => !value)}>
+                {visualMode ? '源码' : '可视化'}
               </button>
+              <label className={css.autoSaveToggle} title="自动保存编辑内容">
+                <input type="checkbox" checked={autoSave} onChange={event => setAutoSave(event.target.checked)} />
+                自动保存
+              </label>
               <button className={css.saveButton} type="button" onClick={() => void onSave()} disabled={saving}>
                 {saving ? '保存中…' : dirty ? '保存 *' : '保存'}
               </button>
@@ -333,8 +350,8 @@ export function Workspace({
         </div>
         {openFile === null ? (
           <div className={css.editorPlaceholder}>点击左侧文件打开，或展开目录查看内容</div>
-        ) : preview ? (
-          <div className={css.previewContainer}><MarkdownText text={draft} /></div>
+        ) : visualMode ? (
+          <VisualEditor key={openFile.path} initialDoc={draft} onChange={doc => { setDraft(doc); setDirty(true); setSaveStatus(null) }} />
         ) : (
           <Editor key={openFile.path} initialDoc={draft} mode={openFile.path.includes('/剧本/') || /episode-\d+\.md$/.test(openFile.path) ? 'dlkjb' : 'markdown'} onChange={doc => { setDraft(doc); setDirty(true); setSaveStatus(null) }} />
         )}

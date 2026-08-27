@@ -485,6 +485,18 @@
 .toggleButton:hover {
   background: var(--zw-surface-2);
 }
+.autoSaveToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--zw-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  user-select: none;
+}
+.autoSaveToggle input {
+  accent-color: var(--zw-brand);
+}
 .previewContainer {
   flex: 1;
   overflow: auto;
@@ -529,6 +541,59 @@
   padding: 28px 32px;
   border-radius: 8px;
   box-shadow: var(--zw-shadow);
+}
+.visualEditor {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 22px 26px;
+  background: var(--zw-surface-2);
+}
+.visualEditor :global(.milkdown) {
+  min-height: calc(100% - 56px);
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 28px 34px;
+  border-radius: 8px;
+  background: var(--zw-surface);
+  box-shadow: var(--zw-shadow);
+  color: var(--zw-ink);
+  font-family: var(--zw-writing);
+  font-size: 15px;
+  line-height: 2;
+  outline: none;
+}
+.visualEditor :global(.milkdown:focus-within) {
+  box-shadow: var(--zw-shadow), 0 0 0 2px color-mix(in srgb, var(--zw-brand) 16%, transparent);
+}
+.visualEditor :global(.ProseMirror),
+.visualEditor :global(.ProseMirror-focused),
+.visualEditor :global(.ProseMirror-selectednode) {
+  outline: none !important;
+  border: 0 !important;
+}
+.visualEditor :global(.ProseMirror-selectednode) {
+  background: color-mix(in srgb, var(--zw-brand) 8%, transparent);
+}
+.visualEditor :global(.milkdown h1),
+.visualEditor :global(.milkdown h2),
+.visualEditor :global(.milkdown h3) {
+  color: var(--zw-ink);
+  line-height: 1.35;
+}
+.visualEditor :global(.milkdown blockquote) {
+  margin-inline: 0;
+  padding-left: 16px;
+  border-left: 3px solid var(--zw-brand);
+  color: var(--zw-muted);
+}
+.visualEditor :global(.milkdown pre) {
+  overflow-x: auto;
+  padding: 12px 14px;
+  border-radius: 6px;
+  background: var(--zw-surface-2);
+  font-family: var(--zw-mono);
+  line-height: 1.6;
 }
 .editorPlaceholder {
   flex: 1;

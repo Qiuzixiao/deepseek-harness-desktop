@@ -206,6 +206,23 @@ function clientConfig(id: string, entry: string): UserConfig {
     // opinion for table entries (external above wins), bundle everything else.
     noExternal: (id: string) => (CLIENT_EXTERNALS.includes(id) ? undefined : true),
     plugins: [{
+      // unified/vfile (used by Milkdown's Markdown transformer) imports these
+      // Node builtins for its CLI-facing helpers. They are inert in the browser,
+      // but the loader must still resolve them without consulting Node.
+      name: 'dsh-browser-node-builtins',
+      resolveId(source: string) {
+        if (source === 'node:process') return '\0dsh-browser-process'
+        if (source === 'node:path') return '\0dsh-browser-path'
+        if (source === 'node:url') return '\0dsh-browser-url'
+        return null
+      },
+      load(id: string) {
+        if (id === '\0dsh-browser-process') return "export default { env: {}, cwd: () => '/' }"
+        if (id === '\0dsh-browser-path') return "const sep='/'; const basename=p=>p.split('/').filter(Boolean).pop()||''; const dirname=p=>{const a=p.split('/').filter(Boolean);a.pop();return '/'+a.join('/')}; const extname=p=>{const b=basename(p),i=b.lastIndexOf('.');return i>0?b.slice(i):''}; const join=(...p)=>p.join('/').replaceAll(/\\+/g,'/'); export { sep, basename, dirname, extname, join }; export default { sep, basename, dirname, extname, join }"
+        if (id === '\0dsh-browser-url') return "export const fileURLToPath = value => typeof value === 'string' ? value.replace(/^file:\\/\\//, '/') : value.pathname; export default { fileURLToPath }"
+        return null
+      },
+    }, {
       // Bundle purity gate (build-time mirror of the module-edge rules):
       // platform seed entries stay external, inline-safe wire layers inline,
       // and every other @deepseek-ai value import is a build error — a

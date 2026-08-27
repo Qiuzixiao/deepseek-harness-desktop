@@ -13,6 +13,7 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
 
 vi.mock('../src/client/Editor.tsx', () => ({
   Editor: () => <div data-testid="editor" />,
+  VisualEditor: ({ initialDoc }: { initialDoc: string }) => <div data-testid="visual-editor">{initialDoc}</div>,
 }))
 
 afterEach(() => {
@@ -96,19 +97,19 @@ describe('Zenwit workspace layout', () => {
     expect(view.startSession).toHaveBeenCalledWith('workspace-1')
   })
 
-  it('opens every file in CodeMirror and keeps rendered preview available', async () => {
+  it('opens Markdown in visual mode and keeps source mode available', async () => {
     mountWorkspace()
     fireEvent.click(await screen.findByRole('treeitem', { name: '剧本' }))
     fireEvent.click(await screen.findByText('episode-1.md'))
     await waitFor(() => {
       expect(screen.getByRole('treeitem', { name: /episode-1\.md/ }).getAttribute('aria-current')).toBe('page')
     })
-    expect(await screen.findByTestId('editor')).toBeTruthy()
-    expect(screen.queryByTestId('preview')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '预览' }))
-    expect(screen.getByTestId('preview').textContent).toBe('# 第一集')
-    fireEvent.click(screen.getByRole('button', { name: '编辑' }))
+    expect(await screen.findByTestId('visual-editor')).toBeTruthy()
+    expect(screen.queryByTestId('editor')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '源码' }))
     expect(screen.getByTestId('editor')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '可视化' }))
+    expect(screen.getByTestId('visual-editor')).toBeTruthy()
   })
 
   it('resizes all three panes through the two column handles', async () => {

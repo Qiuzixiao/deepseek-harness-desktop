@@ -1,6 +1,6 @@
 # Typora 风格 Markdown 编辑器第一、二阶段实现详解
 
-> **回滚说明（2026-08-27）：本文记录的 Milkdown/ProseMirror 第一、二阶段实现已经从产品代码撤回。当前工作台已恢复为默认 CodeMirror 编辑、按需 Markdown 预览；本文仅作为历史实现记录，不再代表当前运行代码。**
+> **状态说明（2026-08-27）：Milkdown/ProseMirror 实现已在当前产品代码中启用。本文早期章节包含设计阶段的文件与行号说明，具体以新增的实现记录和当前源码为准。**
 
 > 文档基线：2026-08-27 当前工作树  
 > 实现范围：`deepseek-harness/packages/client/ui-short-drama`，以及为了让该编辑器在 Desktop 集成环境中稳定构建和运行而加入的支持代码  

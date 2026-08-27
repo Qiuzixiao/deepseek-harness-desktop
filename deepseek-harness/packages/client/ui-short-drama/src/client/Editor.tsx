@@ -2,6 +2,10 @@
 import { useEffect, useRef } from 'react'
 import { EditorView, basicSetup } from 'codemirror'
 import { markdown } from '@codemirror/lang-markdown'
+import { defaultValueCtx, Editor as MilkdownEditor, rootCtx } from '@milkdown/core'
+import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react'
+import { listener, listenerCtx } from '@milkdown/plugin-listener'
+import { commonmark } from '@milkdown/preset-commonmark'
 import { dlkjb } from './dlkjb-language.ts'
 import css from './zenwit.module.css'
 
@@ -31,4 +35,30 @@ export function Editor({ initialDoc, onChange, mode = 'markdown' }: EditorProps)
   }, [])
 
   return <div ref={host} className={css.editor} />
+}
+
+interface VisualEditorProps {
+  initialDoc: string
+  onChange: (doc: string) => void
+}
+
+/** Typora-style Markdown editing surface. The document remains Markdown at the boundary. */
+function VisualEditorInner({ initialDoc, onChange }: VisualEditorProps) {
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+  useEditor((root) => MilkdownEditor.make()
+    .config(ctx => {
+      ctx.set(rootCtx, root)
+      ctx.set(defaultValueCtx, initialDoc)
+      ctx.get(listenerCtx).markdownUpdated((_ctx, markdownText) => onChangeRef.current(markdownText))
+    })
+    .use(commonmark)
+    .use(listener), [])
+
+  return <div className={css.visualEditor}><Milkdown /></div>
+}
+
+/** MilkdownProvider owns the editor context for the visual editor instance. */
+export function VisualEditor(props: VisualEditorProps) {
+  return <MilkdownProvider><VisualEditorInner {...props} /></MilkdownProvider>
 }
