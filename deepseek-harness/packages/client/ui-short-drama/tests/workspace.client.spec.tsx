@@ -6,7 +6,6 @@ import { Workspace } from '../src/client/Workspace.tsx'
 import type { WorkspaceProps } from '../src/client/Workspace.tsx'
 
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
-  MarkdownText: ({ text }: { text: string }) => <article data-testid="preview">{text}</article>,
   IconChevronDownOutline14: () => <span />,
   IconNewChatOutline16: () => <span />,
 }))
@@ -47,8 +46,9 @@ function mountWorkspace() {
         path: '/project', phase: 'Writing', revision: 3, nextEpisode: 2, root: 'Project',
         tree: [
           {
-            name: '剧本', path: '/project/剧本', kind: 'dir', detail: '', children: [
-              { name: 'episode-1.md', path: '/project/剧本/episode-1.md', kind: 'file', detail: '1200 字' },
+              name: '剧本', path: '/project/剧本', kind: 'dir', detail: '', children: [
+                { name: 'episode-1.md', path: '/project/剧本/episode-1.md', kind: 'file', detail: '1200 字' },
+                { name: 'episode-2.md', path: '/project/剧本/episode-2.md', kind: 'file', detail: '900 字' },
             ],
           },
         ],
@@ -110,6 +110,30 @@ describe('Zenwit workspace layout', () => {
     expect(screen.getByTestId('editor')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '可视化' }))
     expect(screen.getByTestId('visual-editor')).toBeTruthy()
+  })
+
+  it('keeps multiple documents in independent tabs and reuses an existing tab', async () => {
+    mountWorkspace()
+    fireEvent.click(await screen.findByRole('treeitem', { name: '剧本' }))
+    fireEvent.click(await screen.findByRole('treeitem', { name: /episode-1\.md/ }))
+    fireEvent.click(await screen.findByRole('treeitem', { name: /episode-2\.md/ }))
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'episode-2.md' })).toBeTruthy())
+    expect(screen.getAllByRole('tab')).toHaveLength(2)
+    fireEvent.click(screen.getByRole('treeitem', { name: /episode-1\.md/ }))
+    expect(screen.getByRole('tab', { name: 'episode-1.md' }).getAttribute('aria-selected')).toBe('true')
+    fireEvent.click(screen.getByRole('treeitem', { name: /episode-1\.md/ }))
+    expect(screen.getAllByRole('tab')).toHaveLength(2)
+  })
+
+  it('closes an unchanged tab and activates the remaining document', async () => {
+    mountWorkspace()
+    fireEvent.click(await screen.findByRole('treeitem', { name: '剧本' }))
+    fireEvent.click(await screen.findByRole('treeitem', { name: /episode-1\.md/ }))
+    fireEvent.click(await screen.findByRole('treeitem', { name: /episode-2\.md/ }))
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'episode-2.md' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: '关闭 episode-2.md' }))
+    expect(screen.queryByRole('tab', { name: 'episode-2.md' })).toBeNull()
+    expect(screen.getByRole('tab', { name: 'episode-1.md' }).getAttribute('aria-selected')).toBe('true')
   })
 
   it('resizes all three panes through the two column handles', async () => {

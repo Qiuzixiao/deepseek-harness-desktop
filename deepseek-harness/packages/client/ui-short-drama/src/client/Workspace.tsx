@@ -12,7 +12,7 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
   ArrowLeft, ChevronDown, ChevronRight, File, FileJson, FileText,
-  Folder, FolderOpen, ScrollText,
+  Folder, FolderOpen, ScrollText, X,
 } from 'lucide-react'
 import { Editor, VisualEditor } from './Editor.tsx'
 import css from './zenwit.module.css'
@@ -36,10 +36,15 @@ interface StructureResponse {
   root: string
 }
 
-interface OpenFile {
+interface OpenDocument {
   path: string
   name: string
   content: string
+  draft: string
+  dirty: boolean
+  saving: boolean
+  saveStatus: string | null
+  visualMode: boolean
 }
 
 /** One workspace pane props. */
@@ -132,22 +137,18 @@ export function Workspace({
       .sort((a, b) => b.updatedAt - a.updatedAt)
   const [structure, setStructure] = useState<StructureResponse | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [openFile, setOpenFile] = useState<OpenFile | null>(null)
-  const [draft, setDraft] = useState('')
-  const [dirty, setDirty] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [saveStatus, setSaveStatus] = useState<string | null>(null)
-  const [visualMode, setVisualMode] = useState(true)
+  const [documents, setDocuments] = useState<OpenDocument[]>([])
+  const [activePath, setActivePath] = useState<string | null>(null)
+  const [pendingClosePath, setPendingClosePath] = useState<string | null>(null)
   const [autoSave, setAutoSave] = useState(true)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [leftWidth, setLeftWidth] = useState(LEFT_DEFAULT)
   const [rightWidth, setRightWidth] = useState(RIGHT_DEFAULT)
   const leftDragBase = useRef(LEFT_DEFAULT)
   const rightDragBase = useRef(RIGHT_DEFAULT)
-  const draftRef = useRef(draft)
-  const openFileRef = useRef(openFile)
-  draftRef.current = draft
-  openFileRef.current = openFile
+  const documentsRef = useRef(documents)
+  documentsRef.current = documents
+  const activeDocument = documents.find(document => document.path === activePath) ?? null
 
   const reloadStructure = async (): Promise<StructureResponse | null> => {
     try {
@@ -173,23 +174,24 @@ export function Workspace({
   }, [projectPath])
 
   const openFilePath = async (path: string, name: string) => {
-    setVisualMode(true)
-    setSaveStatus(null)
+    const existing = documentsRef.current.find(document => document.path === path)
+    if (existing !== undefined) {
+      setActivePath(path)
+      return
+    }
     try {
       const res = await fetch('/api/desktop/projects/file?path=' + encodeURIComponent(path))
       if (res.status === 404) {
-        setOpenFile({ path, name, content: '' })
-        setDraft('')
-        setDirty(false)
+        setDocuments(previous => [...previous, { path, name, content: '', draft: '', dirty: false, saving: false, saveStatus: null, visualMode: true }])
+        setActivePath(path)
         return
       }
       if (!res.ok) throw new Error('read ' + res.status)
       const body = await res.json() as { content: string }
-      setOpenFile({ path, name, content: body.content })
-      setDraft(body.content)
-      setDirty(false)
+      setDocuments(previous => [...previous, { path, name, content: body.content, draft: body.content, dirty: false, saving: false, saveStatus: null, visualMode: true }])
+      setActivePath(path)
     } catch (e) {
-      setSaveStatus('打开失败：' + String(e instanceof Error ? e.message : e))
+      setDocuments(previous => previous.map(document => document.path === path ? { ...document, saveStatus: '打开失败：' + String(e instanceof Error ? e.message : e) } : document))
     }
   }
 
@@ -205,12 +207,11 @@ export function Workspace({
     await openFilePath(node.path, node.name)
   }
 
-  const onSave = async () => {
-    const file = openFileRef.current
-    const content = draftRef.current
-    if (file === null || saving) return
-    setSaving(true)
-    setSaveStatus(null)
+  const saveDocument = async (path: string): Promise<boolean> => {
+    const file = documentsRef.current.find(document => document.path === path)
+    if (file === undefined || file.saving) return false
+    const content = file.draft
+    setDocuments(previous => previous.map(document => document.path === path ? { ...document, saving: true, saveStatus: null } : document))
     try {
       const res = await fetch('/api/desktop/projects/file', {
         method: 'POST',
@@ -218,22 +219,45 @@ export function Workspace({
         body: JSON.stringify({ path: file.path, content }),
       })
       if (!res.ok) throw new Error('save ' + res.status)
-      setOpenFile(current => current?.path === file.path ? { ...current, content } : current)
-      if (openFileRef.current?.path === file.path && draftRef.current === content) setDirty(false)
-      setSaveStatus('已保存')
+      setDocuments(previous => previous.map(document => document.path === path
+        ? { ...document, content, dirty: document.draft !== content, saving: false, saveStatus: '已保存' }
+        : document))
       void reloadStructure()
+      return true
     } catch (e) {
-      setSaveStatus('保存失败：' + String(e instanceof Error ? e.message : e))
-    } finally {
-      setSaving(false)
+      setDocuments(previous => previous.map(document => document.path === path
+        ? { ...document, saving: false, saveStatus: '保存失败：' + String(e instanceof Error ? e.message : e) }
+        : document))
+      return false
     }
   }
 
   useEffect(() => {
-    if (!autoSave || !dirty || openFile === null || saving) return
-    const timer = window.setTimeout(() => { void onSave() }, 800)
-    return () => window.clearTimeout(timer)
-  }, [autoSave, dirty, draft, openFile, saving])
+    if (!autoSave) return
+    const timers = documents.filter(document => document.dirty && !document.saving).map(document =>
+      window.setTimeout(() => { void saveDocument(document.path) }, 800))
+    return () => timers.forEach(timer => window.clearTimeout(timer))
+  }, [autoSave, documents])
+
+  const closeDocument = async (path: string, discard = false) => {
+    const document = documentsRef.current.find(item => item.path === path)
+    if (document === undefined) return
+    if (document.dirty && !discard) {
+      setPendingClosePath(path)
+      return
+    }
+    const index = documentsRef.current.findIndex(item => item.path === path)
+    const remaining = documentsRef.current.filter(item => item.path !== path)
+    setDocuments(remaining)
+    if (activePath === path) setActivePath(remaining[Math.min(index, remaining.length - 1)]?.path ?? null)
+  }
+
+  const confirmSaveAndClose = async () => {
+    if (pendingClosePath === null) return
+    const path = pendingClosePath
+    setPendingClosePath(null)
+    if (await saveDocument(path)) await closeDocument(path, true)
+  }
 
   const renderFileIcon = (node: TreeNode): ReactNode => {
     const iconProps = { size: 15, strokeWidth: 1.7, 'aria-hidden': true as const }
@@ -248,7 +272,7 @@ export function Workspace({
   /** Recursive tree render: a folder expands to reveal its real contents. */
   const renderNodes = (nodes: TreeNode[]): ReactNode[] => nodes.map(node => {
     const isOpen = expanded.has(node.path)
-    const isSelected = node.kind === 'file' && openFile?.path === node.path
+    const isSelected = node.kind === 'file' && activePath === node.path
     return (
       <li key={node.path} role="none">
         <button
@@ -332,30 +356,56 @@ export function Workspace({
       />
       <section className={css.paneEditor} aria-label="文档编辑器">
         <div className={css.editorHeader}>
-          <span className={css.paneTitle}>{openFile === null ? '文档编辑器' : openFile.name}</span>
-          {openFile !== null && (
+          <span className={css.paneTitle}>{activeDocument === null ? '文档编辑器' : activeDocument.name}</span>
+          {activeDocument !== null && (
             <div className={css.editorHeaderActions}>
-              <button className={css.toggleButton} type="button" onClick={() => setVisualMode(value => !value)}>
-                {visualMode ? '源码' : '可视化'}
+              <button className={css.toggleButton} type="button" onClick={() => setDocuments(previous => previous.map(document => document.path === activeDocument.path ? { ...document, visualMode: !document.visualMode } : document))}>
+                {activeDocument.visualMode ? '源码' : '可视化'}
               </button>
               <label className={css.autoSaveToggle} title="自动保存编辑内容">
                 <input type="checkbox" checked={autoSave} onChange={event => setAutoSave(event.target.checked)} />
                 自动保存
               </label>
-              <button className={css.saveButton} type="button" onClick={() => void onSave()} disabled={saving}>
-                {saving ? '保存中…' : dirty ? '保存 *' : '保存'}
+              <button className={css.saveButton} type="button" onClick={() => void saveDocument(activeDocument.path)} disabled={activeDocument.saving}>
+                {activeDocument.saving ? '保存中…' : activeDocument.dirty ? '保存 *' : '保存'}
               </button>
             </div>
           )}
         </div>
-        {openFile === null ? (
+        <div className={css.documentTabs} role="tablist" aria-label="已打开文档">
+          {documents.map(document => (
+            <div key={document.path} className={css.documentTab + (document.path === activePath ? ' ' + css.documentTabActive : '')}>
+              <button type="button" role="tab" aria-selected={document.path === activePath} className={css.documentTabSelect} title={document.path} onClick={() => setActivePath(document.path)}>
+                <span className={css.documentTabName}>{document.name}</span>
+                {document.dirty && <span className={css.documentTabDirty} aria-label="未保存">*</span>}
+              </button>
+              <button type="button" className={css.documentTabClose} aria-label={`关闭 ${document.name}`} title="关闭文档" onClick={event => { event.stopPropagation(); void closeDocument(document.path) }}>
+                <X size={13} strokeWidth={2} aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+        </div>
+        {activeDocument === null ? (
           <div className={css.editorPlaceholder}>点击左侧文件打开，或展开目录查看内容</div>
-        ) : visualMode ? (
-          <VisualEditor key={openFile.path} initialDoc={draft} onChange={doc => { setDraft(doc); setDirty(true); setSaveStatus(null) }} />
+        ) : activeDocument.visualMode ? (
+          <VisualEditor key={activeDocument.path} initialDoc={activeDocument.draft} onChange={doc => setDocuments(previous => previous.map(document => document.path === activeDocument.path ? { ...document, draft: doc, dirty: true, saveStatus: null } : document))} />
         ) : (
-          <Editor key={openFile.path} initialDoc={draft} mode={openFile.path.includes('/剧本/') || /episode-\d+\.md$/.test(openFile.path) ? 'dlkjb' : 'markdown'} onChange={doc => { setDraft(doc); setDirty(true); setSaveStatus(null) }} />
+          <Editor key={activeDocument.path} initialDoc={activeDocument.draft} mode={activeDocument.path.includes('/剧本/') || /episode-\d+\.md$/.test(activeDocument.path) ? 'dlkjb' : 'markdown'} onChange={doc => setDocuments(previous => previous.map(document => document.path === activeDocument.path ? { ...document, draft: doc, dirty: true, saveStatus: null } : document))} />
         )}
-        {saveStatus !== null && <div className={css.saveStatus}>{saveStatus}</div>}
+        {activeDocument?.saveStatus !== null && activeDocument !== null && <div className={css.saveStatus}>{activeDocument.saveStatus}</div>}
+        {pendingClosePath !== null && (
+          <div className={css.closeDialogOverlay} role="presentation">
+            <div className={css.closeDialog} role="dialog" aria-modal="true" aria-labelledby="close-document-title">
+              <h2 id="close-document-title">文档尚未保存</h2>
+              <p>要保存对「{documents.find(document => document.path === pendingClosePath)?.name ?? ''}」的修改吗？</p>
+              <div className={css.closeDialogActions}>
+                <button type="button" className={css.closeDialogCancel} onClick={() => setPendingClosePath(null)}>取消</button>
+                <button type="button" className={css.closeDialogDiscard} onClick={() => { const path = pendingClosePath; setPendingClosePath(null); void closeDocument(path, true) }}>放弃修改</button>
+                <button type="button" className={css.closeDialogSave} onClick={() => void confirmSaveAndClose()}>保存并关闭</button>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
       <ResizeHandle
         label="调整对话区域宽度"

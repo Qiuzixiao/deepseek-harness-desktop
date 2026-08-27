@@ -195,6 +195,9 @@
   box-shadow: var(--zw-shadow);
   color: var(--zw-text);
 }
+.paneEditor {
+  position: relative;
+}
 .workspaceSettings {
   min-width: 0;
 }
@@ -471,6 +474,126 @@
   align-items: center;
   gap: 8px;
 }
+.documentTabs {
+  display: flex;
+  flex: none;
+  align-items: flex-end;
+  gap: 5px;
+  height: 42px;
+  padding: 7px 10px 0;
+  box-sizing: border-box;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-bottom: 1px solid var(--zw-hairline-strong);
+  background: color-mix(in srgb, var(--zw-surface-2) 82%, var(--zw-bg));
+  scrollbar-width: thin;
+}
+.documentTab {
+  display: flex;
+  position: relative;
+  flex: 0 1 190px;
+  min-width: 120px;
+  max-width: 230px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 11px 11px 0 0;
+  background: color-mix(in srgb, var(--zw-surface) 40%, transparent);
+  transform: translateY(1px);
+  transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+.documentTabActive {
+  z-index: 1;
+  border-color: var(--zw-hairline-strong);
+  background: var(--zw-surface);
+  box-shadow: 0 -3px 12px rgba(31, 52, 73, .08), 0 1px 0 var(--zw-surface);
+  transform: translateY(0);
+}
+.documentTabActive::before {
+  position: absolute;
+  top: 0;
+  left: 14px;
+  width: 30px;
+  height: 2px;
+  border-radius: 0 0 4px 4px;
+  background: var(--zw-brand);
+  content: '';
+}
+.documentTabActive::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 11px;
+  height: 11px;
+  border-left: 1px solid var(--zw-hairline-strong);
+  border-bottom: 1px solid var(--zw-hairline-strong);
+  border-radius: 0 0 0 5px;
+  background: var(--zw-surface-2);
+  content: '';
+  transform: translate(1px, -1px) rotate(45deg);
+  transform-origin: top right;
+}
+.documentTabSelect,
+.documentTabClose {
+  border: 0;
+  background: transparent;
+  color: var(--zw-text);
+  cursor: pointer;
+}
+.documentTabSelect {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 6px 8px 12px;
+  text-align: left;
+  font: inherit;
+  font-size: 12px;
+  transition: color 160ms ease;
+}
+.documentTab:not(.documentTabActive) .documentTabSelect {
+  color: var(--zw-muted);
+}
+.documentTab:not(.documentTabActive):hover {
+  background: color-mix(in srgb, var(--zw-surface) 72%, transparent);
+  transform: translateY(0);
+}
+.documentTabName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.documentTabDirty {
+  color: var(--zw-brand);
+  font-weight: 700;
+}
+.documentTabClose {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-right: 4px;
+  border-radius: 5px;
+  color: var(--zw-faint);
+  transition: background 140ms ease, color 140ms ease, transform 140ms ease;
+}
+.documentTabClose:hover {
+  background: var(--zw-surface-2);
+  color: var(--zw-ink);
+  transform: scale(1.06);
+}
+@media (prefers-reduced-motion: reduce) {
+  .documentTab,
+  .documentTabSelect,
+  .documentTabClose {
+    transition: none;
+  }
+}
 .toggleButton {
   padding: 6px 12px;
   border-radius: var(--zw-r-pill);
@@ -608,6 +731,56 @@
   font-size: 12px;
   color: var(--zw-muted);
   border-top: 1px solid var(--zw-hairline);
+}
+.closeDialogOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(20, 28, 38, .22);
+}
+.closeDialog {
+  width: min(390px, 100%);
+  padding: 20px;
+  border: 1px solid var(--zw-hairline);
+  border-radius: var(--zw-r-card);
+  background: var(--zw-surface);
+  box-shadow: var(--zw-shadow-float);
+}
+.closeDialog h2 {
+  margin: 0;
+  color: var(--zw-ink);
+  font-size: 16px;
+}
+.closeDialog p {
+  margin: 10px 0 18px;
+  color: var(--zw-muted);
+  font-size: 13px;
+}
+.closeDialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.closeDialogActions button {
+  padding: 7px 11px;
+  border-radius: var(--zw-r-sm);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.closeDialogCancel,
+.closeDialogDiscard {
+  border: 1px solid var(--zw-hairline-strong);
+  background: var(--zw-surface);
+  color: var(--zw-text);
+}
+.closeDialogSave {
+  border: 1px solid var(--zw-brand);
+  background: var(--zw-brand);
+  color: #fff;
 }
 
 /* chat (right pane): force the DSH conversation to this theme */
