@@ -47,6 +47,11 @@ interface OpenDocument {
   visualMode: boolean
 }
 
+interface PersistedDocumentTabs {
+  activePath: string | null
+  documents: Array<Pick<OpenDocument, 'path' | 'name' | 'visualMode'>>
+}
+
 /** One workspace pane props. */
 export interface WorkspaceProps {
   projectPath: string
@@ -64,9 +69,23 @@ const LEFT_MAX = 360
 const RIGHT_DEFAULT = 500
 const RIGHT_MIN = 300
 const RIGHT_MAX = 520
+const DOCUMENT_TABS_STORAGE_PREFIX = 'zenwit.document-tabs.'
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
+}
+
+function readPersistedTabs(projectPath: string): PersistedDocumentTabs | null {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(DOCUMENT_TABS_STORAGE_PREFIX + projectPath) ?? 'null') as Partial<PersistedDocumentTabs> | null
+    if (parsed === null || !Array.isArray(parsed.documents)) return null
+    const documents = parsed.documents.filter((item): item is PersistedDocumentTabs['documents'][number] =>
+      typeof item?.path === 'string' && typeof item.name === 'string' && typeof item.visualMode === 'boolean')
+    const activePath = typeof parsed.activePath === 'string' && documents.some(item => item.path === parsed.activePath) ? parsed.activePath : documents[0]?.path ?? null
+    return { activePath, documents }
+  } catch {
+    return null
+  }
 }
 
 interface ResizeHandleProps {
@@ -147,6 +166,7 @@ export function Workspace({
   const leftDragBase = useRef(LEFT_DEFAULT)
   const rightDragBase = useRef(RIGHT_DEFAULT)
   const documentsRef = useRef(documents)
+  const tabsRestoredRef = useRef(false)
   documentsRef.current = documents
   const activeDocument = documents.find(document => document.path === activePath) ?? null
 
@@ -164,6 +184,51 @@ export function Workspace({
   }
 
   useEffect(() => { void reloadStructure() }, [projectPath])
+
+  useEffect(() => {
+    let cancelled = false
+    const persisted = readPersistedTabs(projectPath)
+    if (persisted === null || persisted.documents.length === 0) {
+      tabsRestoredRef.current = true
+      return
+    }
+    void Promise.all(persisted.documents.map(async (item): Promise<OpenDocument | null> => {
+      try {
+        const response = await fetch('/api/desktop/projects/file?path=' + encodeURIComponent(item.path))
+        if (!response.ok) return null
+        const body = await response.json() as { content?: unknown }
+        if (typeof body.content !== 'string') return null
+        return { ...item, content: body.content, draft: body.content, dirty: false, saving: false, saveStatus: null }
+      } catch {
+        return null
+      }
+    })).then(restored => {
+      if (cancelled) return
+      const valid = restored.filter((document): document is OpenDocument => document !== null)
+      setDocuments(current => {
+        const currentPaths = new Set(current.map(document => document.path))
+        return [...valid.filter(document => !currentPaths.has(document.path)), ...current]
+      })
+      setActivePath(current => current ?? (valid.some(document => document.path === persisted.activePath) ? persisted.activePath : valid[0]?.path ?? null))
+      tabsRestoredRef.current = true
+      if (valid.length === 0) window.localStorage.removeItem(DOCUMENT_TABS_STORAGE_PREFIX + projectPath)
+    })
+    return () => { cancelled = true }
+  }, [projectPath])
+
+  useEffect(() => {
+    if (!tabsRestoredRef.current) return
+    const key = DOCUMENT_TABS_STORAGE_PREFIX + projectPath
+    if (documents.length === 0) {
+      window.localStorage.removeItem(key)
+      return
+    }
+    const persisted: PersistedDocumentTabs = {
+      activePath,
+      documents: documents.map(({ path, name, visualMode }) => ({ path, name, visualMode })),
+    }
+    window.localStorage.setItem(key, JSON.stringify(persisted))
+  }, [activePath, documents, projectPath])
 
   // The AI writes screenplay files through the kernel; those changes are not
   // visible to this pane's single on-open fetch. Poll the tree while open so

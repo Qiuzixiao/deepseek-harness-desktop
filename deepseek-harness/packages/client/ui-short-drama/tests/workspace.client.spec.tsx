@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { Workspace } from '../src/client/Workspace.tsx'
 import type { WorkspaceProps } from '../src/client/Workspace.tsx'
@@ -18,6 +18,10 @@ vi.mock('../src/client/Editor.tsx', () => ({
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+})
+
+beforeEach(() => {
+  window.localStorage.clear()
 })
 
 function mountWorkspace() {
@@ -134,6 +138,20 @@ describe('Zenwit workspace layout', () => {
     fireEvent.click(screen.getByRole('button', { name: '关闭 episode-2.md' }))
     expect(screen.queryByRole('tab', { name: 'episode-2.md' })).toBeNull()
     expect(screen.getByRole('tab', { name: 'episode-1.md' }).getAttribute('aria-selected')).toBe('true')
+  })
+
+  it('restores open tabs, active document, and editor mode for the project', async () => {
+    window.localStorage.setItem('zenwit.document-tabs./project', JSON.stringify({
+      activePath: '/project/剧本/episode-2.md',
+      documents: [
+        { path: '/project/剧本/episode-1.md', name: 'episode-1.md', visualMode: true },
+        { path: '/project/剧本/episode-2.md', name: 'episode-2.md', visualMode: false },
+      ],
+    }))
+    mountWorkspace()
+    await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(2))
+    expect(screen.getByRole('tab', { name: 'episode-2.md' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByTestId('editor')).toBeTruthy()
   })
 
   it('resizes all three panes through the two column handles', async () => {
