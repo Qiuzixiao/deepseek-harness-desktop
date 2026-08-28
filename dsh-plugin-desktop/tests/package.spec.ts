@@ -579,6 +579,7 @@ describe('published package surface', () => {
       'cordis.patch.yml',
       'build/**',
       'lib/**',
+      'resources/**',
       'node_modules/**',
     ])
     expect(manifest.build?.electronFuses).toEqual({ runAsNode: true })
@@ -597,6 +598,7 @@ describe('published package surface', () => {
       'build/tray-icon*.png',
       'cordis.patch.yml',
       'lib/**',
+      'resources/**',
       'package.json',
       '!node_modules/node-pty/build/**',
     ])
