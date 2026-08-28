@@ -201,13 +201,20 @@ export function apply(ctx: ClientContext): void {
   }
 
   ctx.effect(() => {
+    // ui-layout owns the root child declarations in extended/advanced modes.
+    // The Zenwit shell only declares them in compatibility mode, where the
+    // layout plugin intentionally releases its AppFrame registration.
+    const compatibility = typeof window === 'undefined'
+      || new URLSearchParams(window.location.search).get('dsh-desktop-mode') === 'compatibility'
     const dispose = ctx.slots.register({
       name: 'root',
       priority: -1,
-      children: {
-        'sidebar': { kind: 'single', scope: 'root' },
-        'conversation': { kind: 'single', scope: 'session-maybe' },
-      },
+      ...(compatibility ? {
+        children: {
+          'sidebar': { kind: 'single', scope: 'root' },
+          'conversation': { kind: 'single', scope: 'session-maybe' },
+        },
+      } : {}),
       inject: () => ({
         list,
         create,

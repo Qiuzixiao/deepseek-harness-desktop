@@ -71,11 +71,17 @@ export function HomePage({ list, create, openProject }: { list: () => Promise<Pr
       <div className={css.homeNoise} aria-hidden="true" />
       <div className={css.homeGlow} aria-hidden="true" />
       <div className={css.particleField} aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /></div>
+      <nav className={css.homeNav} aria-label="主导航">
+        <div className={css.navBrand}><strong>ZENWIT</strong><span>/</span><span>CREATIVE SYSTEM</span></div>
+        <div className={css.navLinks}><button className={css.navActive} type="button" aria-current="page">首页</button><button type="button">项目库</button><button type="button">灵感库</button><button type="button">设置</button></div>
+        <div className={css.navTools}><button type="button" aria-label="搜索">⌕</button><button type="button" aria-label="通知">♧</button><button className={css.avatar} type="button" aria-label="账户菜单">ZW</button></div>
+      </nav>
       <header className={css.homeHero}>
         <div className={css.heroCopy}>
-          <div className={css.eyebrow}><span className={css.liveDot} /> ZENWIT / CREATIVE SYSTEM</div>
           <h2 className={css.heroTitle}>让灵感，<br /><em>成片。</em></h2>
           <p className={css.homeIntro}>从一粒微光开始，搭建你的下一部故事。</p>
+          <div className={css.heroButtons}><button className={css.heroPrimary} type="button" onClick={openCreate}>＋ 新建项目</button><button className={css.heroSecondary} type="button">✦ 随机灵感</button></div>
+          <div className={css.stats}><div><b>{projects?.filter(p => p.phase === 'Ready').length ?? 0}</b><span>进行中项目</span></div><div><b>{projects?.filter(p => p.phase !== 'Ready').length ?? 0}</b><span>已完成项目</span></div><div><b>86</b><span>灵感收集</span></div></div>
           <div className={css.heroMeta}><span>STORY OS · 01</span><span>● 系统在线</span></div>
         </div>
         <div className={css.orbitStage} aria-hidden="true">
@@ -85,12 +91,12 @@ export function HomePage({ list, create, openProject }: { list: () => Promise<Pr
           <div className={css.orbitCore}><span>ZW</span></div>
           <i className={`${css.particle} ${css.particleOne}`} /><i className={`${css.particle} ${css.particleTwo}`} /><i className={`${css.particle} ${css.particleThree}`} /><i className={`${css.particle} ${css.particleFour}`} />
         </div>
+        <aside className={css.quoteCard}><span>“</span><p>每一个好故事，<br />都值得被认真构建。</p><small>ZENWIT · 创作随笔</small><div>●　•　•</div></aside>
       </header>
-      <div className={css.libraryHeader}>
-        <div><span className={css.sectionKicker}>PROJECT LIBRARY</span><span className={css.sectionTitle}>你的创作舱</span></div>
-        <span className={css.projectCount}>{projects?.length ?? '—'} 个项目</span>
-      </div>
-      <main className={css.projectGrid}>
+      <div className={css.contentSplit}>
+        <section className={css.libraryColumn}>
+          <div className={css.libraryHeader}><div><span className={css.sectionKicker}>PROJECT LIBRARY</span><span className={css.sectionTitle}>项目库　›</span></div><button className={css.viewAll} type="button">查看全部　›</button></div>
+          <main className={css.projectGrid}>
         {projects === null ? (
           <>
             <div className={css.projectSkeleton} />
@@ -99,22 +105,21 @@ export function HomePage({ list, create, openProject }: { list: () => Promise<Pr
           </>
         ) : projects.length === 0 ? (
           <div className={css.emptyState}>还没有项目<br /><span>打开一个新的叙事坐标</span></div>
-        ) : projects.map(project => (
+        ) : projects.slice(0, 4).map((project, index) => (
           <button key={project.path} className={css.projectCard} type="button" onClick={() => void onClickProject(project.path)}>
-            <span className={css.cardIndex}>0{projects.indexOf(project) + 1}</span>
+            <span className={`${css.cardCover} ${css[`cover${index % 4}`]}`}><span>{project.phase === 'Ready' ? '进行中' : '构思中'}</span></span>
             <strong className={css.projectName}>{project.name}</strong>
             <span className={css.projectMeta}>{projectMeta(project)}</span>
             <span className={css.projectTime}>{formatTime(project.updatedAt)}</span>
-            <span className={css.cardArrow}>↗</span>
+            <span className={css.cardFooter}>♧　{index + 1}<i>•••</i></span>
           </button>
         ))}
-      </main>
-      <footer className={css.homeActions}>
-        <button className={css.newButton} type="button" onClick={openCreate} disabled={creating}>
-          {creating ? '正在建立坐标…' : '＋ 建立新坐标'}
-        </button>
-        {error !== null && <span className={css.homeError}>{error}</span>}
-      </footer>
+          </main>
+          <section className={css.quickStart}><h3>快速开始</h3><div className={css.quickGrid}>{[['▤','新建空白项目','从零开始创建你的故事'],['✦','使用模板','从精选模板快速开始'],['♢','生成灵感','AI 为你生成创意点子'],['↥','导入项目','从本地文件导入项目']].map(([icon,title,desc]) => <button type="button" key={title} onClick={title === '新建空白项目' ? openCreate : undefined}><span>{icon}</span><b>{title}</b><small>{desc}</small></button>)}</div></section>
+        </section>
+        <aside className={css.activity}><div className={css.activityHead}><h3>最近动态</h3><button type="button">查看全部　›</button></div>{['项目「测试剧本」已更新','灵感「雨夜的第七封信」已收藏','项目「a-a-a」已创建','项目「我在唐朝当皇上」已更新'].map((item,index) => <div className={css.activityItem} key={item}><span>{['▣','★','＋','↗'][index]}</span><div><b>{item}</b><small>{index === 0 ? '2 小时前' : index === 1 ? '昨天' : `${index + 1} 天前`}</small></div></div>)}</aside>
+      </div>
+      {error !== null && <footer className={css.homeActions}><span className={css.homeError}>{error}</span></footer>}
 
       {showCreate && (
         <div className={css.modalOverlay} onClick={cancelCreate}>
