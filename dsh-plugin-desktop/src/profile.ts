@@ -508,11 +508,10 @@ function loadRecoveryFilteredProfile(
   }
 }
 
-/** Resolve the agent presets shipped by the matching dsh CLI dependency. */
+/** Resolve the agent presets shipped by the desktop package itself. */
 export function shippedPresetRoot(moduleUrl: string = import.meta.url): string {
-  const require = createRequire(moduleUrl)
   return unpackedAsarPath(
-    join(dirname(require.resolve('@deepseek-ai/dsh/package.json')), 'config', 'agent-presets'),
+    fileURLToPath(new URL('../resources/agent-presets', moduleUrl)),
   )
 }
 

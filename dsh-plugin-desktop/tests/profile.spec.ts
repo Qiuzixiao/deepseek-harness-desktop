@@ -69,14 +69,10 @@ describe('desktop profile composition', {
   it('reads packaged Cordis skills from the physical unpacked preset root', () => {
     const home = temporaryHome()
     const resources = join(home, 'resources')
-    const archivedDsh = join(resources, 'app.asar', 'node_modules', '@deepseek-ai', 'dsh')
     const physicalPresetRoot = join(
       resources,
       'app.asar.unpacked',
-      'node_modules',
-      '@deepseek-ai',
-      'dsh',
-      'config',
+      'resources',
       'agent-presets',
     )
     const skillPath = join(
@@ -87,18 +83,13 @@ describe('desktop profile composition', {
       'SKILL.md',
     )
     mkdirSync(join(resources, 'app.asar', 'lib'), { recursive: true })
-    mkdirSync(archivedDsh, { recursive: true })
     mkdirSync(dirname(skillPath), { recursive: true })
-    writeFileSync(join(archivedDsh, 'package.json'), JSON.stringify({
-      name: '@deepseek-ai/dsh',
-      exports: { './package.json': './package.json' },
-    }) + '\n')
     writeFileSync(skillPath, '# Cordis plugin development\n')
 
     const moduleUrl = pathToFileURL(join(resources, 'app.asar', 'lib', 'profile.js')).href
     const resolvedRoot = shippedPresetRoot(moduleUrl)
 
-    expect(resolvedRoot).toBe(realpathSync(physicalPresetRoot))
+    expect(resolvedRoot).toBe(physicalPresetRoot)
     expect(readFileSync(join(
       resolvedRoot,
       'cordis',

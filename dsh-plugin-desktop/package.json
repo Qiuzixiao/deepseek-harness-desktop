@@ -88,6 +88,7 @@
     "lib/**/*.map",
     "lib/native-ui/**",
     "lib/types/**/*.d.ts",
+    "resources/**",
     "README.md",
     "README.zh.md",
     "README.i18n.yaml",
@@ -248,6 +249,7 @@
     "@deepseek-ai/schemastery": "^3.18.1",
     "adm-zip": "^0.6.0",
     "dsh-community-market": "0.1.0-dev.0",
+    "dsh-short-drama": "file:../dsh-short-drama",
     "dshmarket": "1.17.1",
     "koffi": "3.1.5",
     "node-addon-require-builtin": "^0.1.4",
@@ -295,6 +297,7 @@
       "cordis.patch.yml",
       "build/**",
       "lib/**",
+      "resources/**",
       "node_modules/**"
     ],
     "afterPack": "./scripts/verify-packaged-runtime.ts",
@@ -315,6 +318,7 @@
       "build/tray-icon*.png",
       "cordis.patch.yml",
       "lib/**",
+      "resources/**",
       "package.json",
       "!node_modules/node-pty/build/**"
     ],
