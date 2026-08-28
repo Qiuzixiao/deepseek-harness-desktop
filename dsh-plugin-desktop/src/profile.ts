@@ -73,9 +73,6 @@ const UPSTREAM_PWSH_SANDBOX_PACKAGE = '@deepseek-ai/dsh-pwsh-sandbox'
 const DESKTOP_WINDOWS_PWSH_SANDBOX_ROW_ID = 'desktop-windows-pwsh-sandbox'
 const DESKTOP_WINDOWS_PWSH_SANDBOX_PACKAGE = 'dsh-plugin-desktop/windows-pwsh-sandbox'
 const AGENT_PRESETS_ROW_ID = 'agent-presets'
-const UPSTREAM_AGENT_PRESETS_PACKAGE = '@deepseek-ai/dsh-agent-presets'
-const DESKTOP_WINDOWS_AGENT_PRESETS_ROW_ID = 'desktop-windows-agent-presets'
-const DESKTOP_WINDOWS_AGENT_PRESETS_PACKAGE = 'dsh-plugin-desktop/windows-agent-presets'
 const DEFAULT_DESKTOP_SHELL_MODE: DesktopShellMode = 'compatibility'
 const DEFAULT_DESKTOP_PORT = DESKTOP_DEFAULT_WEB_PORT
 const DESKTOP_WEB_SERVER_ROW_ID = 'desktop-webserver'
@@ -866,30 +863,16 @@ export function prepareDesktopProfile(
   }
   const presets = rows.get(AGENT_PRESETS_ROW_ID)
   if (presets !== undefined) {
-    const config = {
-      ...rowConfig(presets),
-      roots: [{ path: shippedPresetRoot(), trust: 'system' }],
-    }
-    if (platform === 'win32'
-      && presets.name === UPSTREAM_AGENT_PRESETS_PACKAGE
-      && !rowDisabledOnPlatform(presets, platform)) {
-      patches.push(
-        {
-          id: AGENT_PRESETS_ROW_ID,
-          name: UPSTREAM_AGENT_PRESETS_PACKAGE,
-          disabled: true,
-        },
-        {
-          insert: [{
-            id: DESKTOP_WINDOWS_AGENT_PRESETS_ROW_ID,
-            name: DESKTOP_WINDOWS_AGENT_PRESETS_PACKAGE,
-            config,
-          }],
-        },
-      )
-    } else {
-      patches.push({ id: AGENT_PRESETS_ROW_ID, config })
-    }
+    // The desktop ships its own preset root, so upstream presets never appear.
+    // Both shipped presets are win32-safe: `cordis` gates its one-shot shells on
+    // `process.platform` and `screenplay-v1` has no shell at all.
+    patches.push({
+      id: AGENT_PRESETS_ROW_ID,
+      config: {
+        ...rowConfig(presets),
+        roots: [{ path: shippedPresetRoot(), trust: 'system' }],
+      },
+    })
   }
   const webserver = rows.get('webserver')
   if (webserver === undefined) {
