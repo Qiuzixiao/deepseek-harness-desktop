@@ -86,6 +86,7 @@ interface BenchOptions {
   rightItems?: React.ReactNode
   attachments?: readonly ComposerAttachment[]
   addImages?: (files: readonly File[]) => string | null
+  intakeFiles?: InputBarProps['intakeFiles']
   commandMenuOpen?: boolean
   busyEnter?: 'queue' | 'steer'
   toggleCommandMenu?: (selection: { start: number; end: number }) => void
@@ -161,6 +162,7 @@ function bench(over?: BenchOptions) {
     inputActions: shell.actions,
     keyboard: shell,
     addImages: over?.addImages ?? (() => null),
+    ...(over?.intakeFiles !== undefined ? { intakeFiles: over.intakeFiles } : {}),
     removeImage,
     draftImages: ids => ids.flatMap((id) => {
       const attachment = over?.attachments?.find(candidate => candidate.id === id)
@@ -205,6 +207,12 @@ function bench(over?: BenchOptions) {
 }
 
 describe('image draft rail', () => {
+  it('keeps file selection in the shared hidden picker without a second toolbar button', () => {
+    const { view } = bench({ intakeFiles: vi.fn(() => Promise.resolve()) })
+    expect(view.container.querySelector('#dsh-composer-file-picker')).not.toBeNull()
+    expect(view.container.querySelector('button[aria-label="添加附件"]')).toBeNull()
+  })
+
   it('collects clipboard files while preserving text from a mixed paste', () => {
     const addImages = vi.fn(() => null)
     const { textarea, shell } = bench({ addImages })
@@ -235,6 +243,42 @@ describe('image draft rail', () => {
     expect(fireEvent.drop(document.body, { dataTransfer })).toBe(false)
     expect(addImages).toHaveBeenCalledWith([image])
     expect(view.queryByRole('status')).toBeNull()
+  })
+
+  it('passes document-only picker and drops to the unified intake route', () => {
+    const intakeFiles = vi.fn(() => Promise.resolve())
+    const { view } = bench({ intakeFiles })
+    const documentFile = new File([Uint8Array.of(1, 2)], 'notes.pdf', { type: 'application/pdf' })
+    const picker = view.container.querySelector<HTMLInputElement>('input[type="file"]')!
+
+    fireEvent.change(picker, { target: { files: [documentFile] } })
+    expect(intakeFiles).toHaveBeenCalledWith([documentFile])
+
+    fireEvent.drop(document.body, {
+      dataTransfer: { types: ['Files'], files: [documentFile], dropEffect: 'none' },
+    })
+    expect(intakeFiles).toHaveBeenCalledTimes(2)
+  })
+
+  it('refreshes the document card when upload status settles', () => {
+    const attachment: ComposerAttachment = {
+      kind: 'document',
+      id: 'draft-document' as DraftAttachmentId,
+      ref: '',
+      name: 'notes.md',
+      extension: 'md',
+      bytes: 2048,
+      status: 'uploading',
+    }
+    const { view, shell } = bench({ attachments: [attachment] })
+    expect(view.getByText('上传中…')).toBeTruthy()
+
+    attachment.status = 'ready'
+    attachment.ref = '/workspace/.dsh-uploads/s1/notes.md'
+    act(() => { shell.refreshAttachments() })
+
+    expect(view.queryByText('上传中…')).toBeNull()
+    expect(view.getByText('2 KB')).toBeTruthy()
   })
 
   it('keeps text drags native and hides the overlay when the drag leaves or ends', () => {
@@ -297,7 +341,7 @@ describe('image draft rail', () => {
     expect(within.view.queryByRole('alert')).toBeNull()
   })
 
-  it('announces the format problem before any limit when the batch holds a non-image', () => {
+  it('leaves non-image drops to the document upload plugin', () => {
     const addImages = vi.fn(() => '仅支持 PNG、JPG、WebP、GIF 格式的图片')
     const { view } = bench({
       addImages,
@@ -309,14 +353,25 @@ describe('image draft rail', () => {
         mediaTypes: ['image/png'] as const,
       },
     })
-    // Oversized AND over-count AND wrong type: the format rejection wins.
     const files = [
       new File([new ArrayBuffer(64)], 'a.pdf', { type: 'application/pdf' }),
       new File([new ArrayBuffer(64)], 'b.pdf', { type: 'application/pdf' }),
     ]
     fireEvent.drop(document.body, { dataTransfer: { types: ['Files'], files, dropEffect: 'none' } })
-    expect(addImages).toHaveBeenCalledWith(files)
-    expect(view.getByRole('alert').textContent).toContain('仅支持 PNG、JPG、WebP、GIF 格式的图片')
+    expect(addImages).not.toHaveBeenCalled()
+    expect(view.queryByRole('alert')).toBeNull()
+  })
+
+  it('filters mixed drops to images before invoking the image attachment route', () => {
+    const addImages = vi.fn(() => null)
+    const { view } = bench({ addImages })
+    const image = new File([Uint8Array.of(1)], 'dropped.png', { type: 'image/png' })
+    const documentFile = new File([Uint8Array.of(2)], 'notes.pdf', { type: 'application/pdf' })
+    fireEvent.drop(document.body, {
+      dataTransfer: { types: ['Files'], files: [image, documentFile], dropEffect: 'none' },
+    })
+    expect(addImages).toHaveBeenCalledWith([image])
+    expect(view.queryByRole('alert')).toBeNull()
   })
 
   it('shows the projected limits in the drop overlay desc line', () => {
@@ -1192,16 +1247,16 @@ describe('command launcher chrome and control seats', () => {
     const { view } = bench({ permissions, command })
     const trigger = view.getByLabelText(/^访问模式/) as HTMLButtonElement
     // Title-case display is presentation only; the menu ids stay machine names.
-    expect(trigger.textContent).toBe('Read Only')
+    expect(trigger.textContent).toBe('只读')
     expect([...trigger.querySelectorAll('svg')]
       .every(icon => icon.closest('[aria-hidden="true"]') !== null)).toBe(true)
     fireEvent.click(trigger)
     const items = view.getAllByRole('menuitem')
-    expect(items.map(o => o.textContent)).toEqual(['Read Only', 'Workspace Write', 'Full access'])
+    expect(items.map(o => o.textContent)).toEqual(['只读', '工作区写入', '完全访问'])
     fireEvent.click(items[1]!)
     // Optimistic pick + disable until admission resolves (command stub resolves true).
     const busy = view.getByLabelText(/^访问模式/) as HTMLButtonElement
-    expect(busy.textContent).toBe('Workspace Write')
+    expect(busy.textContent).toBe('工作区写入')
     expect(busy.disabled).toBe(true)
     expect(command).toHaveBeenCalledWith('/permission workspace-write')
     await act(async () => {})
@@ -1219,11 +1274,11 @@ describe('command launcher chrome and control seats', () => {
     }
     const { view } = bench({ permissions, command })
     fireEvent.click(view.getByLabelText(/^访问模式/))
-    fireEvent.click(view.getByRole('menuitem', { name: 'Full access' }))
+    fireEvent.click(view.getByRole('menuitem', { name: '完全访问' }))
 
     expect(command).not.toHaveBeenCalled()
-    expect(view.getByRole('dialog', { name: '确认启用 Full access？' })).toBeTruthy()
-    const enable = view.getByRole('button', { name: '启用 Full access' }) as HTMLButtonElement
+    expect(view.getByRole('dialog', { name: '确认启用完全访问？' })).toBeTruthy()
+    const enable = view.getByRole('button', { name: '启用完全访问' }) as HTMLButtonElement
     expect(enable.disabled).toBe(true)
 
     fireEvent.click(view.getByRole('checkbox', { name: '我已了解风险，并愿意继续' }))
@@ -1233,7 +1288,7 @@ describe('command launcher chrome and control seats', () => {
     expect(command).toHaveBeenCalledOnce()
     expect(command).toHaveBeenCalledWith('/permission danger-full-access')
     expect(view.queryByRole('dialog')).toBeNull()
-    expect((view.getByLabelText(/^访问模式/) as HTMLButtonElement).textContent).toBe('Full access')
+    expect((view.getByLabelText(/^访问模式/) as HTMLButtonElement).textContent).toBe('完全访问')
     await act(async () => {})
   })
 
@@ -1249,18 +1304,18 @@ describe('command launcher chrome and control seats', () => {
     const { view } = bench({ permissions, command })
     const openConfirmation = () => {
       fireEvent.click(view.getByLabelText(/^访问模式/))
-      fireEvent.click(view.getByRole('menuitem', { name: 'Full access' }))
+      fireEvent.click(view.getByRole('menuitem', { name: '完全访问' }))
     }
 
     openConfirmation()
     fireEvent.click(view.getByRole('checkbox'))
     fireEvent.click(view.getByRole('button', { name: '取消' }))
     expect(command).not.toHaveBeenCalled()
-    expect((view.getByLabelText(/^访问模式/) as HTMLButtonElement).textContent).toBe('Workspace Write')
+    expect((view.getByLabelText(/^访问模式/) as HTMLButtonElement).textContent).toBe('工作区写入')
 
     openConfirmation()
     expect((view.getByRole('checkbox') as HTMLInputElement).checked).toBe(false)
-    expect((view.getByRole('button', { name: '启用 Full access' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((view.getByRole('button', { name: '启用完全访问' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('revokes an open Full access confirmation when the task locks', () => {
@@ -1274,7 +1329,7 @@ describe('command launcher chrome and control seats', () => {
     }
     const { view, session } = bench({ permissions, command })
     fireEvent.click(view.getByLabelText(/^访问模式/))
-    fireEvent.click(view.getByRole('menuitem', { name: 'Full access' }))
+    fireEvent.click(view.getByRole('menuitem', { name: '完全访问' }))
     fireEvent.click(view.getByRole('checkbox'))
     act(() => { session.set(snapshotOf({ removed: true })) })
     expect(view.queryByRole('dialog')).toBeNull()
@@ -1292,7 +1347,7 @@ describe('command launcher chrome and control seats', () => {
     }
     const { view, props } = bench({ permissions, command })
     fireEvent.click(view.getByLabelText(/^访问模式/))
-    fireEvent.click(view.getByRole('menuitem', { name: 'Full access' }))
+    fireEvent.click(view.getByRole('menuitem', { name: '完全访问' }))
     fireEvent.click(view.getByRole('checkbox'))
     view.rerender(<InputBar {...props} sessionId={'s2' as SessionId} />)
     expect(view.queryByRole('dialog')).toBeNull()

@@ -118,7 +118,10 @@ export function SidebarRoot({
   if (settingsOnly) {
     return (
       <div className={clsx(css.settingsOnlyRoot, settingsOnlyInline && css.settingsOnlyInline)}>
-        {renderSlot('sidebar.settings', { wide: !collapsed })}
+        {renderSlot('sidebar.settings', {
+          wide: !collapsed,
+          hideTrigger: settingsOnlyInline && width === 0,
+        })}
       </div>
     )
   }

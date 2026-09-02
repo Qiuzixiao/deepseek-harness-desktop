@@ -699,6 +699,14 @@ describe('read caps are plugin config', () => {
     return { ctx, fs: ctx.fs as FakeFs }
   }
 
+  it('can expose a read-only filesystem tool set', async () => {
+    const { ctx } = await setupWith({ allowMutations: false })
+    expect(ctx.tools.get('read')).toBeDefined()
+    expect(ctx.tools.get('read_image')).toBeUndefined()
+    expect(ctx.tools.get('write')).toBeUndefined()
+    expect(ctx.tools.get('edit')).toBeUndefined()
+  })
+
   it('a configured readLimit is both the default and the cap, and the schema names it', async () => {
     const { ctx, fs } = await setupWith({ readLimit: 2 })
     fs.files.set('key:a.txt', 'one\ntwo\nthree\nfour')

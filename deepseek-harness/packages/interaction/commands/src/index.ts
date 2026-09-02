@@ -5,6 +5,7 @@
 
 import { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { EncodedImageAttachment } from '@deepseek-ai/dsh-attachment'
 import { NamedEntries, ScopedLayers } from '@deepseek-ai/dsh-scope'
 import type { ScopeKey, ScopeLayer } from '@deepseek-ai/dsh-scope'
 import type { Session, SessionEvent, SessionEventMap } from '@deepseek-ai/dsh-session'
@@ -297,8 +298,14 @@ export class CommandRuntime extends TypertRemoteService {
   async execute(
     agent: Agent,
     line: string,
+    images: readonly EncodedImageAttachment[],
     signal: AbortSignal,
   ): Promise<CommandExecution | undefined> {
+    // RC2 carries the composer image envelope through this Remote method. The
+    // integrated command registry does not consume images yet, but must keep
+    // the argument in the Host face so generated contracts cannot regress to
+    // the RC5 two-argument ABI.
+    void images
     const parsed = parseCommand(line)
     if (parsed === undefined) return undefined
     const command = this.view(agent).get(parsed.name)

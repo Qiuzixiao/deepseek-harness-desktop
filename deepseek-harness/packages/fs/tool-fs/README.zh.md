@@ -22,6 +22,7 @@ await ctx.plugin(ToolFs)                                  // this package — re
 
 | 键 | 默认值 | 含义 |
 |---|---|---|
+| `allowMutations` | `true` | 是否注册会修改文件的 `write` 和 `edit` 工具。短剧等只读组合可设为 `false`，仍保留 `read` 和 `read_image`。 |
 | `readLimit` | `2000` | 一次 `read` 调用返回的默认和最大行数（工具 schema 将其声明为 `limit` 默认值）。 |
 | `readMaxLineLength` | `2000` | 每行截断前保留的字符数（后缀会说明上限）。 |
 | `readMaxBytes` | `51200` | 一次 `read` 调用所选行的字节上限；溢出时以「已达上限」footer 结束窗口。 |

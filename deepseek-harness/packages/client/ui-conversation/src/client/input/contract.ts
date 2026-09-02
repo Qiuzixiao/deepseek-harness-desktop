@@ -13,6 +13,7 @@ import type {
 } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type { QueueRow } from '../contract/queue.ts'
 import type { InputSubmitMode } from '../contract/composer-submission.ts'
+import type { ComposerDocumentAttachment } from '../contract/slots.ts'
 
 /** Browser-runtime identity of one unsent image draft. */
 export type DraftAttachmentId = Branded<'DraftAttachmentId'>
@@ -37,10 +38,16 @@ export interface SessionInput extends InputTarget {
   setDraft(text: string): void
   /** Append ordered browser-owned image ids; busy admission phases refuse. */
   addImages(ids: readonly DraftAttachmentId[]): boolean
+  addAttachments(ids: readonly DraftAttachmentId[]): boolean
   /** Remove one browser-owned image id. */
   removeImage(id: DraftAttachmentId): void
+  removeAttachment(id: DraftAttachmentId): void
   /** Drop ids whose browser-owned objects no longer exist. */
   pruneImages(ids: readonly DraftAttachmentId[]): void
+  pruneAttachments(ids: readonly DraftAttachmentId[]): void
+  addDocument(document: Omit<ComposerDocumentAttachment, 'id' | 'kind'>): DraftAttachmentId | null
+  updateDocument(id: DraftAttachmentId, patch: Partial<Omit<ComposerDocumentAttachment, 'id' | 'kind'>>): void
+  intakeFiles(files: readonly File[]): Promise<void>
   /**
    * THE complexity sink: enter adjudication, submit transaction, and the default sink live inside.
    * @param mode - delivery intent retained through asynchronous adjudication and serialization.
@@ -77,10 +84,13 @@ export interface InputActions {
   setDraft(text: string): void
   /** Append ordered browser-owned image ids; busy admission phases refuse. */
   addImages(ids: readonly DraftAttachmentId[]): boolean
+  addAttachments?(ids: readonly DraftAttachmentId[]): boolean
   /** Remove one browser-owned image id. */
   removeImage(id: DraftAttachmentId): void
+  removeAttachment?(id: DraftAttachmentId): void
   /** Drop ids whose browser-owned objects no longer exist. */
   pruneImages(ids: readonly DraftAttachmentId[]): void
+  pruneAttachments?(ids: readonly DraftAttachmentId[]): void
   /** Enter submission (adjudication / claim transaction / default sink inside). */
   submit(): void
 }
@@ -214,6 +224,7 @@ export interface InputState {
   readonly draft: string
   /** Ordered runtime-only image ids; bytes and URLs stay in ConversationController. */
   readonly imageIds: readonly DraftAttachmentId[]
+  readonly attachmentIds?: readonly DraftAttachmentId[]
   /** Monotonic draft revision (span CAS compares against this). */
   readonly draftRev: number
   readonly phase: 'plain' | 'adjudicating' | 'claimed' | 'submitting'

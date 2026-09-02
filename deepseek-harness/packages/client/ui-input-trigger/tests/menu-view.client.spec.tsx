@@ -31,7 +31,7 @@ function openState(partial?: Partial<MenuState>): MenuState {
     hit,
     generation: 1,
     groups: [
-      { source: 'command', status: 'ready', items: [{ name: 'goal', description: 'Set up a goal', icon: '⚑' }, { name: 'plan' }] },
+      { source: 'command', status: 'ready', items: [{ name: 'goal', label: '目标', description: 'Set up a goal', icon: '⚑' }, { name: 'plan' }] },
       { source: 'skill', status: 'pending', items: [] },
     ],
     highlight: { source: 'command', index: 0 },
@@ -58,10 +58,11 @@ const t = makeTranslate(zh, commonZh)
 
 function mount(state: MenuState) {
   const menu = createSnapshotStore<MenuState>(state)
+  const launcher = createSnapshotStore<string | null>(null)
   const onPick = vi.fn()
   const onDismiss = vi.fn()
-  const view = render(<MenuView menu={menu} onPick={onPick} onDismiss={onDismiss} t={t} />)
-  return { menu, onPick, onDismiss, view }
+  const view = render(<MenuView menu={menu} launcher={launcher} onPick={onPick} onDismiss={onDismiss} t={t} />)
+  return { menu, launcher, onPick, onDismiss, view }
 }
 
 /** The non-interactive group title rows (role=presentation), in document order. */
@@ -71,6 +72,31 @@ function titles(container: HTMLElement): string[] {
 }
 
 describe('MenuView', () => {
+  it('renders launcher actions before trigger candidates and routes selection', () => {
+    const menu = createSnapshotStore<MenuState>(openState())
+    const launcher = createSnapshotStore<string | null>('command')
+    const onPick = vi.fn()
+    const onDismiss = vi.fn()
+    const onSelect = vi.fn()
+    render(
+      <MenuView
+        menu={menu}
+        launcher={launcher}
+        actions={[{ id: 'add-file', label: '添加文件', icon: '📎', onSelect }]}
+        onPick={onPick}
+        onDismiss={onDismiss}
+        t={t}
+      />,
+    )
+    const options = screen.getAllByRole('option')
+    expect(options[0]?.textContent).toContain('添加文件')
+    expect(options[1]?.textContent).toContain('goal')
+    fireEvent.click(options[0]!)
+    expect(onSelect).toHaveBeenCalledTimes(1)
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+    expect(onPick).not.toHaveBeenCalled()
+  })
+
   it('renders null while closed and appears when the store opens', () => {
     const { menu, view } = mount(CLOSED)
     expect(view.container.childElementCount).toBe(0)
@@ -83,7 +109,7 @@ describe('MenuView', () => {
   it('renders ready groups as option rows and pending groups as loading rows', () => {
     mount(openState())
     const options = screen.getAllByRole('option')
-    expect(options.map(o => o.textContent)).toEqual(['⚑goalSet up a goal', 'plan'])
+    expect(options.map(o => o.textContent)).toEqual(['⚑目标Set up a goal', 'plan'])
     expect(screen.queryByText('正在加载…')).not.toBeNull()
   })
 
@@ -162,7 +188,7 @@ describe('MenuView', () => {
     const onDismiss = vi.fn()
     render(
       <div data-composer-card="">
-        <MenuView menu={menu} onPick={vi.fn()} onDismiss={onDismiss} t={t} />
+        <MenuView menu={menu} launcher={createSnapshotStore<string | null>(null)} onPick={vi.fn()} onDismiss={onDismiss} t={t} />
         <button type="button" data-testid="composer-button" />
       </div>,
     )

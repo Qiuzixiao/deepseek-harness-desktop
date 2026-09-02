@@ -8,7 +8,7 @@ import type {
   WindowsWindowMaterial,
 } from './window-material.ts'
 
-/** Electron platforms supported by the DSH Desktop native adapter. */
+/** Electron platforms supported by the Zenwit native adapter. */
 export type DesktopPlatform = 'darwin' | 'win32' | 'linux'
 
 /** Native presentation modes selected by the desktop-shell Cordis row. */
@@ -198,6 +198,12 @@ export interface DesktopRuntime {
   /** Open a native terminal containing packaged DSH command shims. */
   openTerminal(): void
 
+  /** Open the packaged DSH terminal with a selected working directory. */
+  openTerminalAt?(path: string): void
+
+  /** Reveal a validated project path in the native file manager. */
+  revealInFileManager?(path: string): void
+
   /** Export a diagnostics zip and reveal it in the system file manager. */
   exportDiagnostics(): Promise<void>
 
@@ -228,7 +234,7 @@ export interface DesktopRuntime {
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
-    /** Electron adapter provided by the DSH Desktop launcher. */
+    /** Electron adapter provided by the Zenwit launcher. */
     desktopRuntime: DesktopRuntime
   }
 }

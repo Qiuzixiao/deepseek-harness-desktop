@@ -73,7 +73,6 @@ const UPSTREAM_PWSH_SANDBOX_PACKAGE = '@deepseek-ai/dsh-pwsh-sandbox'
 const DESKTOP_WINDOWS_PWSH_SANDBOX_ROW_ID = 'desktop-windows-pwsh-sandbox'
 const DESKTOP_WINDOWS_PWSH_SANDBOX_PACKAGE = 'dsh-plugin-desktop/windows-pwsh-sandbox'
 const AGENT_PRESETS_ROW_ID = 'agent-presets'
-const DEFAULT_DESKTOP_SHELL_MODE: DesktopShellMode = 'compatibility'
 const DEFAULT_DESKTOP_PORT = DESKTOP_DEFAULT_WEB_PORT
 const DESKTOP_WEB_SERVER_ROW_ID = 'desktop-webserver'
 const DESKTOP_WEB_SERVER_PACKAGE = 'dsh-plugin-desktop/webserver'
@@ -101,8 +100,11 @@ const MARKET_PACKAGE_NAMES: ReadonlySet<string> = new Set([
  * @param value - untrusted settings value.
  * @returns a supported desktop shell mode.
  */
-export function parseDesktopShellMode(value: unknown): DesktopShellMode {
-  if (value === undefined) return DEFAULT_DESKTOP_SHELL_MODE
+export function parseDesktopShellMode(
+  value: unknown,
+  platform: NodeJS.Platform = process.platform,
+): DesktopShellMode {
+  if (value === undefined) return platform === 'linux' ? 'compatibility' : 'advanced'
   if (value === 'compatibility' || value === 'extended' || value === 'advanced') return value
   throw new Error(`${BIN_NAME}: ${DESKTOP_SETTINGS_NAMESPACE}.mode must be "compatibility", "extended", or "advanced"`)
 }
@@ -110,7 +112,7 @@ export function parseDesktopShellMode(value: unknown): DesktopShellMode {
 /** Parse the requested loopback Web port and reject values Node cannot listen on. */
 export function parseDesktopPort(value: unknown): number {
   // Isolated-dev support: DSH_DESKTOP_WEB_PORT overrides the settings port so a
-  // dev instance can run beside an installed DSH Desktop on a different port.
+  // dev instance can run beside an installed Zenwit on a different port.
   const envPort = process.env.DSH_DESKTOP_WEB_PORT
   if (envPort !== undefined && envPort.length > 0) {
     const parsed = Number(envPort)
@@ -130,19 +132,24 @@ export interface DesktopStartupSettings {
   windowsMaterial: WindowsWindowMaterial
 }
 
-const DEFAULT_DESKTOP_STARTUP_SETTINGS: DesktopStartupSettings = Object.freeze({
-  mode: DEFAULT_DESKTOP_SHELL_MODE,
-  port: DEFAULT_DESKTOP_PORT,
-  macosMaterial: DEFAULT_MACOS_WINDOW_MATERIAL,
-  windowsMaterial: DEFAULT_WINDOWS_WINDOW_MATERIAL,
-})
+function defaultDesktopStartupSettings(platform: NodeJS.Platform): DesktopStartupSettings {
+  return {
+    mode: parseDesktopShellMode(undefined, platform),
+    port: DEFAULT_DESKTOP_PORT,
+    macosMaterial: DEFAULT_MACOS_WINDOW_MATERIAL,
+    windowsMaterial: DEFAULT_WINDOWS_WINDOW_MATERIAL,
+  }
+}
 
 /**
  * Read Desktop startup settings from one parsed settings document.
  * @param document - untrusted settings document root.
  * @returns validated mode and port defaults for the next generation.
  */
-export function desktopStartupSettingsFromSettings(document: unknown): DesktopStartupSettings {
+export function desktopStartupSettingsFromSettings(
+  document: unknown,
+  platform: NodeJS.Platform = process.platform,
+): DesktopStartupSettings {
   if (typeof document !== 'object' || document === null || Array.isArray(document)) {
     throw new Error(`${BIN_NAME}: settings document must be a map of namespace sections`)
   }
@@ -153,7 +160,7 @@ export function desktopStartupSettingsFromSettings(document: unknown): DesktopSt
     // explicit section is important here: the old fast path returned the
     // compile-time default (43120) before `DSH_DESKTOP_WEB_PORT` was read.
     return {
-      ...DEFAULT_DESKTOP_STARTUP_SETTINGS,
+      ...defaultDesktopStartupSettings(platform),
       port: parseDesktopPort(undefined),
     }
   }
@@ -162,7 +169,7 @@ export function desktopStartupSettingsFromSettings(document: unknown): DesktopSt
   }
   const values = section as Record<string, unknown>
   return {
-    mode: parseDesktopShellMode(values.mode),
+    mode: parseDesktopShellMode(values.mode, platform),
     port: parseDesktopPort(values.port),
     macosMaterial: parseMacosWindowMaterial(values.macosMaterial),
     windowsMaterial: parseWindowsWindowMaterial(values.windowsMaterial),
@@ -170,8 +177,11 @@ export function desktopStartupSettingsFromSettings(document: unknown): DesktopSt
 }
 
 /** Read only the shell mode from one parsed settings document. */
-export function desktopShellModeFromSettings(document: unknown): DesktopShellMode {
-  return desktopStartupSettingsFromSettings(document).mode
+export function desktopShellModeFromSettings(
+  document: unknown,
+  platform: NodeJS.Platform = process.platform,
+): DesktopShellMode {
+  return desktopStartupSettingsFromSettings(document, platform).mode
 }
 
 /**
@@ -179,14 +189,17 @@ export function desktopShellModeFromSettings(document: unknown): DesktopShellMod
  * @param config - validated settings-file row config.
  * @returns the values projected into the startup Loader graph.
  */
-export function readDesktopStartupSettings(config: SettingsFileConfig): DesktopStartupSettings {
+export function readDesktopStartupSettings(
+  config: SettingsFileConfig,
+  platform: NodeJS.Platform = process.platform,
+): DesktopStartupSettings {
   const spec = resolveSettingsFileSpec(config)
   let text: string
   try {
     text = readFileSync(spec.filename, 'utf8')
   } catch (cause) {
     if ((cause as NodeJS.ErrnoException).code === 'ENOENT') {
-      return { ...DEFAULT_DESKTOP_STARTUP_SETTINGS }
+      return desktopStartupSettingsFromSettings({}, platform)
     }
     throw cause
   }
@@ -200,12 +213,15 @@ export function readDesktopStartupSettings(config: SettingsFileConfig): DesktopS
   } else {
     document = text.trim().length === 0 ? {} : JSON.parse(text)
   }
-  return desktopStartupSettingsFromSettings(document)
+  return desktopStartupSettingsFromSettings(document, platform)
 }
 
 /** Read only the shell mode from the settings provider's resolved file. */
-export function readDesktopShellMode(config: SettingsFileConfig): DesktopShellMode {
-  return readDesktopStartupSettings(config).mode
+export function readDesktopShellMode(
+  config: SettingsFileConfig,
+  platform: NodeJS.Platform = process.platform,
+): DesktopShellMode {
+  return readDesktopStartupSettings(config, platform).mode
 }
 
 /** Resolve the public Web template once and reject an incompatible DSH release. */
@@ -840,7 +856,7 @@ export function prepareDesktopProfile(
   } as SettingsFileConfig)
   const settingsDocument = resolveSettingsFileSpec(settingsConfig).filename
   hooks.onSettingsDocumentResolved?.(settingsDocument)
-  const { mode, port, macosMaterial, windowsMaterial } = readDesktopStartupSettings(settingsConfig)
+  const { mode, port, macosMaterial, windowsMaterial } = readDesktopStartupSettings(settingsConfig, platform)
   patches.push({
     id: 'settings',
     config: settingsConfig,
@@ -865,7 +881,7 @@ export function prepareDesktopProfile(
   if (presets !== undefined) {
     // The desktop ships its own preset root, so upstream presets never appear.
     // Both shipped presets are win32-safe: `cordis` gates its one-shot shells on
-    // `process.platform` and `screenplay-v1` has no shell at all.
+    // `process.platform` and `short-drama` has no shell at all.
     patches.push({
       id: AGENT_PRESETS_ROW_ID,
       config: {

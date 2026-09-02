@@ -92,6 +92,27 @@ describe('screenplay references', () => {
     await expect(store.preview('不存在.pdf')).rejects.toThrow('参考文件不存在')
   })
 
+  it('reads uploaded documents in bounded pages without exposing the source path', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'screenplay-reference-'))
+    const store = new ScreenplayReferenceStore(projectRoot, '参考文件')
+    const result = await store.saveBatch([{
+      originalName: '分页.txt',
+      bytesBase64: Buffer.from('第一段\n\n第二段\n\n第三段').toString('base64'),
+      selection: { purpose: 'custom', scope: { kind: 'full' } },
+    }])
+    const referenceId = result.references[0]!.referenceId
+
+    await expect(store.readDocument(referenceId, 1, 2)).resolves.toMatchObject({
+      originalName: '分页.txt', format: 'text', page: 1, pageSize: 2, totalPages: 2,
+      content: '第一段\n\n第二段', hasMore: true, nextPage: 2,
+    })
+    await expect(store.readDocument(referenceId, 2, 2)).resolves.toMatchObject({
+      page: 2, totalPages: 2, content: '第三段', hasMore: false,
+    })
+    await expect(store.readDocument('../outside', 1, 2)).rejects.toThrow('参考文件 ID无效')
+    await expect(store.readDocument(referenceId, 3, 2)).rejects.toThrow('指定文档页不存在')
+  })
+
   it('returns a DOCX preview while preserving the uploaded binary', async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), 'screenplay-reference-'))
     const store = new ScreenplayReferenceStore(projectRoot, '参考文件')
@@ -113,7 +134,7 @@ describe('screenplay references', () => {
     const projectRoot = await mkdtemp(join(tmpdir(), 'screenplay-reference-'))
     const store = new ScreenplayReferenceStore(projectRoot, '参考文件')
     const bytes = textPdf('PDF Preview Text')
-    await store.saveBatch([{
+    const saved = await store.saveBatch([{
       originalName: '故事资料.pdf',
       bytesBase64: bytes.toString('base64'),
       selection: { purpose: 'story-facts', scope: { kind: 'full' } },
@@ -125,6 +146,9 @@ describe('screenplay references', () => {
     expect(preview.content).toContain('PDF Preview Text')
     expect(preview.structure.pages).toEqual([expect.objectContaining({ page: 1 })])
     expect(await readFile(join(projectRoot, '参考文件', '故事资料.pdf'))).toEqual(bytes)
+
+    await expect(store.readDocument(saved.references[0]!.referenceId, 1))
+      .resolves.toMatchObject({ format: 'pdf', page: 1, pageSize: 1, totalPages: 1, content: expect.stringContaining('PDF Preview Text') })
   })
 
   it('requires explicit replacement for a same-name file', async () => {

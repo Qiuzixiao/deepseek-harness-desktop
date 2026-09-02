@@ -53,3 +53,15 @@ index 8d2992afbe79af270a0d08c38203166d3afc03f1..bd8dc7fd2bc01a4ec9ade821bbd5d7bd
 +++ b/templates/nsis/portable.nsi
 @@ -8,0 +9 @@
 +ManifestLongPathAware true
+diff --git a/out/util/appFileCopier.js b/out/util/appFileCopier.js
+--- a/out/util/appFileCopier.js
++++ b/out/util/appFileCopier.js
+@@ -234,7 +234,7 @@ async function collectNodeModulesWithLogging(platformPackager) {
+     const packager = platformPackager.info;
+     const { tempDirManager, appDir, projectDir } = packager;
+     const searchDirectories = Array.from(new Set([appDir, projectDir, await packager.getWorkspaceRoot()])).filter((it) => (0, builder_util_1.isEmptyOrSpaces)(it) === false);
+-    const pmApproaches = [await packager.getPackageManager(), node_module_collector_1.PM.TRAVERSAL];
++    const pmApproaches = [node_module_collector_1.PM.TRAVERSAL, await packager.getPackageManager()];
+     // Validate against the as-declared (pre-extraMetadata) production dependencies so a configured
+     // `extraMetadata.dependencies` entry that isn't installed cannot reject a correct collection.
+     const deps = await resolveFirstMatchingCollection({

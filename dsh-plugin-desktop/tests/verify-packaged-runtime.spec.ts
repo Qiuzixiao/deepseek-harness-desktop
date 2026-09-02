@@ -31,7 +31,7 @@ function context(
     appOutDir,
     electronPlatformName,
     ...(arch === undefined ? {} : { arch }),
-    packager: { appInfo: { productFilename: 'DSH Desktop' } },
+    packager: { appInfo: { productFilename: 'Zenwit' } },
   }
 }
 
@@ -44,6 +44,23 @@ function completePackageResolver(unpackedRoot: string): PackageResolver {
 }
 
 describe('packaged desktop runtime verification', () => {
+  it('requires the Zenwit short-drama Client shell in both packaged runtime trees', () => {
+    const packageRoot = 'node_modules/@deepseek-ai/dsh-client-ui-short-drama'
+
+    expect(REQUIRED_PACKAGED_RUNTIME_ENTRIES).toEqual(expect.arrayContaining([
+      `${packageRoot}/package.json`,
+      `${packageRoot}/lib/index.js`,
+      `${packageRoot}/lib/client.js`,
+    ]))
+    expect(REQUIRED_UNPACKED_RUNTIME_ENTRIES).toEqual(expect.arrayContaining([
+      `${packageRoot}/package.json`,
+      `${packageRoot}/lib/index.js`,
+      `${packageRoot}/lib/client.js`,
+    ]))
+    expect(REQUIRED_UNPACKED_PACKAGE_SPECIFIERS)
+      .toContain('@deepseek-ai/dsh-client-ui-short-drama/package.json')
+  })
+
   it('fails the diagnostic Worker smoke when its archive omits the crash dump', async () => {
     const unpackedRoot = resolvePackagedUnpackedRoot(context('/build', 'win32'))
     const launch = vi.fn<PackagedDiagnosticWorkerLauncher>(async (_workerPath, workerData) => {
@@ -116,7 +133,7 @@ describe('packaged desktop runtime verification', () => {
   it.each([
     [
       'darwin',
-      join('/build', 'DSH Desktop.app', 'Contents', 'Resources', 'app.asar'),
+      join('/build', 'Zenwit.app', 'Contents', 'Resources', 'app.asar'),
     ],
     [
       'win32',
@@ -249,7 +266,7 @@ describe('packaged desktop runtime verification', () => {
       'resources/agent-presets/cordis/agent.cordis.yml',
       'resources/agent-presets/cordis/skills/cordis-plugin-development/SKILL.md',
       'resources/agent-presets/cordis/skills/editing-cordis-compositions/SKILL.md',
-      'resources/agent-presets/screenplay-v1/agent.cordis.yml',
+      'resources/agent-presets/short-drama/agent.cordis.yml',
     ]
 
     for (const missing of requiredPresetEntries) {

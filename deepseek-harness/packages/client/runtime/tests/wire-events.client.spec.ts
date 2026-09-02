@@ -30,14 +30,13 @@ function forwardedEventContracts(ctx: Context): void {
   })
   ctx.remote.$on('credentials/updated', () => {})
   ctx.remote.$on('commands/change', () => {})
+  ctx.remote.$on('skills/change', () => {})
   ctx.remote.$on('llm/adapters-updated', () => {})
   ctx.remote.$on('agent-preset/selected', (sessionId, agentPreset) => {
     void sessionId; void agentPreset
   })
   // @ts-expect-error -- client-local event outside the allowlist
   ctx.remote.$on('slots/changed', () => {})
-  // @ts-expect-error -- declared host event the allowlist does not select
-  ctx.remote.$on('skills/change', () => {})
 }
 void forwardedEventContracts
 
@@ -94,6 +93,15 @@ describe('wire event bridge', () => {
       payload: { type: 'host/session-status', sessionId: 's1' as never, running: true },
     })
     expect(seen).toEqual([['commands/change']])
+  })
+
+  it('republishes skills/change so skill catalogs can invalidate', async () => {
+    const bench = await mount()
+    bench.sinks?.onHostEnvelope?.({
+      rpcId: 'r-skills' as never,
+      payload: { type: 'host/remote-event', event: 'skills/change', args: [] },
+    })
+    expect(bench.dispatched).toEqual([['skills/change']])
   })
 
   it('carries each forwarded event name with its own argument list, unfiltered', async () => {

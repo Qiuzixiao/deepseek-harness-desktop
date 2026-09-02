@@ -161,13 +161,23 @@ function createHarness(platform: DesktopRuntime['platform'] = 'darwin'): PluginH
 }
 
 describe('desktop Host plugin', () => {
-  it('defaults to compatibility mode and validates both schemas', () => {
-    expect(Config({} as DesktopConfig)).toEqual(config)
-    expect(Config({ mode: 'advanced' } as DesktopConfig)).toEqual({ ...config, mode: 'advanced' })
+  it('defaults to enhanced mode and validates both schemas', () => {
+    expect(Config({} as DesktopConfig)).toEqual({
+      ...config,
+      mode: 'advanced',
+      macosMaterial: 'off',
+      windowsMaterial: 'off',
+    })
+    expect(Config({ mode: 'advanced' } as DesktopConfig)).toEqual({
+      ...config,
+      mode: 'advanced',
+      macosMaterial: 'off',
+      windowsMaterial: 'off',
+    })
     expect(DesktopSettingsSchema({} as DesktopSettings)).toEqual({
-      mode: 'compatibility',
-      macosMaterial: 'transparent',
-      windowsMaterial: 'acrylic',
+      mode: 'advanced',
+      macosMaterial: 'off',
+      windowsMaterial: 'off',
       port: 43_120,
       logLevel: 'info',
     })
@@ -244,8 +254,8 @@ describe('desktop Host plugin', () => {
     expect(harness.shell()).toEqual(expect.objectContaining({
       mode: 'compatibility',
       url: 'http://127.0.0.1:43120/?dsh-desktop-entry=3&dsh-desktop-mode=compatibility&dsh-desktop-platform=darwin&dsh-desktop-material=off',
-      productName: 'DSH Desktop',
-      windowTitle: 'DeepSeek Harness Desktop',
+      productName: 'Zenwit',
+      windowTitle: 'Zenwit',
       readThemeSource: expect.any(Function),
     }))
     expect(harness.shell()?.iconPath.endsWith(join('build', 'app-icon-mac.png'))).toBe(true)

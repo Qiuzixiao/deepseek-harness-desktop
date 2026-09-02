@@ -20,6 +20,7 @@ const SEAT_CONTENT: Record<string, string> = {
 
 function mount({
   wide = true,
+  hideTrigger = false,
   onboardingActive = true,
   rows = [
     { id: 'general', order: 0, label: 'General' },
@@ -30,7 +31,7 @@ function mount({
     { id: 'welcome', order: -100 },
     { id: 'credential', order: 0 },
   ],
-}: { wide?: boolean; onboardingActive?: boolean; rows?: Row[]; steps?: Step[] } = {}) {
+}: { wide?: boolean; hideTrigger?: boolean; onboardingActive?: boolean; rows?: Row[]; steps?: Step[] } = {}) {
   // Mutable row source standing in for the bound useSections hook; bump()
   // plays a ledger change through the same observable contract.
   let current = rows
@@ -49,10 +50,11 @@ function mount({
       byId: { 'active-session': { blank: false } },
     })) as never
   const unusedHook = (() => { throw new Error('unused by SettingsRoot') }) as never
-  const props: SettingsRootComponentProps = {
+  const props = {
     useSessions,
     useWorkspaces: unusedHook,
     wide,
+    hideTrigger,
     useOnboardingSteps: select => select(steps),
     useSections: (select) => {
       const [, force] = useState(0)
@@ -64,7 +66,7 @@ function mount({
       return select(current)
     },
     renderSlot,
-  }
+  } as SettingsRootComponentProps
   const view = render(<SettingsRoot {...props} />)
   const bump = (next: Row[]) => {
     act(() => {
@@ -102,6 +104,13 @@ describe('SettingsRoot trigger', () => {
     expect(screen.getByRole('dialog')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Settings', expanded: true })).toBeTruthy()
   })
+
+  it('can hide its native trigger while retaining the product-shell event owner', () => {
+    mount({ hideTrigger: true })
+    expect(screen.queryByRole('button', { name: 'Settings' })).toBeNull()
+    act(() => { window.dispatchEvent(new Event('dsh:settings-open')) })
+    expect(screen.getByRole('dialog')).toBeTruthy()
+  })
 })
 
 describe('SettingsPanel chrome seats', () => {
@@ -124,11 +133,12 @@ describe('SettingsPanel chrome seats', () => {
     expect(close.textContent).toContain('Close')
   })
 
-  it('renders header actions before the shell-owned close control', () => {
+  it('hides header actions while retaining the shell-owned close control', () => {
     const { renderSlot } = mount()
     openPanel()
-    expect(screen.getByText('Open configuration file')).toBeTruthy()
-    expect(renderSlot).toHaveBeenCalledWith('settings.action', {})
+    expect(screen.queryByText('Open configuration file')).toBeNull()
+    expect(renderSlot).not.toHaveBeenCalledWith('settings.action', {})
+    expect(screen.getByRole('button', { name: 'Close' })).toBeTruthy()
   })
 })
 

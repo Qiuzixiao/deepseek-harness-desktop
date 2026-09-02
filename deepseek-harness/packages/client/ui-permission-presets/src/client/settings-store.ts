@@ -13,7 +13,7 @@ import {
 import {
   nodeAtPath, rehydrateSchema, type SchemaNode,
 } from '@deepseek-ai/dsh-client-schema-form'
-import { displayPermissionPreset } from './presentation.ts'
+import { displayPermissionPreset, type PermissionPresetLabelKey } from './presentation.ts'
 
 /** Permission's settings namespace on the host wire. */
 export const PERMISSION_SETTINGS_NS = 'permission'
@@ -47,7 +47,7 @@ interface ConstChoice {
  * @param view - permission namespace descriptor.
  * @returns current value and selectable options.
  */
-export function permissionDefaultOf(view: SettingsNamespaceView): {
+export function permissionDefaultOf(view: SettingsNamespaceView, translate?: (key: PermissionPresetLabelKey) => string): {
   currentValue: string
   options: PermissionDefaultOption[]
 } {
@@ -65,8 +65,8 @@ export function permissionDefaultOf(view: SettingsNamespaceView): {
     return [{
       id: choice.value,
       label: typeof described === 'string' && described.length > 0
-        ? displayPermissionPreset(choice.value, described)
-        : displayPermissionPreset(choice.value, choice.value),
+        ? displayPermissionPreset(choice.value, described, translate)
+        : displayPermissionPreset(choice.value, choice.value, translate),
     }]
   })
   if (options.length === 0 || !options.some(option => option.id === value)) {
@@ -91,7 +91,10 @@ export class PermissionPresetSettingsController {
   private view: SettingsNamespaceView | undefined
 
   /** @param api - Settings wire face. */
-  constructor(private readonly api: Pick<IApiClient, 'settings'>) {}
+  constructor(
+    private readonly api: Pick<IApiClient, 'settings'>,
+    private readonly translate?: (key: PermissionPresetLabelKey) => string,
+  ) {}
 
   /**
    * Refresh the permission descriptor. Latest request wins.
@@ -161,7 +164,7 @@ export class PermissionPresetSettingsController {
   }
 
   private accept(view: SettingsNamespaceView, writable: boolean): void {
-    const resolved = permissionDefaultOf(view)
+    const resolved = permissionDefaultOf(view, this.translate)
     this.view = view
     this.store.update((state) => {
       state.status = 'ready'

@@ -1,4 +1,4 @@
-/** Browser download state shared by the Session Header button and `/export`. */
+/** Browser download state shared by the Session export dialog and `/export`. */
 
 import { createSnapshotStore, type SessionId, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 

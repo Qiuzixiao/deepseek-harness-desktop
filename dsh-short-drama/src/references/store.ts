@@ -13,6 +13,8 @@ import type {
   ReferenceUploadFile,
   ReferenceUploadResult,
   ReferencePreview,
+  ReferenceDocumentPage,
+  ReferenceDocumentStructure,
 } from './types.js'
 
 interface ReferenceManifest {
@@ -216,6 +218,43 @@ export class ScreenplayReferenceStore {
       format: record.format,
       content,
       structure: JSON.parse(structureText) as ReferencePreview['structure'],
+    }
+  }
+
+  /** Read a bounded paragraph page without exposing the stored source path. */
+  async readDocument(referenceId: string, page = 1, pageSize?: number): Promise<ReferenceDocumentPage> {
+    const safeId = safeOpaqueId(referenceId, '参考文件 ID')
+    if (!Number.isInteger(page) || page < 1 || page > 10_000) throw new Error('文档页码无效')
+    const manifest = await this.manifest()
+    const record = manifest.references.find(item => item.referenceId === safeId)
+    if (record === undefined) throw new Error('参考文件不存在')
+    const parsedRoot = join(this.internalRoot, 'parsed', safeId)
+    const [content, structureText] = await Promise.all([
+      readFile(join(parsedRoot, 'content.md'), 'utf8'),
+      readFile(join(parsedRoot, 'structure.json'), 'utf8'),
+    ])
+    const structure = JSON.parse(structureText) as ReferenceDocumentStructure
+    const units = structure.pages === undefined
+      ? structure.paragraphs.map(span => ({ start: span.start, end: span.end }))
+      : structure.pages.map(span => ({ start: span.start, end: span.end }))
+    const effectivePageSize = pageSize ?? (structure.pages === undefined ? 20 : 1)
+    if (!Number.isInteger(effectivePageSize) || effectivePageSize < 1 || effectivePageSize > 100) throw new Error('文档分页大小无效')
+    const totalPages = Math.max(1, Math.ceil(units.length / effectivePageSize))
+    if (page > totalPages) throw new Error('指定文档页不存在')
+    const startIndex = (page - 1) * effectivePageSize
+    const spans = units.slice(startIndex, startIndex + effectivePageSize)
+    const selected = spans.map(span => content.slice(span.start, span.end)).join('\n\n').trim()
+    const hasMore = page < totalPages
+    return {
+      referenceId: safeId,
+      originalName: record.originalName,
+      format: record.format,
+      page,
+      pageSize: effectivePageSize,
+      totalPages,
+      content: selected,
+      hasMore,
+      ...(hasMore ? { nextPage: page + 1 } : {}),
     }
   }
 

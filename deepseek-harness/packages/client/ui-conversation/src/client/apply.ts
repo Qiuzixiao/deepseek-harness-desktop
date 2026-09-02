@@ -323,11 +323,13 @@ export function apply(ctx: Context): void {
             return error instanceof Error ? error.message : String(error)
           }
         },
+        intakeFiles: files => shell.intakeFiles(files),
         removeImage: (id) => {
-          conversation.releaseDraftImage(id)
+          conversation.removeDraftAttachment(sessionId, id)
           shell.removeImage(id)
         },
         draftImages: ids => conversation.draftImages(ids),
+        draftAttachments: ids => conversation.draftAttachmentsFor(ids),
         resolveSubmitMode: (running, gesture, steeringAvailable) =>
           submissionPolicy.resolve(running, gesture, steeringAvailable),
         toggleCommandMenu: inputTriggers === undefined

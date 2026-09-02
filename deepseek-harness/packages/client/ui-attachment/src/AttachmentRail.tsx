@@ -12,10 +12,18 @@ import css from './AttachmentRail.module.css'
 export interface AttachmentRailItem {
   /** Stable identity for the React key. */
   id: string
-  /** Object or data URL rendered as the thumbnail. */
-  previewUrl: string
+  /** Object or data URL rendered as the thumbnail (images only). */
+  previewUrl?: string
   /** Image alt text (display name with the owner's fallback applied). */
   alt: string
+  /** Optional attachment kind; omitted values remain backwards-compatible images. */
+  kind?: 'image' | 'document'
+  /** Document display metadata. */
+  name?: string
+  extension?: string
+  bytes?: number
+  status?: 'uploading' | 'ready' | 'error'
+  error?: string
   /** Accessible label of the item's remove control. */
   removeLabel: string
 }
@@ -26,6 +34,8 @@ export interface AttachmentRailLabels {
   group: string
   /** Thumbnail tooltip inviting the original-image preview. */
   open: string
+  /** Document status while the upload request is in flight. */
+  uploading: string
   /** Accessible label of the left paging arrow. */
   scrollLeft: string
   /** Accessible label of the right paging arrow. */
@@ -164,16 +174,34 @@ export function AttachmentRail<T extends AttachmentRailItem>({ items, labels, on
         aria-label={labels.group}
         onScroll={updateEdges}
       >
-        {items.map(item => (
-          <div key={item.id} className={css.item}>
-            <button
-              type="button"
-              className={css.thumbnail}
-              title={labels.open}
-              onClick={() => { onOpen(item) }}
-            >
-              <img src={item.previewUrl} alt={item.alt} />
-            </button>
+        {items.map(item => {
+          const documentItem = item.kind === 'document'
+          const bytes = item.bytes ?? 0
+          const size = bytes < 1024 * 1024
+            ? `${Math.max(1, Math.round(bytes / 1024))} KB`
+            : `${(bytes / (1024 * 1024)).toFixed(bytes % (1024 * 1024) === 0 ? 0 : 1)} MB`
+          return (
+          <div key={item.id} className={clsx(css.item, documentItem && css.documentItem)}>
+            {documentItem ? (
+              <div className={css.documentCard} title={item.error ?? item.name ?? item.alt}>
+                <div className={css.documentIcon} aria-hidden>{(item.extension ?? 'FILE').slice(0, 5).toUpperCase()}</div>
+                <div className={css.documentMeta}>
+                  <div className={css.documentName}>{item.name ?? item.alt}</div>
+                  <div className={css.documentSize}>
+                    {item.status === 'uploading' ? labels.uploading : item.status === 'error' ? (item.error ?? 'Upload failed') : size}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className={css.thumbnail}
+                title={labels.open}
+                onClick={() => { onOpen(item) }}
+              >
+                {item.previewUrl !== undefined && <img src={item.previewUrl} alt={item.alt} />}
+              </button>
+            )}
             <button
               type="button"
               className={css.remove}
@@ -183,7 +211,8 @@ export function AttachmentRail<T extends AttachmentRailItem>({ items, labels, on
               <IconCloseFill14 size={12} />
             </button>
           </div>
-        ))}
+          )
+        })}
       </div>
       {edges.right && (
         <button

@@ -48,7 +48,7 @@ function mountWorkspace() {
   vi.stubGlobal('fetch', vi.fn(async (input: string) => {
     if (input.includes('/structure?')) {
       return new Response(JSON.stringify({
-        path: '/project', phase: 'Writing', revision: 3, nextEpisode: 2, root: 'Project',
+        path: '/project', root: 'Project', agentId: 'short-drama',
         tree: [
           {
               name: '剧本', path: '/project/剧本', kind: 'dir', detail: '', children: [
@@ -76,10 +76,59 @@ function mountWorkspace() {
     startSession,
     addSelectionToConversation,
   } as unknown as WorkspaceProps
-  return { ...render(<Workspace {...props} />), openSession, startSession, addSelectionToConversation }
+  return {
+    ...render(<Workspace {...props} />),
+    openSession,
+    startSession,
+    addSelectionToConversation,
+    renderSlot: props.renderSlot,
+  }
 }
 
 describe('Zenwit workspace layout', () => {
+  it('creates nodes and exposes daily file actions through the application menu', async () => {
+    mountWorkspace()
+    const files = screen.getByRole('complementary', { name: '文件目录' })
+    fireEvent.click(await within(files).findByRole('button', { name: '新建文件' }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: '想法.md' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '确定' }))
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/desktop/projects/node', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ path: '/project/想法.md', kind: 'file' }),
+    })))
+
+    fireEvent.click(within(files).getByRole('button', { name: '项目操作' }))
+    const projectMenu = screen.getByRole('menu')
+    expect(within(projectMenu).getByRole('menuitem', { name: '新建文件夹' })).toBeTruthy()
+    expect(within(projectMenu).getByRole('menuitem', { name: '刷新' })).toBeTruthy()
+    expect(within(projectMenu).getByRole('menuitem', { name: '全部折叠' })).toBeTruthy()
+    fireEvent.pointerDown(document.body)
+
+    fireEvent.click(within(files).getByRole('treeitem', { name: '剧本' }))
+    const file = within(files).getByRole('treeitem', { name: /episode-1\.md/ })
+    fireEvent.contextMenu(file, { clientX: 20, clientY: 30 })
+    const menu = screen.getByRole('menu')
+    expect(within(menu).getByRole('menuitem', { name: '重命名' })).toBeTruthy()
+    expect(within(menu).getByRole('menuitem', { name: '在 Finder 中显示' })).toBeTruthy()
+    expect(within(menu).getByRole('menuitem', { name: '在终端中打开' })).toBeTruthy()
+    expect(within(menu).getByRole('menuitem', { name: '添加到聊天' })).toBeTruthy()
+  })
+
+  it('closes an open file tab after confirmed deletion', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    mountWorkspace()
+    const files = screen.getByRole('complementary', { name: '文件目录' })
+    fireEvent.click(await within(files).findByRole('treeitem', { name: '剧本' }))
+    const file = within(files).getByRole('treeitem', { name: /episode-1\.md/ })
+    fireEvent.click(file)
+    await screen.findByRole('tab', { name: 'episode-1.md' })
+    fireEvent.contextMenu(file, { clientX: 20, clientY: 30 })
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: '删除' }))
+    await waitFor(() => expect(screen.queryByRole('tab', { name: 'episode-1.md' })).toBeNull())
+    expect(fetch).toHaveBeenCalledWith('/api/desktop/projects/node', expect.objectContaining({ method: 'DELETE' }))
+  })
+
   it('keeps files and settings on the left and conversation controls on the right', async () => {
     const view = mountWorkspace()
     const files = screen.getByRole('complementary', { name: '文件目录' })
@@ -96,9 +145,21 @@ describe('Zenwit workspace layout', () => {
     expect(within(files).queryByText(/历史会话/)).toBeNull()
     expect(screen.getByRole('button', { name: '原生设置' })).toBeTruthy()
     expect(within(chat).getByRole('button', { name: '新建对话' })).toBeTruthy()
+    expect(view.renderSlot).toHaveBeenCalledWith('conversation', {
+      showWorkspacePicker: false,
+      showHeroHeadline: false,
+    })
 
-    fireEvent.click(within(chat).getByRole('button', { name: '历史对话（2）' }))
+    const historyButton = within(chat).getByRole('button', { name: '历史对话（2）' })
+    expect(historyButton.getAttribute('title')).toBe('历史对话（2）')
+    expect(within(historyButton).getByText('2')).toBeTruthy()
+    fireEvent.click(historyButton)
     expect(within(chat).getByRole('button', { name: '打开历史对话：历史对话' })).toBeTruthy()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(within(chat).queryByRole('button', { name: '打开历史对话：历史对话' })).toBeNull()
+    fireEvent.click(historyButton)
+    fireEvent.pointerDown(document.body)
+    expect(within(chat).queryByRole('button', { name: '打开历史对话：历史对话' })).toBeNull()
     fireEvent.click(within(chat).getByRole('button', { name: '新建对话' }))
     expect(view.startSession).toHaveBeenCalledWith('workspace-1')
   })

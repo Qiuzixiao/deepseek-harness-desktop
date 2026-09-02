@@ -21,7 +21,7 @@ afterEach(() => {
 // props share; stub them as never-called functions.
 const neverHook = (() => { throw new Error('shell must not read global hooks') }) as never
 
-function mountShell({ collapsed = false, width = 300, settingsOnly = false }: { collapsed?: boolean; width?: number; settingsOnly?: boolean } = {}) {
+function mountShell({ collapsed = false, width = 300, settingsOnly = false, settingsOnlyInline = false }: { collapsed?: boolean; width?: number; settingsOnly?: boolean; settingsOnlyInline?: boolean } = {}) {
   const startSession = vi.fn()
   const toggleSidebar = vi.fn()
   let regionOwner: SidebarSectionOwnerProps | undefined
@@ -31,6 +31,7 @@ function mountShell({ collapsed = false, width = 300, settingsOnly = false }: { 
   const root = () => (
     <SidebarRoot
       collapsed={current.collapsed} width={current.width} settingsOnly={settingsOnly}
+      settingsOnlyInline={settingsOnlyInline}
       useSessions={neverHook} useWorkspaces={neverHook}
       startSession={startSession} toggleSidebar={toggleSidebar} t={t}
       renderSlot={((
@@ -123,5 +124,12 @@ describe('SidebarRoot shell', () => {
     expect(shell.settingsOwner().wide).toBe(false)
     expect(screen.queryByTestId('region')).toBeNull()
     expect(screen.queryByRole('button', { name: 'New session' })).toBeNull()
+  })
+
+  it('hides the native trigger host when a zero-width product shell owns the visible action', () => {
+    const shell = mountShell({ collapsed: true, width: 0, settingsOnly: true, settingsOnlyInline: true })
+    expect(screen.getByTestId('settings-seat')).toBeTruthy()
+    expect(shell.settingsOwner().wide).toBe(false)
+    expect(shell.settingsOwner().hideTrigger).toBe(true)
   })
 })

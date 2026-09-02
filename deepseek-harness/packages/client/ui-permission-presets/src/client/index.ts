@@ -58,7 +58,7 @@ function optionsOf(value: PermissionSelect, t: (key: string) => string): SelectO
     .filter(option => option.value !== 'custom')
     .map(option => ({
       id: option.value,
-      label: displayPermissionPreset(option.value, option.name),
+      label: displayPermissionPreset(option.value, option.name, t),
       ...(option.description !== undefined ? { detail: option.description } : {}),
       ...(option.value === value.currentValue ? { active: true } : {}),
       ...(option.value === FULL_ACCESS_PRESET
@@ -92,15 +92,21 @@ export function apply(ctx: ClientContext): void {
         'confirm.title': accessZh['confirm.title'],
         'confirm.description': accessZh['confirm.description'],
         'confirm.acknowledge': accessZh['confirm.acknowledge'],
-        'confirm.cancel': accessZh['confirm.cancel'],
-        'confirm.enable': accessZh['confirm.enable'],
+      'confirm.cancel': accessZh['confirm.cancel'],
+      'confirm.enable': accessZh['confirm.enable'],
+      'preset.readOnly': accessZh['preset.readOnly'],
+      'preset.workspaceWrite': accessZh['preset.workspaceWrite'],
+      'preset.fullAccess': accessZh['preset.fullAccess'],
       }),
       ctx.locale.register(ACCESS_NS, 'en', {
         'confirm.title': accessEn['confirm.title'],
         'confirm.description': accessEn['confirm.description'],
         'confirm.acknowledge': accessEn['confirm.acknowledge'],
-        'confirm.cancel': accessEn['confirm.cancel'],
-        'confirm.enable': accessEn['confirm.enable'],
+      'confirm.cancel': accessEn['confirm.cancel'],
+      'confirm.enable': accessEn['confirm.enable'],
+      'preset.readOnly': accessEn['preset.readOnly'],
+      'preset.workspaceWrite': accessEn['preset.workspaceWrite'],
+      'preset.fullAccess': accessEn['preset.fullAccess'],
       }),
     ]
     return () => { for (const dispose of disposers) dispose() }
@@ -113,7 +119,8 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register('settings.permission', { zh, en }), 'ui-permission: settings row dictionaries')
 
   const connection = ctx.get('connection') as ConnectionHandle
-  const controller = new PermissionPresetSettingsController(connection.api)
+  const settingsTranslate = ctx.locale.bind('settings.permission')
+  const controller = new PermissionPresetSettingsController(connection.api, settingsTranslate)
   const load = (): Promise<void> => controller.load()
   const select = (preset: string): Promise<void> => controller.select(preset)
   const injected = (): PermissionRowInjected => ({

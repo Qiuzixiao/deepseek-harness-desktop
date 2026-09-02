@@ -902,6 +902,6 @@ corepack yarn check
 5. 新工具栏应调用 Milkdown/ProseMirror 正式命令，不通过字符串拼接修改复杂 Markdown。
 6. 高级 Markdown 必须先建立 round-trip 样例，再宣称支持。
 7. 不升级当前锁定的 Milkdown/ProseMirror 版本。
-8. 不清理 `~/.dsh`；编辑器功能和本地开发数据清理没有依赖关系。
+8. 不清理 `~/.zenwit`；编辑器功能和本地开发数据清理没有依赖关系。
 
 至此，第一阶段完成了“默认可视化编辑 + 源码回退 + 原保存链路”，第二阶段完成了“共享短剧识别 + 双模式一致的视觉语义”。稳定化代码则保证这套实现能在现有 Desktop RC2 组合和 Cordis 会话生命周期下实际运行。

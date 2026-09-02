@@ -32,14 +32,24 @@ export const DESKTOP_PROFILE_CREATE_WINDOW_PATH = '/api/desktop/profiles/create-
 /** Restore the last successful Profile and its latest healthy configuration. */
 export const DESKTOP_PROFILE_ROLLBACK_PATH = '/api/desktop/profiles/rollback'
 
-/** Zenwit project library: list (GET) and create (POST) screenplay projects. */
+/** Zenwit project library: list/create screenplay projects. */
 export const DESKTOP_PROJECT_LIBRARY_PATH = '/api/desktop/projects'
+/** Permanently delete one registered screenplay project. */
+export const DESKTOP_PROJECT_DELETE_PATH = '/api/desktop/projects/delete'
 /** Zenwit project structure tree. */
 export const DESKTOP_PROJECT_STRUCTURE_PATH = '/api/desktop/projects/structure'
 /** Zenwit project file read/write. */
 export const DESKTOP_PROJECT_FILE_PATH = '/api/desktop/projects/file'
 /** Zenwit project files available to the @ resource picker. */
 export const DESKTOP_PROJECT_RESOURCES_PATH = '/api/desktop/projects/resources'
+/** Daily file and folder operations inside a project. */
+export const DESKTOP_PROJECT_NODE_PATH = '/api/desktop/projects/node'
+/** Reveal one project file or folder in the native file manager. */
+export const DESKTOP_PROJECT_REVEAL_PATH = '/api/desktop/projects/reveal'
+/** Open the launcher-owned terminal at one project path. */
+export const DESKTOP_PROJECT_TERMINAL_PATH = '/api/desktop/projects/terminal'
+
+export interface DesktopProjectPathRequest { readonly path: string }
 
 /** Renderer-safe projection of one discovered profile. */
 export interface DesktopSettingsProfileView {

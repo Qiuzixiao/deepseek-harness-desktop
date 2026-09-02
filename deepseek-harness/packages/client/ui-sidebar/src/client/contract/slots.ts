@@ -54,6 +54,8 @@ export interface SidebarSectionOwnerProps {
 export interface SidebarSettingsOwnerProps {
   /** Whether the sidebar renders wide content (false = 56px rail). */
   wide: boolean
+  /** Keep the settings owner mounted without painting its native trigger. */
+  hideTrigger?: boolean
 }
 
 /** Owner share of an action rendered beside Settings at the sidebar foot. */

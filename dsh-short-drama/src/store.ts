@@ -55,7 +55,7 @@ export const EPISODE_OUTLINES_FILE = LEGACY_SCREENPLAY_LAYOUT.episodeOutlinesFil
 export const SCREENPLAY_DIR = LEGACY_SCREENPLAY_LAYOUT.screenplayDir
 export const DELIVERABLE_DIR = LEGACY_SCREENPLAY_LAYOUT.deliverablesDir
 
-const CONTRACT_SECTIONS = [
+const LEGACY_CONTRACT_SECTIONS = [
   '## 一、项目定位',
   '## 二、核心故事与总规划',
   '## 三、人物与关系设定',
@@ -69,7 +69,7 @@ const CONTRACT_SECTIONS = [
   '## 十一、待确认事项',
 ] as const
 
-const SETTING_SECTIONS = [
+const LEGACY_SETTING_SECTIONS = [
   '## 一、故事世界观',
   '## 二、核心设定',
   '## 三、关键地点',
@@ -78,7 +78,7 @@ const SETTING_SECTIONS = [
   '## 六、风格底色（一句话）',
 ] as const
 
-const EPISODE_OUTLINE_FIELDS = [
+const LEGACY_EPISODE_OUTLINE_FIELDS = [
   '**核心冲突**：',
   '**情绪定位**：',
   '- 钩子开场：',
@@ -159,10 +159,47 @@ function normalizeRequirements(
 function requireSections(content: string, sections: readonly string[], label: string): void {
   const missing = sections.filter(section => !content.includes(section))
   if (missing.length > 0) {
-    throw new ScreenplayError('VALIDATION_FAILED', `${label} does not match the required Markdown format`, {
+    throw new ScreenplayError('VALIDATION_FAILED', `${label} is missing required Markdown sections`, {
       missingSections: missing,
     })
   }
+}
+
+/** The project name is a file-system fact, while the wording after it is user-owned. */
+function hasProjectHeading(content: string, projectName: string | undefined): boolean {
+  const firstLine = content.split('\n', 1)[0]?.trim() ?? ''
+  return /^#\s+\S/u.test(firstLine)
+    && (projectName === undefined || firstLine.includes(projectName))
+}
+
+/** New projects use a small facts-oriented Markdown contract; legacy sections remain readable. */
+function validateFlexibleArtifact(content: string, label: string, projectName?: string): void {
+  if (!hasProjectHeading(content, projectName)) {
+    validationFailure(`${label} must start with an H1 containing the confirmed project name`, label as ScreenplayArtifactKind, [{
+      field: 'title',
+      expected: projectName === undefined ? '# <title>' : `# <title containing ${projectName}>`,
+      actual: content.split('\n', 1)[0]?.trim() ?? '',
+    }])
+  }
+  const headings = content.match(/^##\s+\S.+$/gmu) ?? []
+  if (headings.length === 0) {
+    validationFailure(`${label} must contain at least one level-two facts section`, label as ScreenplayArtifactKind, [{
+      field: 'sections',
+      expected: 'at least one ## section',
+    }])
+  }
+}
+
+function validateCreativeContract(content: string, projectName?: string): void {
+  const legacyCount = LEGACY_CONTRACT_SECTIONS.filter(section => content.includes(section)).length
+  if (legacyCount === LEGACY_CONTRACT_SECTIONS.length) return
+  validateFlexibleArtifact(content, 'creative-contract', projectName)
+}
+
+function validateCoreSetting(content: string, projectName?: string): void {
+  const legacyCount = LEGACY_SETTING_SECTIONS.filter(section => content.includes(section)).length
+  if (legacyCount === LEGACY_SETTING_SECTIONS.length) return
+  validateFlexibleArtifact(content, 'core-setting', projectName)
 }
 
 function validateMainCharacterTemplate(content: string, characterName: string): void {
@@ -249,8 +286,8 @@ function validationFailure(
 }
 
 function episodeOutlineBlock(content: string, episode: number): string | undefined {
-  const headings = [...content.matchAll(/^##\s+第\s*(\d+)\s*集《[^》]+》\s*$/gmu)]
-  const heading = headings.find(candidate => Number(candidate[1]) === episode)
+  const headings = episodeOutlineHeadings(content)
+  const heading = headings.find(candidate => candidate.number === episode)
   if (heading === undefined || heading.index === undefined) return undefined
   const next = headings.find(candidate => (candidate.index ?? 0) > heading.index!)
   const forecast = content.indexOf('\n## 后续主线预告', heading.index)
@@ -258,6 +295,52 @@ function episodeOutlineBlock(content: string, episode: number): string | undefin
   if (forecast >= 0) candidates.push(forecast)
   const end = Math.min(...candidates)
   return content.slice(heading.index, end).trim()
+}
+
+interface EpisodeOutlineHeading {
+  number: number
+  index: number
+  style: 'legacy' | 'compact'
+}
+
+function episodeOutlineHeadings(content: string): EpisodeOutlineHeading[] {
+  const headings: EpisodeOutlineHeading[] = []
+  for (const match of content.matchAll(/^##\s+第\s*(\d+)\s*集《[^》]+》\s*$/gmu)) {
+    if (match.index !== undefined && match[1] !== undefined) {
+      headings.push({ number: Number(match[1]), index: match.index, style: 'legacy' })
+    }
+  }
+  for (const match of content.matchAll(/^###\s+第\s*(\d+)\s*集\s*$/gmu)) {
+    if (match.index !== undefined && match[1] !== undefined) {
+      headings.push({ number: Number(match[1]), index: match.index, style: 'compact' })
+    }
+  }
+  return headings.sort((left, right) => left.index - right.index)
+}
+
+function validateCompactEpisodeOutlineBlock(content: string, episode: number): void {
+  const lines = content.split('\n').map(line => line.trim()).filter(Boolean)
+  const intro = lines.findIndex(line => /^导语：\S.*$/u.test(line))
+  if (intro < 0) {
+    validationFailure(`episode ${String(episode)} compact outline is missing 导语`, 'episode-outlines', [{
+      field: `episode-${String(episode)}`,
+      expected: '导语：一句话核心冲突、选择、反转或关系变化',
+    }])
+  }
+  const storyLines = lines.slice(intro + 1).filter(line => line !== '---')
+  if (storyLines.length === 0) {
+    validationFailure(`episode ${String(episode)} compact outline has no third-person story`, 'episode-outlines', [{
+      field: `episode-${String(episode)}`,
+      expected: 'a complete third-person episode narrative after 导语',
+    }])
+  }
+  const analysisLabels = /^(?:核心冲突|情绪定位|钩子开场|冲突升级|情绪爆发|微反转\/钩子)\s*[：:]/u
+  if (storyLines.some(line => analysisLabels.test(line))) {
+    validationFailure(`episode ${String(episode)} compact outline must be narrative rather than analysis fields`, 'episode-outlines', [{
+      field: `episode-${String(episode)}`,
+      expected: 'third-person narrative without analysis labels',
+    }])
+  }
 }
 
 function normalizeContinuity(value: ScreenplayContinuityState): ScreenplayContinuityState {
@@ -324,12 +407,34 @@ function validateEpisodeScreenplay(
       actual: 'none',
     }])
   }
+  const sceneNumbers = sceneIndexes.map(index => Number(lines[index]?.match(new RegExp(`^${String(episode)}-(\\d+)`, 'u'))?.[1]))
+  const expectedSceneNumbers = Array.from({ length: sceneNumbers.length }, (_value, index) => index + 1)
+  if (sceneNumbers.some((number, index) => number !== expectedSceneNumbers[index])) {
+    validationFailure('scene numbers must be sequential starting at 1', 'episode-screenplay', [{
+      field: 'sceneHeaders',
+      expected: expectedSceneNumbers,
+      actual: sceneNumbers,
+    }])
+  }
+  const dialoguePattern = /^[^#\[\]△\s][^：\n]{0,40}(?:（(?:表演提示|OS|VO)）)?：.+$/u
   for (const index of sceneIndexes) {
     const nextScene = sceneIndexes.find(candidate => candidate > index)
     const block = lines.slice(index, nextScene ?? lines.length)
     if (!block.some(line => /^人物：.+/u.test(line.trim()))) {
       validationFailure('each scene must declare its actual speaking characters', 'episode-screenplay', [{
         field: 'characters',
+        scene: lines[index],
+      }])
+    }
+    if (!block.some(line => line.trim().startsWith('△'))) {
+      validationFailure('each scene must contain a performable action line beginning with △', 'episode-screenplay', [{
+        field: 'actions',
+        scene: lines[index],
+      }])
+    }
+    if (!block.some(line => !/^人物：/u.test(line.trim()) && dialoguePattern.test(line.trim()))) {
+      validationFailure('each scene must contain character dialogue', 'episode-screenplay', [{
+        field: 'dialogue',
         scene: lines[index],
       }])
     }
@@ -341,8 +446,7 @@ function validateEpisodeScreenplay(
       expected: 'at least one action line',
     }])
   }
-  const dialoguePattern = /^[^#\[\]△\s][^：\n]{0,40}(?:（(?:表演提示|OS|VO)）)?：.+$/u
-  const dialogueLines = lines.filter(line => dialoguePattern.test(line.trim()))
+  const dialogueLines = lines.filter(line => !/^人物：/u.test(line.trim()) && dialoguePattern.test(line.trim()))
   if (dialogueLines.length === 0) {
     validationFailure('episode screenplay must contain character dialogue', 'episode-screenplay', [{
       field: 'dialogue',
@@ -358,9 +462,15 @@ function validateEpisodeScreenplay(
       ends: flashbackEnds,
     }])
   }
-  if (/分镜|镜头语言|作者说明|写作说明/u.test(content)) {
+  if (/分镜|镜头语言|分镜脚本|镜号|作者说明|写作说明|制作指令/u.test(content)) {
     validationFailure('episode screenplay must remain generic screenplay prose without shot or author instructions', 'episode-screenplay', [{
       field: 'forbiddenTerms',
+    }])
+  }
+  if (!lines.some(line => /^【卡点(?:特写)?[：:]/u.test(line.trim()))) {
+    validationFailure('episode screenplay must contain an explicit card-point marker', 'episode-screenplay', [{
+      field: 'cardPoint',
+      expected: '【卡点：...】 or 【卡点特写：...】',
     }])
   }
   const count = effectiveCharacterCount(content)
@@ -414,10 +524,10 @@ function validateFullOutline(content: string, projectName: string | undefined): 
     throw new ScreenplayError('INVALID_STATE', 'full outline validation requires the project name')
   }
   const firstLine = content.split('\n', 1)[0]?.trim()
-  if (firstLine !== `# 《${projectName}》全剧大纲`) {
-    validationFailure('full outline title must use the exact project folder name', 'full-outline', [{
+  if (firstLine === undefined || !/^#(?!#)\s+\S/u.test(firstLine) || !firstLine.includes(projectName)) {
+    validationFailure('full outline must start with an H1 containing the exact project folder name', 'full-outline', [{
       field: 'title',
-      expected: `# 《${projectName}》全剧大纲`,
+      expected: `an H1 containing ${projectName}`,
       actual: firstLine ?? '',
     }])
   }
@@ -454,29 +564,17 @@ function validateEpisodeOutlines(
   if (projectName === undefined || episodeCount === undefined) {
     throw new ScreenplayError('INVALID_STATE', 'episode outline validation requires project name and episode count')
   }
-  const firstLine = content.split('\n', 1)[0]?.trim()
-  if (firstLine !== `# 《${projectName}》前 ${String(episodeCount)} 集大纲`) {
-    validationFailure('episode outline title must use the exact project folder name and confirmed total episode count', 'episode-outlines', [{
+  const firstLine = content.split('\n', 1)[0]?.trim() ?? ''
+  if (!hasProjectHeading(content, projectName) || !/(?:大纲|集纲|分集)/u.test(firstLine)) {
+    validationFailure('episode outline title must contain the exact project folder name', 'episode-outlines', [{
       field: 'title',
-      expected: `# 《${projectName}》前 ${String(episodeCount)} 集大纲`,
-      actual: firstLine ?? '',
+      expected: `# <title containing ${projectName}>`,
+      actual: firstLine,
       projectName,
       totalEpisodes: episodeCount,
-      titleNumberMeaning: 'confirmed total episode count, not the current batch size',
     }])
   }
-  const missingHeaderFields = [
-    '> 单元结构：',
-    '> 每集核心公式：',
-    '## 后续主线预告',
-  ].filter(field => !content.includes(field))
-  if (missingHeaderFields.length > 0) {
-    validationFailure('episode outlines must keep the image-referenced header and forecast format', 'episode-outlines', [{
-      field: 'header',
-      missing: missingHeaderFields,
-    }])
-  }
-  const headings = [...content.matchAll(/^##\s+第\s*(\d+)\s*集《([^》]+)》\s*$/gmu)]
+  const headings = episodeOutlineHeadings(content)
   if (headings.length !== episodeCount) {
     validationFailure('episode outline count does not match the confirmed episode count', 'episode-outlines', [{
       field: 'episodeCount',
@@ -484,26 +582,51 @@ function validateEpisodeOutlines(
       actual: headings.length,
     }])
   }
-  const numbers = headings.map(match => Number(match[1]))
+  const numbers = headings.map(heading => heading.number)
   const expectedNumbers = Array.from({ length: episodeCount }, (_value, index) => index + 1)
   if (numbers.some((number, index) => number !== expectedNumbers[index])
-    || headings.some(match => match[2]?.trim().length === 0)) {
+    || new Set(numbers).size !== numbers.length) {
     validationFailure('episode outline headings must be unique and sequential from episode 1', 'episode-outlines', [{
       field: 'episodeHeadings',
       expected: expectedNumbers,
       actual: numbers,
     }])
   }
-  for (const [index, heading] of headings.entries()) {
-    const start = heading.index ?? 0
-    const end = headings[index + 1]?.index ?? content.length
-    const episode = content.slice(start, end)
-    const missing = EPISODE_OUTLINE_FIELDS.filter(field => !episode.includes(field))
-    if (missing.length > 0) {
-      validationFailure(`episode ${String(index + 1)} does not match the image-referenced format`, 'episode-outlines', [{
-        field: `episode-${String(index + 1)}`,
-        missingFields: missing,
+  const usesLegacy = headings.some(heading => heading.style === 'legacy')
+  if (usesLegacy && firstLine !== `# 《${projectName}》前 ${String(episodeCount)} 集大纲`) {
+    validationFailure('episode outline title must use the exact project folder name and confirmed total episode count', 'episode-outlines', [{
+      field: 'title',
+      expected: `# 《${projectName}》前 ${String(episodeCount)} 集大纲`,
+      actual: firstLine,
+      totalEpisodes: episodeCount,
+      titleNumberMeaning: 'confirmed total episode count, not the current batch size',
+    }])
+  }
+  if (usesLegacy) {
+    const missingHeaderFields = [
+      '> 单元结构：',
+      '> 每集核心公式：',
+      '## 后续主线预告',
+    ].filter(field => !content.includes(field))
+    if (missingHeaderFields.length > 0) {
+      validationFailure('legacy episode outlines are missing required header or forecast fields', 'episode-outlines', [{
+        field: 'header',
+        missing: missingHeaderFields,
       }])
+    }
+    for (const [index] of headings.entries()) {
+      const episode = outlineSegment(content, headings, index)
+      const missing = LEGACY_EPISODE_OUTLINE_FIELDS.filter(field => !episode.includes(field))
+      if (missing.length > 0) {
+        validationFailure(`episode ${String(index + 1)} is missing legacy outline fields`, 'episode-outlines', [{
+          field: `episode-${String(index + 1)}`,
+          missingFields: missing,
+        }])
+      }
+    }
+  } else {
+    for (const [index, heading] of headings.entries()) {
+      validateCompactEpisodeOutlineBlock(outlineSegment(content, headings, index), heading.number)
     }
   }
 }
@@ -518,29 +641,18 @@ function validateEpisodeOutlineBatch(
   if (projectName === undefined || totalEpisodes === undefined) {
     throw new ScreenplayError('INVALID_STATE', 'episode outline batch validation requires project name and episode count')
   }
-  const firstLine = content.split('\n', 1)[0]?.trim()
-  if (firstLine !== `# 《${projectName}》前 ${String(totalEpisodes)} 集大纲`) {
-    validationFailure('episode outline title must use the exact project folder name and confirmed total episode count', 'episode-outlines', [{
+  const firstLine = content.split('\n', 1)[0]?.trim() ?? ''
+  if (!hasProjectHeading(content, projectName) || !/(?:大纲|集纲|分集)/u.test(firstLine)) {
+    validationFailure('episode outline title must contain the exact project folder name', 'episode-outlines', [{
       field: 'title',
-      expected: `# 《${projectName}》前 ${String(totalEpisodes)} 集大纲`,
-      actual: firstLine ?? '',
+      expected: `# <title containing ${projectName}>`,
+      actual: firstLine,
       projectName,
       totalEpisodes,
       requestedBatch: { startEpisode, endEpisode },
-      titleNumberMeaning: 'confirmed total episode count, not the current batch size',
     }])
   }
-  const missingHeaderFields = [
-    '> 单元结构：',
-    '> 每集核心公式：',
-  ].filter(field => !content.includes(field))
-  if (missingHeaderFields.length > 0) {
-    validationFailure('episode outline batch must keep the image-referenced header format', 'episode-outlines', [{
-      field: 'header',
-      missing: missingHeaderFields,
-    }])
-  }
-  const headings = [...content.matchAll(/^##\s+第\s*(\d+)\s*集《([^》]+)》\s*$/gmu)]
+  const headings = episodeOutlineHeadings(content)
   const expectedCount = endEpisode - startEpisode + 1
   if (headings.length !== expectedCount) {
     validationFailure('episode outline batch count does not match the requested range', 'episode-outlines', [{
@@ -550,45 +662,70 @@ function validateEpisodeOutlineBatch(
       requestedRange: { startEpisode, endEpisode },
     }])
   }
-  const numbers = headings.map(match => Number(match[1]))
+  const numbers = headings.map(heading => heading.number)
   const expectedNumbers = Array.from({ length: expectedCount }, (_value, index) => startEpisode + index)
   if (numbers.some((number, index) => number !== expectedNumbers[index])
-    || headings.some(match => match[2]?.trim().length === 0)) {
+    || new Set(numbers).size !== numbers.length) {
     validationFailure('episode outline batch headings must be sequential and match the requested range', 'episode-outlines', [{
       field: 'episodeHeadings',
       expected: expectedNumbers,
       actual: numbers,
     }])
   }
-  for (const [index, heading] of headings.entries()) {
-    const start = heading.index ?? 0
-    const end = headings[index + 1]?.index ?? content.length
-    const episode = content.slice(start, end)
-    const missing = EPISODE_OUTLINE_FIELDS.filter(field => !episode.includes(field))
-    if (missing.length > 0) {
-      validationFailure(`episode ${String(startEpisode + index)} does not match the image-referenced format`, 'episode-outlines', [{
-        field: `episode-${String(startEpisode + index)}`,
-        missingFields: missing,
+  if (headings.some(heading => heading.style === 'legacy')
+    && firstLine !== `# 《${projectName}》前 ${String(totalEpisodes)} 集大纲`) {
+    validationFailure('episode outline title must use the exact project folder name and confirmed total episode count', 'episode-outlines', [{
+      field: 'title',
+      expected: `# 《${projectName}》前 ${String(totalEpisodes)} 集大纲`,
+      actual: firstLine,
+      totalEpisodes,
+      requestedBatch: { startEpisode, endEpisode },
+      titleNumberMeaning: 'confirmed total episode count, not the current batch size',
+    }])
+  }
+  if (headings.some(heading => heading.style === 'legacy')) {
+    const missingHeaderFields = ['> 单元结构：', '> 每集核心公式：'].filter(field => !content.includes(field))
+    if (missingHeaderFields.length > 0) {
+      validationFailure('legacy episode outline batch is missing required header fields', 'episode-outlines', [{
+        field: 'header',
+        missing: missingHeaderFields,
       }])
+    }
+    for (const [index] of headings.entries()) {
+      const episode = outlineSegment(content, headings, index)
+      const missing = LEGACY_EPISODE_OUTLINE_FIELDS.filter(field => !episode.includes(field))
+      if (missing.length > 0) {
+        validationFailure(`episode ${String(startEpisode + index)} is missing legacy outline fields`, 'episode-outlines', [{
+          field: `episode-${String(startEpisode + index)}`,
+          missingFields: missing,
+        }])
+      }
+    }
+  } else {
+    for (const [index, heading] of headings.entries()) {
+      validateCompactEpisodeOutlineBlock(outlineSegment(content, headings, index), heading.number)
     }
   }
 }
 
+function outlineSegment(content: string, headings: readonly EpisodeOutlineHeading[], index: number): string {
+  const heading = headings[index]
+  if (heading === undefined) return ''
+  const end = headings[index + 1]?.index ?? content.length
+  const forecast = content.indexOf('\n## 后续主线预告', heading.index)
+  return content.slice(heading.index, Math.min(end, forecast >= 0 ? forecast : content.length))
+}
+
 function batchHeader(content: string): string {
-  const firstEpisode = content.search(/^##\s+第\s*\d+\s*集《/mu)
+  const firstEpisode = episodeOutlineHeadings(content)[0]?.index ?? -1
   if (firstEpisode < 0) return content.trim()
   return content.slice(0, firstEpisode).trim()
 }
 
 function batchEpisodes(content: string): string[] {
-  const headings = [...content.matchAll(/^##\s+第\s*\d+\s*集《/gmu)]
-  return headings.map((heading, index) => {
-    const start = heading.index ?? 0
-    const forecast = content.indexOf('\n## 后续主线预告', start)
-    const nextHeading = headings[index + 1]?.index ?? content.length
-    const end = forecast >= 0 && forecast < nextHeading ? forecast : nextHeading
-    return content.slice(start, end).trim().replace(/\n---\s*$/u, '').trim()
-  })
+  const headings = episodeOutlineHeadings(content)
+  return headings.map((_heading, index) => outlineSegment(content, headings, index)
+    .trim().replace(/\n---\s*$/u, '').trim())
 }
 
 function buildEpisodeOutlines(
@@ -640,10 +777,10 @@ function validateContent(
 ): void {
   switch (kind) {
     case 'creative-contract':
-      requireSections(content, CONTRACT_SECTIONS, 'creative contract')
+      validateCreativeContract(content, projectName)
       return
     case 'core-setting':
-      requireSections(content, SETTING_SECTIONS, 'core setting')
+      validateCoreSetting(content, projectName)
       return
     case 'main-character': {
       if (characterName === undefined) {
@@ -655,15 +792,24 @@ function validateContent(
           characterName,
         })
       }
-      if (allowLegacyMainCharacterTemplate && !hasMainCharacterFieldTemplate(content)) {
-        requireSections(content, MAIN_CHARACTER_SECTIONS, `major character ${characterName}`)
+      const legacySections = MAIN_CHARACTER_SECTIONS.filter(section => content.includes(section)).length
+      if (legacySections === MAIN_CHARACTER_SECTIONS.length) {
+        if (allowLegacyMainCharacterTemplate && !hasMainCharacterFieldTemplate(content)) {
+          validateFlexibleArtifact(content, 'main-character')
+        } else {
+          validateMainCharacterTemplate(content, characterName)
+        }
       } else {
-        validateMainCharacterTemplate(content, characterName)
+        validateFlexibleArtifact(content, 'main-character')
       }
       return
     }
     case 'other-characters':
-      validateOtherCharacterTemplate(content)
+      if (content.includes('# 其他关键角色（配角）') && content.includes('## 角色关系图（简要）')) {
+        validateOtherCharacterTemplate(content)
+      } else {
+        validateFlexibleArtifact(content, 'other-characters')
+      }
       return
     case 'full-outline':
       validateFullOutline(content, projectName)
@@ -773,163 +919,26 @@ export class ScreenplayProjectStore {
   }
 
   /**
-   * 70 项清单诊断：对当前正式文件跑机械检查，并给出需模型判断的方法论检查项。
-   * 机械项：正文禁词/抽象动作行/字数档位/头重脚轻/集纲字段空值/角色待确认/连续性环。
-   * checklist 项：四幕功能段、人物发动机、反派压力、中性事件、配角功能、
-   * 开场钩子、悬念信息差、反转兑现、集尾卡点、对白知情边界、伏笔回收、卖点交付。
+   * Return the persisted result for an idempotency key without requiring the
+   * caller to replay the operation's inputs. This is used when a Session-local
+   * draft was consumed by a successful commit but the client needs to retry a
+   * lost response.
    */
-  async diagnose(): Promise<Record<string, unknown>> {
-    const snapshot = await this.snapshot('artifacts')
-    if (!snapshot.initialized || snapshot.currentVersion === undefined) {
-      throw new ScreenplayError('NOT_INITIALIZED', 'screenplay project is not initialized')
-    }
-    const issues: Array<{
-      severity: 'error' | 'warning' | 'info'
-      category: string
-      message: string
-      path?: string
-      detail?: Record<string, unknown>
-    }> = []
-    const contents = snapshot.artifactContents ?? {}
-    const duration = snapshot.requirements.episodeDurationSeconds
-    const episodes = snapshot.currentVersion.artifacts
-      .filter(artifact => artifact.kind === 'episode-screenplay')
-      .map((artifact, index) => ({
-        artifact,
-        episode: index + 1,
-        content: contents[artifact.logicalPath] ?? '',
-      }))
-
-    for (const { artifact, episode, content } of episodes) {
-      const count = effectiveCharacterCount(content)
-      const range = episodeLengthRange(duration)
-      if (count < range.min || count > range.max) {
-        issues.push({
-          severity: 'warning',
-          category: 'episode-length',
-          message: `第${episode}集有效字符 ${count} 超出所选时长档范围 ${range.min}-${range.max}`,
-          path: artifact.logicalPath,
-        })
-      }
-      if (/分镜|镜头语言|作者说明|写作说明/u.test(content)) {
-        issues.push({
-          severity: 'error',
-          category: 'forbidden-terms',
-          message: `第${episode}集正文包含禁词（分镜/镜头语言/作者说明/写作说明）`,
-          path: artifact.logicalPath,
-        })
-      }
-      const abstractLine = content.split('\n').map(line => line.trim())
-        .find(line => line.startsWith('△') && /意识到|终于明白|气氛变得|关系发生了变化|经过一番|众人/.test(line))
-      if (abstractLine !== undefined) {
-        issues.push({
-          severity: 'warning',
-          category: 'abstract-action',
-          message: `第${episode}集存在抽象动作行：${abstractLine.slice(0, 40)}`,
-          path: artifact.logicalPath,
-        })
-      }
-    }
-
-    if (episodes.length >= 6) {
-      const third = Math.max(1, Math.floor(episodes.length / 3))
-      const average = (slice: Array<{ content: string }>) =>
-        slice.reduce((sum, item) => sum + effectiveCharacterCount(item.content), 0) / slice.length
-      const firstAvg = average(episodes.slice(0, third))
-      const lastAvg = average(episodes.slice(-third))
-      if (firstAvg > 0 && lastAvg < firstAvg * 0.7) {
-        issues.push({
-          severity: 'warning',
-          category: 'front-heavy',
-          message: '后三分之一各集平均字数不足前三分之一的 70%，疑似头重脚轻',
-          detail: { firstAvg: Math.round(firstAvg), lastAvg: Math.round(lastAvg) },
-        })
-      }
-    }
-
-    const outlineArtifact = snapshot.currentVersion.artifacts
-      .find(artifact => artifact.logicalPath === this.layout.episodeOutlinesFile)
-    if (outlineArtifact !== undefined) {
-      const text = contents[outlineArtifact.logicalPath] ?? ''
-      const blocks = text.split(/^## /mu).slice(1)
-      const fields = ['**核心冲突**：', '**情绪定位**：', '- 钩子开场：', '- 冲突升级：', '- 情绪爆发：', '- **微反转/钩子**：']
-      for (const block of blocks) {
-        const title = block.split('\n')[0]?.trim() ?? ''
-        for (const field of fields) {
-          const line = block.split('\n').find(candidate => candidate.includes(field))
-          const value = line === undefined ? '' : line.slice(line.indexOf(field) + field.length).trim()
-          if (value.length === 0 || value === '……') {
-            issues.push({
-              severity: 'warning',
-              category: 'episode-outline-field',
-              message: `${title} 的「${field.replace(/[*:：]/gu, '')}」为空或占位`,
-              path: outlineArtifact.logicalPath,
-            })
-          }
-        }
-      }
-    }
-
-    for (const artifact of snapshot.currentVersion.artifacts) {
-      if (artifact.kind !== 'main-character' && artifact.kind !== 'other-characters') continue
-      const pending = (contents[artifact.logicalPath] ?? '').match(/待确认/gu)?.length ?? 0
-      if (pending > 0) {
-        issues.push({
-          severity: 'info',
-          category: 'character-pending',
-          message: `${artifact.logicalPath} 仍有 ${pending} 处「待确认」`,
-          path: artifact.logicalPath,
-        })
-      }
-    }
-
-    const openLoops = (snapshot.writingProgress?.episodes ?? [])
-      .flatMap(record => record.continuity.openLoops)
-    if (openLoops.length > 0) {
-      issues.push({
-        severity: 'info',
-        category: 'continuity-loops',
-        message: `有 ${openLoops.length} 个未闭合剧情环：${openLoops.slice(0, 3).join('；')}`,
-        detail: { openLoops },
+  async findOperationResult(
+    operationId: string,
+    expectedType: ScreenplayEvent['type'],
+  ): Promise<Record<string, unknown> | undefined> {
+    const events = await this.readEvents()
+    const existing = events.find(event => event.operationId === operationId)
+    if (existing === undefined) return undefined
+    if (existing.type !== expectedType) {
+      throw new ScreenplayError('OPERATION_CONFLICT', 'operationId was already used for another operation', {
+        operationId,
+        existingType: existing.type,
+        requestedType: expectedType,
       })
     }
-
-    if (snapshot.writingProgress !== undefined && snapshot.writingProgress.status === 'Writing') {
-      issues.push({
-        severity: 'info',
-        category: 'writing-progress',
-        message: `正文进行中：已完成 ${snapshot.writingProgress.completedEpisodes.length}/${snapshot.writingProgress.totalEpisodes} 集，下一集 ${snapshot.writingProgress.nextEpisode}`,
-      })
-    }
-
-    const checklist = [
-      { id: 'four-act', label: '四幕功能段覆盖：大纲是否按 建立预期→假冲突→真冲突→兑现 递进？', status: 'check' },
-      { id: 'protagonist-engine', label: '主角发动机：是否有缺失/诉求、主动行动、失败代价、可见成长？', status: 'check' },
-      { id: 'antagonist-pressure', label: '反派压力线：是否有自洽信念、分阶段计划、与主角势均力敌？', status: 'check' },
-      { id: 'neutral-event', label: '中性事件镜像：主角与反派面对同一事件是否有相反但自洽的选择？', status: 'check' },
-      { id: 'supporting-cast', label: '配角功能网：每个配角是否有功能、动机并改变局面？', status: 'check' },
-      { id: 'hook-opening', label: '开场钩子：首屏是否有 人物+问题+可验证期待？', status: 'check' },
-      { id: 'suspense-info-gap', label: '悬念/信息差：观众与角色的信息差是否可验证、有代价、可回收？', status: 'check' },
-      { id: 'reversal-recover', label: '反转兑现：每次反转是否改变事件性质且揭示后可回看解释？', status: 'check' },
-      { id: 'cliffhanger', label: '集尾卡点：每集是否停在具体未决事件而非抽象判断？', status: 'check' },
-      { id: 'dialogue-knowledge', label: '对白知情边界：人物是否只说当前知情范围内的内容？', status: 'check' },
-      { id: 'foreshadowing', label: '伏笔回收：已设伏笔是否在揭示节点回收，无功能伏笔是否删除？', status: 'check' },
-      { id: 'deliverable-sell', label: '卖点可交付：标题/logline 是否呈现最大冲突，交付包是否完整？', status: 'check' },
-    ]
-
-    return {
-      ok: true,
-      projectName: snapshot.projectName,
-      revision: snapshot.revision,
-      phase: snapshot.phase,
-      issues,
-      checklist,
-      summary: {
-        errorCount: issues.filter(item => item.severity === 'error').length,
-        warningCount: issues.filter(item => item.severity === 'warning').length,
-        infoCount: issues.filter(item => item.severity === 'info').length,
-      },
-    }
+    return structuredClone(existing.result)
   }
 
   async createProject(
@@ -999,12 +1008,14 @@ export class ScreenplayProjectStore {
         content: normalizeContent(input.otherCharactersContent, 'other characters content'),
       })
 
-      for (const source of sources) validateContent(source.kind, source.content, source.characterName)
-      if (sources[0]?.content.split('\n', 1)[0]?.trim() !== `# 《${normalizedName}》短剧风格与创作规则`
-        || sources[1]?.content.split('\n', 1)[0]?.trim() !== `# 《${normalizedName}》核心设定`) {
+      for (const source of sources) {
+        validateContent(source.kind, source.content, source.characterName, normalizedName)
+      }
+      if (!hasProjectHeading(sources[0]?.content ?? '', normalizedName)
+        || !hasProjectHeading(sources[1]?.content ?? '', normalizedName)) {
         throw new ScreenplayError(
           'VALIDATION_FAILED',
-          'creative contract and core setting titles must use the exact confirmed project name',
+          'creative contract and core setting titles must contain the exact confirmed project name',
         )
       }
       const sourceDigests = sources.map(source => ({ logicalPath: source.logicalPath, sha256: sha256(source.content) }))
@@ -1608,6 +1619,22 @@ export class ScreenplayProjectStore {
     }
   }
 
+  /** Validate episode content without mutating state or materializing a version. */
+  async validateEpisodeContent(episode: number, content: string): Promise<number> {
+    const snapshot = await this.snapshot('summary')
+    if (!snapshot.initialized) {
+      throw new ScreenplayError('NOT_INITIALIZED', 'screenplay project is not initialized')
+    }
+    if (!Number.isSafeInteger(episode) || episode <= 0) {
+      throw new ScreenplayError('VALIDATION_FAILED', 'episode must be a positive integer', { episode })
+    }
+    return validateEpisodeScreenplay(
+      normalizeContent(content, `episode ${String(episode)} screenplay content`),
+      episode,
+      snapshot.requirements.episodeDurationSeconds,
+    )
+  }
+
   async createEpisodeScreenplay(
     expectedRevision: number,
     operationId: string,
@@ -1932,12 +1959,10 @@ export class ScreenplayProjectStore {
           previous.requirements.episodeDurationSeconds,
           artifact.kind === 'main-character' && !hasMainCharacterFieldTemplate(oldText),
         )
-        if (artifact.kind === 'creative-contract'
-          && content.split('\n', 1)[0]?.trim() !== `# 《${previous.projectName}》短剧风格与创作规则`) {
+        if (artifact.kind === 'creative-contract' && !hasProjectHeading(content, previous.projectName)) {
           throw new ScreenplayError('VALIDATION_FAILED', 'creative contract title must keep the exact project name')
         }
-        if (artifact.kind === 'core-setting'
-          && content.split('\n', 1)[0]?.trim() !== `# 《${previous.projectName}》核心设定`) {
+        if (artifact.kind === 'core-setting' && !hasProjectHeading(content, previous.projectName)) {
           throw new ScreenplayError('VALIDATION_FAILED', 'core setting title must keep the exact project name')
         }
         if (content === oldText) {

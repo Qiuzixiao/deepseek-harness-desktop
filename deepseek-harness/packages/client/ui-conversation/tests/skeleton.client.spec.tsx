@@ -97,6 +97,10 @@ function mount(
     summaryOrigin?: 'subagent'
     /** A composer block another plugin raised for this session. */
     composerBlock?: { reason: string }
+    /** Product-shell presentation policy for the hero Workspace picker. */
+    showWorkspacePicker?: boolean
+    /** Product-shell presentation policy for the generic hero headline. */
+    showHeroHeadline?: boolean
     /** Mutable view ledger used by registration-order regressions. */
     viewTabs?: ViewTab[]
   } = {},
@@ -247,6 +251,12 @@ function mount(
     renderSlot,
     renderSlotChain,
     selectWorkspace: retargetWorkspace,
+    ...(options.showWorkspacePicker === undefined
+      ? {}
+      : { showWorkspacePicker: options.showWorkspacePicker }),
+    ...(options.showHeroHeadline === undefined
+      ? {}
+      : { showHeroHeadline: options.showHeroHeadline }),
     t,
   }
   const view = render(<ConversationRoot {...props} />)
@@ -485,6 +495,26 @@ describe('ConversationRoot resident composer', () => {
     expect(b.slotCalls).toContain('conversation.hero.workspace')
     // The agent-preset chip sits in the same row, for the same reason: both
     // choices are only open before the first message.
+    expect(b.slotCalls).toContain('conversation.hero.agentPreset')
+  })
+
+  it('can hide the Workspace picker without hiding the agent-preset seat', () => {
+    const b = mount(conversationSnapshot({ composerPhase: 'blank', blank: true }), undefined, undefined, {
+      showWorkspacePicker: false,
+    })
+
+    expect(b.view.queryByRole('button', { name: '选择工作区' })).toBeNull()
+    expect(b.slotCalls).not.toContain('conversation.hero.workspace')
+    expect(b.slotCalls).toContain('conversation.hero.agentPreset')
+  })
+
+  it('can hide the generic hero headline without hiding the agent-preset seat', () => {
+    const b = mount(conversationSnapshot({ composerPhase: 'blank', blank: true }), undefined, undefined, {
+      showHeroHeadline: false,
+    })
+
+    expect(b.view.queryByText('探索未至之境')).toBeNull()
+    expect(b.view.queryByText('预览版')).toBeNull()
     expect(b.slotCalls).toContain('conversation.hero.agentPreset')
   })
 

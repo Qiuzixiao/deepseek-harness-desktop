@@ -6,8 +6,14 @@ import { ZenwitFrame } from '../src/client/ZenwitFrame.tsx'
 import type { ZenwitFrameProps } from '../src/client/ZenwitFrame.tsx'
 
 vi.mock('../src/client/HomePage.tsx', () => ({
-  HomePage: ({ openProject }: { openProject: (path: string) => Promise<void> }) => (
-    <div data-testid="home"><button data-testid="home-open" type="button" onClick={() => void openProject('/Users/tester/ShortDrama/restored-project')}>open</button></div>
+  HomePage: ({ openProject, openLibrary }: { openProject: (path: string) => Promise<void>, openLibrary: () => void }) => (
+    <div data-testid="home"><button data-testid="home-open" type="button" onClick={() => void openProject('/Users/tester/ShortDrama/restored-project')}>open</button><button data-testid="home-library" type="button" onClick={openLibrary}>library</button></div>
+  ),
+}))
+
+vi.mock('../src/client/ProjectLibraryPage.tsx', () => ({
+  ProjectLibraryPage: ({ openProject, onBack }: { openProject: (path: string) => Promise<void>, onBack: () => void }) => (
+    <div data-testid="library"><button data-testid="library-open" type="button" onClick={() => void openProject('/Users/tester/ShortDrama/restored-project')}>open</button><button data-testid="library-back" type="button" onClick={onBack}>back</button></div>
   ),
 }))
 
@@ -52,6 +58,9 @@ function mount(state: SessionListState) {
     renderSlot,
     list: vi.fn(async () => []),
     create: vi.fn(),
+    updateProjectTags: vi.fn(),
+    listAgentNames: vi.fn(async () => ({ 'short-drama': '短剧创作' })),
+    deleteProject: vi.fn(),
     openProject,
     closeProject,
     openSession: vi.fn(),
@@ -63,10 +72,12 @@ function mount(state: SessionListState) {
 describe('ZenwitFrame surface navigation', () => {
   it('mounts the native settings owner without a Zenwit top bar', () => {
     const view = mount(sessionState('ready'))
+    expect(view.container.querySelector('[data-zenwit-frame]')).toBeTruthy()
     expect(view.renderSlot).toHaveBeenCalledWith('sidebar', {
       collapsed: true,
       width: 0,
       settingsOnly: true,
+      settingsOnlyInline: true,
     })
     expect(view.queryByText('Zenwit')).toBeNull()
     expect(view.queryByText('短剧创作工作台')).toBeNull()
@@ -108,6 +119,22 @@ describe('ZenwitFrame surface navigation', () => {
     await waitFor(() => expect(view.getByTestId('workspace')).toBeTruthy())
     expect(view.openProject).toHaveBeenCalledWith('/Users/tester/ShortDrama/restored-project')
     expect(window.sessionStorage.getItem('zenwit.surface')).toBe('workspace')
+  })
+
+  it('navigates from the home preview to the full project library and back', () => {
+    const view = mount(sessionState('ready'))
+    fireEvent.click(view.getByTestId('home-library'))
+    expect(view.getByTestId('library')).toBeTruthy()
+    expect(window.sessionStorage.getItem('zenwit.surface')).toBe('library')
+    fireEvent.click(view.getByTestId('library-back'))
+    expect(view.getByTestId('home')).toBeTruthy()
+    expect(window.sessionStorage.getItem('zenwit.surface')).toBe('home')
+  })
+
+  it('restores the full project library after refresh', () => {
+    window.sessionStorage.setItem('zenwit.surface', 'library')
+    const view = mount(sessionState('ready'))
+    expect(view.getByTestId('library')).toBeTruthy()
   })
 
   it('persists the project-library intent when leaving the workspace', async () => {

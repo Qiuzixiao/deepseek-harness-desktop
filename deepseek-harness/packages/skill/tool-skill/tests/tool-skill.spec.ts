@@ -31,7 +31,7 @@ async function setup(home: string, config: toolSkill.Config = {}): Promise<Conte
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(SkillRegistry)
-  await ctx.plugin(SkillFileSystem, { dshHome: join(home, '.dsh'), agentsHome: join(home, '.agents'), watch: false })
+  await ctx.plugin(SkillFileSystem, { dshHome: join(home, '.zenwit'), agentsHome: join(home, '.agents'), watch: false })
   await ctx.plugin(toolSkill, config)
   return ctx
 }
@@ -616,7 +616,7 @@ describe('dsh-tool-skill', () => {
 
   it('keeps body-only edits out of the catalog and loads the latest body on demand', async () => {
     const home = await tempDir('tool-body-refresh')
-    const root = join(home, '.dsh/skills')
+    const root = join(home, '.zenwit/skills')
     await writeSkill(root, 'body-skill', 'Stable description', 'First body.')
     const ctx = await setup(home)
     const session = Session.create(SessionId('body-refresh'))
@@ -761,7 +761,7 @@ describe('dsh-tool-skill', () => {
     const home = await tempDir('tool-load')
     const project = await tempDir('tool-project')
     await mkdir(join(project, '.git'), { recursive: true })
-    await writeSkill(join(project, '.dsh/skills'), 'project-skill', 'Project skill', 'Project instructions.')
+    await writeSkill(join(project, '.zenwit/skills'), 'project-skill', 'Project skill', 'Project instructions.')
     const ctx = await setup(home)
 
     const result = await ctx.tools.execute({
@@ -777,7 +777,7 @@ describe('dsh-tool-skill', () => {
     expect(result.value).toEqual({
       name: 'project-skill',
       provider: 'filesystem',
-      resourceBase: { kind: 'directory', path: join(project, '.dsh/skills/project-skill') },
+      resourceBase: { kind: 'directory', path: join(project, '.zenwit/skills/project-skill') },
       content: 'Project instructions.',
     })
     const block = result.content[0]
@@ -786,7 +786,7 @@ describe('dsh-tool-skill', () => {
     expect(block.text).toBe([
       '<skill_content name="project-skill">',
       '<skill_resources>',
-      `Base directory for this skill: ${join(project, '.dsh/skills/project-skill')}`,
+      `Base directory for this skill: ${join(project, '.zenwit/skills/project-skill')}`,
       'Resolve relative paths mentioned by this skill against the base directory before using them. Load referenced resources only as needed.',
       '</skill_resources>',
       '',
@@ -860,8 +860,8 @@ describe('dsh-tool-skill', () => {
 
   it('returns isError for unknown, invalid, and model-disabled skills', async () => {
     const home = await tempDir('tool-errors')
-    await writeSkill(join(home, '.dsh/skills'), 'hidden-skill', 'Hidden skill', 'Hidden instructions.')
-    await writeFile(join(home, '.dsh/skills/hidden-skill/SKILL.md'), '---\nname: hidden-skill\ndescription: Hidden skill\ndisable-model-invocation: true\n---\n\nHidden instructions.\n')
+    await writeSkill(join(home, '.zenwit/skills'), 'hidden-skill', 'Hidden skill', 'Hidden instructions.')
+    await writeFile(join(home, '.zenwit/skills/hidden-skill/SKILL.md'), '---\nname: hidden-skill\ndescription: Hidden skill\ndisable-model-invocation: true\n---\n\nHidden instructions.\n')
     const ctx = await setup(home)
     ctx.skills.register({
       name: 'model-only-skill',

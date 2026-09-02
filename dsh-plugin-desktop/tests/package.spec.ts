@@ -62,14 +62,31 @@ const workspaceManifest = JSON.parse(readFileSync(new URL('package.json', worksp
 const ciWorkflow = readFileSync(new URL('.github/workflows/ci.yml', workspaceRoot), 'utf8')
 
 describe('published package surface', () => {
-  it('runs desktop and community market typechecks from the root command', () => {
-    expect(workspaceManifest.scripts?.typecheck)
-      .toBe('yarn workspace dsh-plugin-desktop typecheck && yarn workspace dsh-community-market typecheck')
+  it('pins the command Remote ABI at the RC2 three-argument boundary', () => {
+    const linker = readFileSync(new URL('scripts/link-local-client.mjs', workspaceRoot), 'utf8')
+    const commandSource = readFileSync(new URL(
+      'deepseek-harness/packages/interaction/commands/src/index.ts', workspaceRoot,
+    ), 'utf8')
+    const uiSource = readFileSync(new URL(
+      'deepseek-harness/packages/client/ui-commands/src/client/service.ts', workspaceRoot,
+    ), 'utf8')
+    expect(linker).toContain("['@deepseek-ai/dsh-commands', 'packages/interaction/commands', ['lib']]")
+    expect(linker).toContain("['@deepseek-ai/dsh-session-log-export', 'packages/session-query/session-log-export', ['lib/client.js']]")
+    expect(linker).toContain('assertCommandsAbi')
+    expect(linker).toContain('assertUiCommandsAbi')
+    expect(commandSource).toContain("from '@deepseek-ai/dsh-attachment'")
+    expect(commandSource).toMatch(/line:\s*string,\s*\n\s*images:\s*readonly EncodedImageAttachment\[\]/u)
+    expect(uiSource).toContain('remote.commands.execute(session.sessionId, line, [])')
   })
 
-  it('runs desktop and community market tests from the root command', () => {
+  it('runs all runtime workspace typechecks from the root command', () => {
+    expect(workspaceManifest.scripts?.typecheck)
+      .toBe('yarn workspace dsh-file-upload typecheck && yarn workspace dsh-short-drama typecheck && yarn workspace dsh-plugin-desktop typecheck && yarn workspace dsh-community-market typecheck')
+  })
+
+  it('runs all runtime workspace tests from the root command', () => {
     expect(workspaceManifest.scripts?.test)
-      .toBe('yarn workspace dsh-plugin-desktop test && yarn workspace dsh-community-market test')
+      .toBe('yarn workspace dsh-file-upload test && yarn workspace dsh-short-drama test && yarn workspace dsh-plugin-desktop test && yarn workspace dsh-community-market test')
   })
 
   it('registers both npm launcher names', () => {
@@ -136,12 +153,14 @@ describe('published package surface', () => {
     })
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop')
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).not.toContain('name: dsh-community-market')
-    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/terminal')
+    expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).not.toContain('name: dsh-plugin-desktop/terminal')
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/pnpm')
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/profiles')
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/diagnostics')
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/notifications')
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/updates')
+    const desktopPatch = readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')
+    expect(desktopPatch).toMatch(/- id: ui-trajectory\n  disabled: true/)
   })
 
   it('pins both selectable Market providers in the published runtime', () => {
@@ -246,10 +265,33 @@ describe('published package surface', () => {
       'const baseURLOverridden = schema.hasPath(draft, ["baseURL"])',
       'const canCustomizeApi = ownsIdentity || baseURLOverridden',
       'canCustomizeApi ? (0, react_jsx_runtime.jsxs)("div"',
-    ]) {
-      expect(patch).toContain(marker)
-      expect(installedClient).toContain(marker)
+    ]) expect(patch).toContain(marker)
+    // Development overlays use the integrated Harness ABI, while a packaged
+    // RC2 install retains the patched legacy bundle. Both are valid, but the
+    // overlay must never silently fall back to the legacy settingsSchema gate.
+    if (installedClient.includes('"settingsSchema"')) {
+      for (const marker of [
+        'const baseURLOverridden = schema.hasPath(draft, ["baseURL"])',
+        'const canCustomizeApi = ownsIdentity || baseURLOverridden',
+        'canCustomizeApi ? (0, react_jsx_runtime.jsxs)("div"',
+      ]) expect(installedClient).toContain(marker)
+    } else {
+      expect(installedClient).toContain('const inject = [')
+      expect(installedClient).not.toContain('"settingsSchema"')
     }
+  })
+
+  it('ships the short-drama Agent preset and bundled skills', () => {
+    const preset = readFileSync(new URL(
+      'resources/agent-presets/short-drama/agent.cordis.yml',
+      packageRoot,
+    ), 'utf8')
+    expect(preset).toContain('id: screenplay-agent')
+    expect(preset).toContain("name: '@deepseek-ai/dsh-skill-filesystem'")
+    expect(preset).toContain("name: '@deepseek-ai/dsh-tool-subagent'")
+    expect(preset).toContain('name: dsh-short-drama/agent')
+    expect(preset).toContain('allowMutations: false')
+    expect(preset).not.toContain("name: '@deepseek-ai/dsh-tool-bash'")
   })
 
   it('localizes Trajectory toolbar labels in Simplified Chinese', () => {
@@ -567,8 +609,8 @@ describe('published package surface', () => {
 
   it('fixes the installed application identity', () => {
     expect(manifest.version).toBe(workspaceManifest.version)
-    expect(manifest.build?.productName).toBe('DSH Desktop')
-    expect(manifest.build?.appId).toBe('ai.deepseek.dsh.desktop')
+    expect(manifest.build?.productName).toBe('Zenwit')
+    expect(manifest.build?.appId).toBe('com.anywherelabs.zenwit')
     expect(manifest.build?.asarUnpack).toEqual([
       'package.json',
       'cordis.patch.yml',
@@ -605,7 +647,7 @@ describe('published package surface', () => {
       target: 'nsis',
       arch: ['x64'],
     }])
-    expect(manifest.build?.win?.artifactName).toBe('DSH-Desktop-${version}-${arch}-Portable.${ext}')
+    expect(manifest.build?.win?.artifactName).toBe('Zenwit-${version}-${arch}-Portable.${ext}')
     expect(manifest.build?.nsis).toEqual({
       license: 'THIRD_PARTY_NOTICES.md',
       oneClick: false,
@@ -615,9 +657,9 @@ describe('published package surface', () => {
       createDesktopShortcut: true,
       createStartMenuShortcut: true,
       differentialPackage: false,
-      shortcutName: 'DSH Desktop',
+      shortcutName: 'Zenwit',
       useZip: false,
-      artifactName: 'DSH-Desktop-${version}-${arch}-Setup.${ext}',
+      artifactName: 'Zenwit-${version}-${arch}-Setup.${ext}',
     })
     expect(manifest.build?.linux?.icon).toBe('build/app-icon.png')
   })
@@ -651,13 +693,13 @@ describe('published package surface', () => {
     expect(manifest.scripts?.['verify:cli']).toBe('node scripts/verify-cli-runtime.mjs')
     expect(manifest.scripts?.check).toContain('yarn run verify:cli')
     expect(workspaceManifest.scripts?.['dist:mac'])
-      .toBe('yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac')
+      .toBe('yarn workspace dsh-file-upload build && yarn workspace dsh-short-drama build && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac')
     expect(workspaceManifest.scripts?.['dist:mac-smoke'])
-      .toBe('yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac-smoke')
+      .toBe('yarn workspace dsh-file-upload build && yarn workspace dsh-short-drama build && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac-smoke')
     expect(workspaceManifest.scripts?.['dist:win'])
-      .toBe('yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win')
+      .toBe('yarn workspace dsh-file-upload build && yarn workspace dsh-short-drama build && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win')
     expect(workspaceManifest.scripts?.['dist:win-portable'])
-      .toBe('yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win-portable')
+      .toBe('yarn workspace dsh-file-upload build && yarn workspace dsh-short-drama build && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win-portable')
     expect(manifest.build?.afterPack).toBe('./scripts/verify-packaged-runtime.ts')
     expect(manifest.build?.mac).toEqual(expect.objectContaining({
       extendInfo: {
@@ -672,6 +714,8 @@ describe('published package surface', () => {
       target: ['dir'],
       x64ArchFiles: expect.stringContaining('node-pty/prebuilds/darwin-*'),
     }))
+    expect(manifest.build?.mac?.x64ArchFiles)
+      .toEqual(expect.stringContaining('@napi-rs/canvas-darwin-*/**'))
     expect(manifest.build?.files).toContain('!node_modules/node-pty/build/**')
     expect(manifest.devDependencies?.['@electron/asar']).toBe('3.4.1')
   })
@@ -740,12 +784,12 @@ describe('published package surface', () => {
     }
   })
 
-  it('keeps the iOS Default source icon unmodified', () => {
+  it('keeps the QNovel application source icon unmodified', () => {
     const digest = createHash('sha256')
       .update(readFileSync(new URL('build/app-icon.png', packageRoot)))
       .digest('hex')
 
-    expect(digest).toBe('315fbc6e57ff1f34894f21f66fb7f9f26deccf78333c71fad21a6cec64e7de80')
+    expect(digest).toBe('528c3b60c8f6462e278445402ffe05025771631ed37e8a5c2fa69347b2b99591')
   })
 
   it('generates a centered macOS icon with a 100-pixel visual inset', async () => {
@@ -780,6 +824,26 @@ describe('published package surface', () => {
     expect(manifest.peerDependencies?.electron).toBe('43.4.0')
     expect(manifest.devDependencies?.electron).toBe('43.4.0')
     expect(manifest.dependencies?.pnpm).toBe('11.7.0')
+  })
+
+  it('declares the unpublished Zenwit shell as a physical production dependency', () => {
+    expect(manifest.dependencies?.['@deepseek-ai/dsh-client-ui-short-drama'])
+      .toBe('file:../deepseek-harness/packages/client/ui-short-drama')
+  })
+
+  it('collects the desktop dependency tree before querying the whole Yarn workspace', () => {
+    const workspaceRequire = createRequire(new URL('package.json', packageRoot))
+    const electronBuilderManifest = workspaceRequire.resolve('electron-builder/package.json')
+    const electronBuilderRequire = createRequire(electronBuilderManifest)
+    const appBuilderManifest = electronBuilderRequire.resolve('app-builder-lib/package.json')
+    const appFileCopier = readFileSync(
+      join(dirname(appBuilderManifest), 'out/util/appFileCopier.js'),
+      'utf8',
+    )
+
+    expect(appFileCopier).toContain(
+      'const pmApproaches = [node_module_collector_1.PM.TRAVERSAL, await packager.getPackageManager()];',
+    )
   })
 
   it('packages the native-compiled Koffi Windows runtime', () => {

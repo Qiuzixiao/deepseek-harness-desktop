@@ -115,6 +115,51 @@ describe('ConversationController', () => {
     await b.runtime.dispose()
   })
 
+  it('infers a supported image MIME type from the filename when Finder omits it', async () => {
+    const b = await bench()
+    const created = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:finder-image')
+    try {
+      const [attachment] = b.root.createDraftImages([
+        new File([Uint8Array.of(1, 2, 3)], 'finder.PNG', { type: '' }),
+      ])
+      if (attachment === undefined) throw new Error('draft attachment missing')
+      expect(b.root.input.for(b.runtime.sessions.scope('s1')!).addImages([attachment.id])).toBe(true)
+      await b.root.sendSession(b.runtime.sessions.binding('s1')!.session, '', [attachment.id], 'queue')
+      expect(b.prompt).toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ type: 'image', mediaType: 'image/png' })]),
+        'queue',
+      )
+    } finally {
+      created.mockRestore()
+      await b.runtime.dispose()
+    }
+  })
+
+  it('serializes document drafts as hidden file references beside the user text', async () => {
+    const b = await bench()
+    const attachment = b.root.createDraftDocumentRecord({
+      ref: '/workspace/.dsh-uploads/s1/notes.md',
+      name: 'notes.md',
+      extension: 'md',
+      bytes: 12,
+      status: 'ready',
+    })
+    expect(b.shell.addAttachments([attachment.id])).toBe(true)
+
+    await b.root.sendSession(
+      b.runtime.sessions.binding('s1')!.session,
+      '这个文档讲的是什么',
+      [attachment.id],
+      'queue',
+    )
+
+    expect(b.prompt).toHaveBeenCalledWith([
+      { type: 'text', text: '<file_reference path="/workspace/.dsh-uploads/s1/notes.md"></file_reference>' },
+      { type: 'text', text: '这个文档讲的是什么' },
+    ], 'queue')
+    await b.runtime.dispose()
+  })
+
   it('invalidates pending historical image loads when the rendered session is released', async () => {
     const read = Promise.withResolvers<Awaited<ReturnType<SessionFace['readAttachment']>>>()
     const b = await bench(() => read.promise)

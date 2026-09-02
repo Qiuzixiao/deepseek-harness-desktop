@@ -12,10 +12,14 @@ import type {
   DesktopProfileSelectRequest,
   DesktopSettingsErrorResponse,
 } from './desktop-settings-contract.ts'
-
-const MAX_SETTINGS_BODY_BYTES = 16 * 1024
-
-class BodyTooLargeError extends Error {}
+import { isSafeProjectPath } from './project-library-route.ts'
+import {
+  BodyTooLargeError,
+  DEFAULT_JSON_BODY_BYTES,
+  isJsonRequest,
+  isSameOriginLoopbackRequest,
+  readJson,
+} from './desktop-http-security.ts'
 
 function finishJson(
   res: ServerResponse,
@@ -33,94 +37,6 @@ function finishJson(
 
 function error(message: string): DesktopSettingsErrorResponse {
   return { error: message }
-}
-
-function isLoopbackHostname(hostname: string): boolean {
-  return hostname === '127.0.0.1' || hostname === '[::1]'
-}
-
-function isLoopbackAddress(address: string | undefined): boolean {
-  if (address === undefined) return false
-  if (address === '::1' || address === '127.0.0.1') return true
-  if (address.startsWith('::ffff:')) {
-    const mapped = address.slice('::ffff:'.length)
-    return mapped.startsWith('127.')
-  }
-  return address.startsWith('127.')
-}
-
-function expectedLoopbackOrigin(expectedOrigin: string): URL | undefined {
-  try {
-    const url = new URL(expectedOrigin)
-    if (url.origin !== expectedOrigin || url.protocol !== 'http:'
-      || url.username !== '' || url.password !== ''
-      || !isLoopbackHostname(url.hostname)) return undefined
-    return url
-  } catch {
-    return undefined
-  }
-}
-
-function exactHeaderOrigin(value: string | undefined): string | undefined {
-  if (value === undefined) return undefined
-  try {
-    const url = new URL(value)
-    return url.origin === value ? value : undefined
-  } catch {
-    return undefined
-  }
-}
-
-function referrerOrigin(value: string | undefined): string | undefined {
-  if (value === undefined) return undefined
-  try {
-    return new URL(value).origin
-  } catch {
-    return undefined
-  }
-}
-
-/**
- * Require the actual socket and Host to stay on the configured loopback origin.
- * A mutating request must carry the exact Origin. A read-only browser GET may
- * use the standard same-origin fetch metadata plus its same-origin referrer,
- * because browsers commonly omit Origin on same-origin GET requests.
- */
-function isSameOriginLoopbackRequest(
-  req: IncomingMessage,
-  expectedOrigin: string,
-  mutating: boolean,
-): boolean {
-  const expected = expectedLoopbackOrigin(expectedOrigin)
-  if (expected === undefined || !isLoopbackAddress(req.socket.remoteAddress)) return false
-  if (req.headers.host?.toLowerCase() !== expected.host.toLowerCase()) return false
-  if (exactHeaderOrigin(req.headers.origin) === expected.origin) {
-    return req.headers['sec-fetch-site'] === undefined || req.headers['sec-fetch-site'] === 'same-origin'
-  }
-  if (mutating) return false
-  return req.headers['sec-fetch-site'] === 'same-origin'
-    && referrerOrigin(req.headers.referer) === expected.origin
-}
-
-function isJsonRequest(req: IncomingMessage): boolean {
-  return req.headers['content-type']?.split(';', 1)[0]?.trim().toLowerCase() === 'application/json'
-}
-
-async function readJson(req: IncomingMessage): Promise<unknown> {
-  const declaredLength = req.headers['content-length']
-  if (declaredLength !== undefined) {
-    if (!/^\d+$/.test(declaredLength)) throw new SyntaxError('invalid content length')
-    if (Number(declaredLength) > MAX_SETTINGS_BODY_BYTES) throw new BodyTooLargeError()
-  }
-  let size = 0
-  const chunks: Buffer[] = []
-  for await (const chunk of req) {
-    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array)
-    size += buffer.byteLength
-    if (size > MAX_SETTINGS_BODY_BYTES) throw new BodyTooLargeError()
-    chunks.push(buffer)
-  }
-  return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown
 }
 
 function isExactRecord(value: unknown, key: string): value is Record<string, unknown> {
@@ -171,6 +87,31 @@ async function parsePostBody(
 }
 
 const INVALID_BODY = Symbol('invalid body')
+
+/** Run one native action against an existing project node. */
+export async function handleDesktopProjectPathActionRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  expectedOrigin: string,
+  controller: DesktopSettingsController,
+  action: 'reveal' | 'terminal',
+): Promise<void> {
+  if (req.method !== 'POST') return finishJson(res, 405, error('method not allowed'), 'POST')
+  if (!isSameOriginLoopbackRequest(req, expectedOrigin, true)) return finishJson(res, 403, error('forbidden'))
+  const value = await parsePostBody(req, res)
+  if (value === INVALID_BODY) return
+  if (!isExactRecord(value, 'path') || typeof value.path !== 'string' || !isSafeProjectPath(value.path)) {
+    return finishJson(res, 400, error('invalid project path'))
+  }
+  try {
+    const response = action === 'reveal'
+      ? controller.revealInFileManager(value.path)
+      : controller.openTerminalAt(value.path)
+    finishJson(res, 200, response)
+  } catch (cause) {
+    finishJson(res, 500, error(action === 'reveal' ? 'path could not be revealed' : 'terminal could not be opened'))
+  }
+}
 
 function finishPostResponse<T extends object>(
   res: ServerResponse,
@@ -437,5 +378,5 @@ export async function handleDesktopProfileRollbackRequest(
 }
 
 export const desktopSettingsRouteConstants = Object.freeze({
-  maxBodyBytes: MAX_SETTINGS_BODY_BYTES,
+  maxBodyBytes: DEFAULT_JSON_BODY_BYTES,
 })

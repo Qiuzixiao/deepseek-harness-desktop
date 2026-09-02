@@ -3,7 +3,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 const environment = { ...process.env }
-environment.DSH_HOME ??= join(homedir(), '.dsh-dev')
+environment.DSH_HOME ??= join(homedir(), '.zenwit-dev')
 
 const child = spawn(process.execPath, ['lib/bin.js'], {
   cwd: new URL('..', import.meta.url),

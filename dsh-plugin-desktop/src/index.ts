@@ -1,6 +1,7 @@
-/** DSH Desktop Host plugin: owns the selected native shell generation. */
+/** Zenwit Host plugin: owns the selected native shell generation. */
 
 import { fileURLToPath } from 'node:url'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-cmdline'
@@ -34,10 +35,14 @@ import {
   DESKTOP_PROFILE_DELETE_PATH,
   DESKTOP_PROFILE_ROLLBACK_PATH,
   DESKTOP_PROFILE_SELECT_PATH,
+  DESKTOP_PROJECT_DELETE_PATH,
   DESKTOP_PROJECT_LIBRARY_PATH,
   DESKTOP_PROJECT_FILE_PATH,
   DESKTOP_PROJECT_STRUCTURE_PATH,
   DESKTOP_PROJECT_RESOURCES_PATH,
+  DESKTOP_PROJECT_NODE_PATH,
+  DESKTOP_PROJECT_REVEAL_PATH,
+  DESKTOP_PROJECT_TERMINAL_PATH,
   DESKTOP_RESTART_PATH,
   DESKTOP_SETTINGS_PATH,
   DESKTOP_TERMINAL_OPEN_PATH,
@@ -53,9 +58,11 @@ import {
   handleDesktopRestartRequest,
   handleDesktopSettingsRequest,
   handleDesktopTerminalOpenRequest,
+  handleDesktopProjectPathActionRequest,
 } from './desktop-settings-route.ts'
-import { handleProjectFileRequest, handleProjectLibraryRequest, handleProjectLibraryResourcesRequest, handleProjectLibraryStructureRequest } from './project-library-route.ts'
+import { handleProjectFileRequest, handleProjectLibraryDeleteRequest, handleProjectLibraryRequest, handleProjectLibraryResourcesRequest, handleProjectLibraryStructureRequest, handleProjectNodeRequest } from './project-library-route.ts'
 import type {} from './desktop-settings-controller.ts'
+import type DesktopSettingsController from './desktop-settings-controller.ts'
 import { desktopBootRecoveryInjections } from './desktop-boot-recovery.ts'
 import type { DesktopShellMode } from './runtime.ts'
 import type {} from './runtime.ts'
@@ -79,6 +86,7 @@ export const inject = ['webServer', 'webRuntime', 'appExit', 'settings']
 
 /** Standard settings namespace shared by tray and configuration surfaces. */
 export const DESKTOP_SETTINGS_NAMESPACE = settingsNamespace('dsh-desktop')
+const DEFAULT_DESKTOP_SHELL_MODE: DesktopShellMode = process.platform === 'linux' ? 'compatibility' : 'advanced'
 
 const UI_THEME_SETTINGS_NAMESPACE = settingsNamespace(THEME_SETTINGS_NAMESPACE)
 const UI_LOCALE_SETTINGS_NAMESPACE = settingsNamespace(LOCALE_SETTINGS_NAMESPACE)
@@ -99,7 +107,7 @@ export interface DesktopSettings {
 
 /** Schema registered with the standard settings service. */
 export const DesktopSettingsSchema: z<DesktopSettings> = z.object({
-  mode: z.union(['compatibility', 'extended', 'advanced'] as const).default('compatibility'),
+  mode: z.union(['compatibility', 'extended', 'advanced'] as const).default(DEFAULT_DESKTOP_SHELL_MODE),
   macosMaterial: z.union(['off', 'transparent'] as const).default(DEFAULT_MACOS_WINDOW_MATERIAL),
   windowsMaterial: z.union(['off', 'acrylic', 'mica'] as const).default(DEFAULT_WINDOWS_WINDOW_MATERIAL),
   port: z.number().step(1).min(0).max(65_535).default(DESKTOP_DEFAULT_WEB_PORT),
@@ -128,7 +136,7 @@ export interface Config {
 
 /** Validated native window configuration. */
 export const Config: z<Config> = z.object({
-  mode: z.union(['compatibility', 'extended', 'advanced'] as const).default('compatibility'),
+  mode: z.union(['compatibility', 'extended', 'advanced'] as const).default(DEFAULT_DESKTOP_SHELL_MODE),
   macosMaterial: z.union(['off', 'transparent'] as const).default(DEFAULT_MACOS_WINDOW_MATERIAL),
   windowsMaterial: z.union(['off', 'acrylic', 'mica'] as const).default(DEFAULT_WINDOWS_WINDOW_MATERIAL),
   port: z.number().step(1).min(0).max(65_535).default(DESKTOP_DEFAULT_WEB_PORT),
@@ -174,8 +182,8 @@ export function apply(ctx: Context, config: Config): void {
   const runtime = ctx.get('desktopRuntime')
   if (runtime === undefined) {
     process.stderr.write(
-      'dsh-plugin-desktop: this profile is composed with the DSH Desktop shell, which requires the desktop launcher (desktopRuntime).\n'
-      + 'Start it with `dsh-desktop`, or select this profile inside the packaged DSH Desktop application.\n'
+      'dsh-plugin-desktop: this profile is composed with the Zenwit shell, which requires the desktop launcher (desktopRuntime).\n'
+      + 'Start it with `dsh-desktop`, or select this profile inside the packaged Zenwit application.\n'
       + 'The desktop terminal, profile, and update rows stay inactive in an ordinary DSH boot.\n',
     )
     return
@@ -221,9 +229,13 @@ export function apply(ctx: Context, config: Config): void {
     const settingsRoutes = [
       [DESKTOP_SETTINGS_PATH, handleDesktopSettingsRequest],
       [DESKTOP_PROJECT_LIBRARY_PATH, handleProjectLibraryRequest],
+      [DESKTOP_PROJECT_DELETE_PATH, handleProjectLibraryDeleteRequest],
       [DESKTOP_PROJECT_STRUCTURE_PATH, handleProjectLibraryStructureRequest],
       [DESKTOP_PROJECT_RESOURCES_PATH, handleProjectLibraryResourcesRequest],
       [DESKTOP_PROJECT_FILE_PATH, handleProjectFileRequest],
+      [DESKTOP_PROJECT_NODE_PATH, handleProjectNodeRequest],
+      [DESKTOP_PROJECT_REVEAL_PATH, (req: IncomingMessage, res: ServerResponse, origin: string, controller: DesktopSettingsController) => handleDesktopProjectPathActionRequest(req, res, origin, controller, 'reveal')],
+      [DESKTOP_PROJECT_TERMINAL_PATH, (req: IncomingMessage, res: ServerResponse, origin: string, controller: DesktopSettingsController) => handleDesktopProjectPathActionRequest(req, res, origin, controller, 'terminal')],
       [DESKTOP_PROFILE_CREATE_PATH, handleDesktopProfileCreateRequest],
       [DESKTOP_PROFILE_CREATE_WINDOW_PATH, handleDesktopProfileCreateWindowRequest],
       [DESKTOP_PROFILE_DELETE_PATH, handleDesktopProfileDeleteRequest],
@@ -346,8 +358,8 @@ export function apply(ctx: Context, config: Config): void {
         material,
         ...(runtime.windowsBuild === undefined ? {} : { windowsBuild: runtime.windowsBuild }),
         url: desktopRendererUrl(ctx.webServer.port, config.mode, runtime.platform, material, runtime.windowsBuild),
-        productName: 'DSH Desktop',
-        windowTitle: 'DeepSeek Harness Desktop',
+        productName: 'Zenwit',
+        windowTitle: 'Zenwit',
         iconPath,
         trayIcons,
         readLocalePreference: () => {

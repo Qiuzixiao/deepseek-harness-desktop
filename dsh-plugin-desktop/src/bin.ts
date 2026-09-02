@@ -1,4 +1,4 @@
-/** Headless-safe npm launcher for the DSH Desktop Electron executable. */
+/** Headless-safe npm launcher for the Zenwit Electron executable. */
 
 import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -13,7 +13,7 @@ export type DesktopCliAction = 'export-diagnostics' | 'help' | 'version' | 'laun
 /** Human-readable launcher help. */
 export const DESKTOP_CLI_HELP = `Usage: dsh-plugin-desktop [options]
 
-Launch DSH Desktop with the selected Web-capable profile.
+Launch Zenwit with the selected Web-capable profile.
 
 Options:
   --export-diagnostics  export logs and crash evidence without launching the app
@@ -51,13 +51,13 @@ export function defaultDesktopUserDataDirectory(
   if (platform === 'win32') {
     const appData = environment.APPDATA
     if (appData === undefined || appData.length === 0) {
-      throw new Error('APPDATA is unavailable; cannot locate DSH Desktop diagnostics')
+      throw new Error('APPDATA is unavailable; cannot locate Zenwit diagnostics')
     }
-    return path.join(appData, 'DSH Desktop')
+    return path.join(appData, 'Zenwit')
   }
-  if (platform === 'darwin') return path.join(homeDirectory, 'Library', 'Application Support', 'DSH Desktop')
+  if (platform === 'darwin') return path.join(homeDirectory, 'Library', 'Application Support', 'Zenwit')
   const config = environment.XDG_CONFIG_HOME
-  return path.join(config === undefined || config.length === 0 ? path.join(homeDirectory, '.config') : config, 'DSH Desktop')
+  return path.join(config === undefined || config.length === 0 ? path.join(homeDirectory, '.config') : config, 'Zenwit')
 }
 
 export interface DesktopCliOptions {
@@ -82,19 +82,19 @@ async function launchElectron(): Promise<number> {
       + '  npm install -g dsh-plugin-desktop\n'
       + 'Or add electron to the profile before launching:\n'
       + '  dsh plugin --profile <name> add electron\n'
-      + 'Or use the packaged DSH Desktop application.\n',
+      + 'Or use the packaged Zenwit application.\n',
     )
     return 1
   }
   const mainPath = fileURLToPath(new URL('./main.js', import.meta.url))
   // Isolated-dev support: DSH_DESKTOP_USER_DATA gives the dev instance its own
-  // Electron user-data directory so it can run beside an installed DSH Desktop.
+  // Electron user-data directory so it can run beside an installed Zenwit.
   const electronArgs = [mainPath]
   const userDataDir = process.env.DSH_DESKTOP_USER_DATA
   if (userDataDir !== undefined && userDataDir.length > 0) {
     // One argv token ('--user-data-dir=<path>'): Chromium only recognizes the
     // equals form, so splitting the flag and its value would fall through to
-    // the default user-data directory and collide with an installed DSH Desktop.
+    // the default user-data directory and collide with an installed Zenwit.
     electronArgs.push(`--user-data-dir=${userDataDir}`)
   }
   return new Promise<number>((resolveExit, reject) => {

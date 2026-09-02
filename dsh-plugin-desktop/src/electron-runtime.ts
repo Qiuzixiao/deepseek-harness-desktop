@@ -60,20 +60,6 @@ import { ElectronWorkspaceAdmission } from './workspace-admission.ts'
 import { ProfileCreateWindow, type ProfileCreateWindowOptions } from './profile-create-window.ts'
 import { windowsBuildNumber } from './window-material.ts'
 
-/** Return the presentation mode opposite the active generation. */
-export function nextDesktopShellMode(mode: DesktopShellSpec['mode']): DesktopShellSpec['mode'] {
-  if (mode === 'compatibility') return 'extended'
-  if (mode === 'extended') return 'advanced'
-  return 'compatibility'
-}
-
-/** Return the tray command describing the mode that will be activated. */
-export function modeToggleLabel(mode: DesktopShellSpec['mode'], locale: DesktopLocale = 'en'): string {
-  if (mode === 'compatibility') return desktopTrayLabel(locale, 'switchToExtended')
-  if (mode === 'extended') return desktopTrayLabel(locale, 'switchToAdvanced')
-  return desktopTrayLabel(locale, 'switchToCompatibility')
-}
-
 /**
  * Read the desktop package version instead of Electron's development-app version.
  * @param moduleUrl - module below the package's `src` or `lib` directory.
@@ -97,7 +83,7 @@ const PRODUCT_VERSION = desktopProductVersion()
 /** Main-process deadline for one Renderer generation to settle its client Loader. */
 export const RENDERER_BOOT_TIMEOUT_MS = 30_000
 
-/** Native adapter used by the DSH Desktop launcher and owned by its Cordis shell plugin. */
+/** Native adapter used by the Zenwit launcher and owned by its Cordis shell plugin. */
 export class ElectronDesktopRuntime implements DesktopRuntime {
   readonly platform: DesktopPlatform
   readonly windowsBuild: number | undefined
@@ -319,6 +305,15 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
 
   /** @inheritdoc */
   openTerminal(): void {
+    this.launchTerminal(undefined, false)
+  }
+
+  /** Open the configured DSH terminal at a workspace path. */
+  openTerminalAt(path: string): void {
+    this.launchTerminal(path, true)
+  }
+
+  private launchTerminal(path: string | undefined, reportFailure: boolean): void {
     try {
       const spec = this.terminalSpec
       if (spec === undefined) {
@@ -337,6 +332,7 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
         profileName: spec.profileName,
         productVersion: PRODUCT_VERSION,
         profileDir: spec.profileDir,
+        ...(path === undefined ? {} : { workingDirectory: path }),
         homeDir: spec.homeDir,
         installRecoveryStatePath: desktopInstallRecoveryStatePath(app.getPath('userData')),
         stateDir: desktopTerminalStateDirectory(app.getPath('userData'), spec.profileName),
@@ -345,7 +341,16 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
       })
     } catch (cause) {
       this.reportTerminalLaunchError(cause)
+      if (reportFailure) throw cause
     }
+  }
+
+  /** Reveal one validated workspace path in the native file manager. */
+  revealInFileManager(path: string): void {
+    if (this.platform !== 'darwin' && this.platform !== 'win32' && this.platform !== 'linux') {
+      throw new Error(`dsh-plugin-desktop: file manager is unsupported on ${this.platform}`)
+    }
+    shell.showItemInFolder(path)
   }
 
   /** @inheritdoc */
@@ -449,9 +454,9 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
     const result = await dialog.showMessageBox({
       type: 'error',
       title: 'Plugin Recovery',
-      message: 'DSH Desktop could not load all plugins.',
-      detail: `Failed plugins:\n${plugins}\n\n${error}\n\nOpen DSH Terminal to update or remove the failing third-party plugin, then restart DSH Desktop.`,
-      buttons: ['Open DSH Terminal', 'Restart DSH Desktop', 'Dismiss'],
+      message: 'Zenwit could not load all plugins.',
+      detail: `Failed plugins:\n${plugins}\n\n${error}\n\nOpen Terminal to update or remove the failing third-party plugin, then restart Zenwit.`,
+      buttons: ['Open Terminal', 'Restart Zenwit', 'Dismiss'],
       defaultId: 0,
       cancelId: 2,
       noLink: true,
@@ -523,8 +528,8 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
   private async confirmUpdateDownload(version: string): Promise<boolean> {
     const result = await this.showUpdateMessageBox({
       type: 'info',
-      title: 'DSH Desktop Update Available',
-      message: `DSH Desktop ${version} is available.`,
+      title: 'Zenwit Update Available',
+      message: `Zenwit ${version} is available.`,
       detail: 'Download this update now?',
       buttons: ['Download', 'Later'],
       defaultId: 1,
@@ -540,7 +545,7 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
       await this.showUpdateMessageBox({
         type: 'warning',
         title: 'Unable to Check for Updates',
-        message: 'DSH Desktop could not check for updates.',
+        message: 'Zenwit could not check for updates.',
         detail: 'Please try again later.',
         buttons: ['OK'],
         defaultId: 0,
@@ -552,8 +557,8 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
     if (result.status === 'up-to-date') {
       await this.showUpdateMessageBox({
         type: 'info',
-        title: 'DSH Desktop Is Up to Date',
-        message: 'No newer version of DSH Desktop is available.',
+        title: 'Zenwit Is Up to Date',
+        message: 'No newer version of Zenwit is available.',
         detail: `Installed version: ${result.currentVersion}`,
         buttons: ['OK'],
         defaultId: 0,
@@ -564,8 +569,8 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
 
     await this.showUpdateMessageBox({
       type: 'info',
-      title: 'DSH Desktop Update Available',
-      message: `DSH Desktop ${result.latestVersion} is available.`,
+      title: 'Zenwit Update Available',
+      message: `Zenwit ${result.latestVersion} is available.`,
       detail: 'Installer downloads are unavailable in this build.',
       buttons: ['OK'],
       defaultId: 0,
@@ -603,9 +608,9 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
       signal.throwIfAborted()
       await this.showUpdateMessageBox({
         type: 'info',
-        title: 'DSH Desktop Update Downloaded',
-        message: `DSH Desktop ${version} is ready to install.`,
-        detail: 'The disk image has opened. Replace DSH Desktop in Applications, then reopen it.',
+        title: 'Zenwit Update Downloaded',
+        message: `Zenwit ${version} is ready to install.`,
+        detail: 'The disk image has opened. Replace Zenwit in Applications, then reopen it.',
         buttons: ['OK'],
         defaultId: 0,
         noLink: true,
@@ -615,9 +620,9 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
 
     const result = await this.showUpdateMessageBox({
       type: 'info',
-      title: 'DSH Desktop Update Downloaded',
-      message: `DSH Desktop ${version} is ready to install.`,
-      detail: 'Restart DSH Desktop and run the installer now?',
+      title: 'Zenwit Update Downloaded',
+      message: `Zenwit ${version} is ready to install.`,
+      detail: 'Restart Zenwit and run the installer now?',
       buttons: ['Restart and Install', 'Later'],
       defaultId: 1,
       cancelId: 1,
@@ -672,8 +677,8 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
       type: 'question',
       title: zh ? '删除更新安装包' : 'Remove Update Installer',
       message: zh
-        ? `DSH Desktop ${artifact.version} 已安装。`
-        : `DSH Desktop ${artifact.version} has been installed.`,
+        ? `Zenwit ${artifact.version} 已安装。`
+        : `Zenwit ${artifact.version} has been installed.`,
       detail: zh
         ? `是否删除下载的安装包以释放磁盘空间？\n\n${artifact.path}`
         : `Delete the downloaded installer to free disk space?\n\n${artifact.path}`,
@@ -718,7 +723,7 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
     const error = cause instanceof Error ? cause : new Error(String(cause))
     this.logError(`dsh-plugin-desktop: failed to open terminal: ${error.message}`)
     try {
-      dialog.showErrorBox('Unable to Open DSH Terminal', error.message)
+      dialog.showErrorBox('Unable to Open Terminal', error.message)
     } catch (dialogCause) {
       this.logError(`dsh-plugin-desktop: failed to show terminal error: ${dialogCause instanceof Error ? dialogCause.message : String(dialogCause)}`)
     }
@@ -747,16 +752,6 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
     if (profiles.length > 0) template.push({ type: 'separator' }, ...profiles)
     if (status.length > 0) template.push({ type: 'separator' }, ...status)
     template.push(
-      { type: 'separator' },
-      {
-        label: modeToggleLabel(spec.mode, this.locale),
-        enabled: this.platformStrategy.canToggleShellMode,
-        click: () => {
-          void spec.requestModeChange(nextDesktopShellMode(spec.mode)).catch((cause: unknown) => {
-            this.logError(`dsh-plugin-desktop: failed to change shell mode: ${cause instanceof Error ? cause.message : String(cause)}`)
-          })
-        },
-      },
       { type: 'separator' },
       { label: desktopTrayLabel(this.locale, 'quit'), click: () => { spec.requestQuit(0) } },
     )

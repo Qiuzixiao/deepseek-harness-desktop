@@ -44,7 +44,7 @@ interface ComposerRailItem extends AttachmentRailItem {
 export type InputBarProps = ComposerBarProps
 
 export function InputBar({
-  useSession, useInput, inputActions, keyboard, addImages, removeImage, draftImages,
+  useSession, useInput, inputActions, keyboard, intakeFiles, addImages, removeImage, draftImages, draftAttachments,
   resolveSubmitMode, toggleCommandMenu, stop, command, t,
   renderSlot, useNotices, useLexicon, useMenuLauncher,
   useProjection, sessionId, variant, disabled: inert = false, blocked,
@@ -69,10 +69,11 @@ export function InputBar({
   const live = input !== undefined && keyboard !== undefined && inputActions !== undefined
   const draft = input?.draft ?? ''
   const attachments = useMemo(
-    () => input === undefined || draftImages === undefined ? [] : draftImages(input.imageIds),
-    [draftImages, input?.imageIds],
+    () => input === undefined ? [] : (draftAttachments ?? draftImages)?.(input.attachmentIds ?? input.imageIds) ?? [],
+    [draftAttachments, draftImages, input],
   )
   const empty = draft.trim() === '' && attachments.length === 0
+  const attachmentUploading = attachments.some(attachment => attachment.kind === 'document' && attachment.status === 'uploading')
   const [preview, setPreview] = useState<ComposerAttachment | null>(null)
   const [dragActive, setDragActive] = useState(false)
   // Transient error banner (image-intake rejections and prompt failures): the
@@ -102,6 +103,7 @@ export function InputBar({
       : `${promptError.error.message} (${promptError.error.code})`)
   }, [promptError, showToast, t, imageLimits])
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
+  const filePickerRef = useRef<HTMLInputElement | null>(null)
   const cardRef = useRef<HTMLDivElement | null>(null)
   const dragDepthRef = useRef(0)
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -149,10 +151,11 @@ export function InputBar({
 
   useEffect(() => {
     if (input === undefined || inputActions === undefined) return
-    if (attachments.length !== input.imageIds.length) {
-      inputActions.pruneImages(attachments.map(attachment => attachment.id))
+    if (attachments.length !== (input.attachmentIds ?? input.imageIds).length) {
+      if (inputActions.pruneAttachments !== undefined) inputActions.pruneAttachments(attachments.map(attachment => attachment.id))
+      else inputActions.pruneImages(attachments.map(attachment => attachment.id))
     }
-  }, [attachments, input?.imageIds, inputActions])
+  }, [attachments, input?.attachmentIds, input?.imageIds, inputActions])
 
   useEffect(() => {
     if (preview !== null && !attachments.some(attachment => attachment.id === preview.id)) setPreview(null)
@@ -397,7 +400,16 @@ export function InputBar({
       .filter(item => item.kind === 'file')
       .map(item => item.getAsFile())
       .filter((file): file is File => file !== null)
-    if (files.length > 0) intakeImages(files)
+    if (files.length > 0) {
+      e.preventDefault()
+      if (intakeFiles !== undefined) void intakeFiles(files).catch(error => {
+        showToast(error instanceof Error ? error.message : String(error))
+      })
+      else {
+        const error = addImages?.(files)
+        if (error !== null && error !== undefined) showToast(error)
+      }
+    }
     const text = e.clipboardData.getData('text/plain')
     if (text === '') {
       if (files.length > 0) e.preventDefault()
@@ -416,38 +428,6 @@ export function InputBar({
     keyboard.track(keyboard.snapshot.draft, caret)
   }
 
-  // Intake pre-check (DeepSeek Chat semantics): an addition that would break
-  // a projected limit is refused as a whole batch, announced immediately, and
-  // never enters the rail — no more submit-time failure rolling the rail
-  // back. The host enforces the same limits at submit for callers that bypass
-  // this composer.
-  const intakeImages = useCallback((files: readonly File[]): void => {
-    if (addImages === undefined || files.length === 0) return
-    const rejected = ((): string | null => {
-      if (imageLimits !== undefined) {
-        // Format precedes limits (DeepSeek Chat's filter order): a batch with
-        // a non-image must announce the format problem, not a count or size
-        // it could never pass anyway — addImages rejects it authoritatively.
-        if (files.some(file => !(imageLimits.mediaTypes as readonly string[]).includes(file.type))) {
-          return addImages(files)
-        }
-        if (attachments.length + files.length > imageLimits.maxImagesPerMessage) {
-          return t('image.tooMany', { count: imageLimits.maxImagesPerMessage })
-        }
-        if (files.some(file => file.size > imageLimits.maxImageBytes)) {
-          return t('image.fileTooLarge', { size: imageSizeText(imageLimits.maxImageBytes) })
-        }
-        const total = attachments.reduce((sum, attachment) => sum + attachment.file.size, 0)
-          + files.reduce((sum, file) => sum + file.size, 0)
-        if (total > imageLimits.maxMessageImageBytes) {
-          return t('image.totalTooLarge', { size: imageSizeText(imageLimits.maxMessageImageBytes) })
-        }
-      }
-      return addImages(files)
-    })()
-    if (rejected !== null) showToast(rejected)
-  }, [addImages, attachments, imageLimits, showToast, t])
-
   // Whole-page file-drop intake (DeepSeek Chat behavior): the listeners live
   // on the document so a drop anywhere over the window adds images, not only
   // over the composer card. Safe as document-level state: the composer-bar
@@ -455,7 +435,44 @@ export function InputBar({
   // Text drags carry no 'Files' type and pass through untouched, keeping the
   // native drop-text-into-textarea path. The overlay layer itself is
   // pointer-inert, so it never disturbs the enter/leave count.
-  const canAcceptDrop = !locked && !machineBusy && addImages !== undefined
+  const canAcceptFiles = intakeFiles !== undefined || addImages !== undefined
+  const acceptFiles = useCallback((files: readonly File[]): void => {
+    if (files.length === 0) return
+    const imageFiles = files.filter(file => {
+      const type = file.type.toLowerCase()
+      if (type.startsWith('image/')) return true
+      const ext = file.name.slice(file.name.lastIndexOf('.') + 1).toLowerCase()
+      return ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext)
+    })
+    if (imageLimits !== undefined && imageFiles.length > 0) {
+      const held = attachments.filter(attachment => attachment.kind === 'image')
+      const total = held.reduce((sum, attachment) => sum + attachment.file.size, 0)
+        + imageFiles.reduce((sum, file) => sum + file.size, 0)
+      if (held.length + imageFiles.length > imageLimits.maxImagesPerMessage) {
+        showToast(t('image.tooMany', { count: imageLimits.maxImagesPerMessage }))
+        return
+      }
+      const tooLarge = imageFiles.find(file => file.size > imageLimits.maxImageBytes)
+      if (tooLarge !== undefined) {
+        showToast(t('image.fileTooLarge', { size: imageSizeText(imageLimits.maxImageBytes) }))
+        return
+      }
+      if (total > imageLimits.maxMessageImageBytes) {
+        showToast(t('image.totalTooLarge', { size: imageSizeText(imageLimits.maxMessageImageBytes) }))
+        return
+      }
+    }
+    if (intakeFiles !== undefined) {
+      void intakeFiles(files).catch(error => {
+        showToast(error instanceof Error ? error.message : String(error))
+      })
+      return
+    }
+    if (imageFiles.length === 0) return
+    const error = addImages?.(imageFiles)
+    if (error !== null && error !== undefined) showToast(error)
+  }, [addImages, attachments, imageLimits, intakeFiles, showToast, t])
+  const canAcceptDrop = !locked && !machineBusy && canAcceptFiles
   useEffect(() => {
     const hasFiles = (event: globalThis.DragEvent): boolean =>
       event.dataTransfer?.types.includes('Files') ?? false
@@ -489,7 +506,7 @@ export function InputBar({
       event.preventDefault()
       reset()
       if (!canAcceptDrop) return
-      intakeImages([...(event.dataTransfer?.files ?? [])])
+      acceptFiles([...(event.dataTransfer?.files ?? [])])
     }
     document.addEventListener('dragenter', onDragEnter)
     document.addEventListener('dragover', onDragOver)
@@ -503,7 +520,7 @@ export function InputBar({
       document.removeEventListener('drop', onDrop)
       window.removeEventListener('dragend', reset)
     }
-  }, [canAcceptDrop, intakeImages])
+  }, [canAcceptDrop, acceptFiles])
 
   const closePreview = useCallback(() => { setPreview(null) }, [])
 
@@ -511,9 +528,16 @@ export function InputBar({
   // zero-cordis and read no locale.
   const railItems = useMemo<ComposerRailItem[]>(() => attachments.map(attachment => ({
     id: attachment.id,
-    previewUrl: attachment.previewUrl,
-    alt: attachment.file.name || t('image.pending'),
-    removeLabel: t('image.remove', { name: attachment.file.name }),
+    ...(attachment.kind === 'image' ? { previewUrl: attachment.previewUrl } : {
+      kind: 'document' as const,
+      name: attachment.name,
+      extension: attachment.extension,
+      bytes: attachment.bytes,
+      status: attachment.status,
+      ...(attachment.error === undefined ? {} : { error: attachment.error }),
+    }),
+    alt: attachment.kind === 'image' ? attachment.file.name || t('image.pending') : attachment.name,
+    removeLabel: t('image.remove', { name: attachment.kind === 'image' ? attachment.file.name : attachment.name }),
     attachment,
   })), [attachments, t])
 
@@ -538,6 +562,12 @@ export function InputBar({
     if (el !== null) toggleCommandMenu?.(selectionOf(el))
   }
 
+  const onFilesPicked = (event: ChangeEvent<HTMLInputElement>): void => {
+    const files = Array.from(event.target.files ?? [])
+    event.target.value = ''
+    acceptFiles(files)
+  }
+
   // Ordinary sessions retain their primary Send/Stop toggle. A continuable
   // child keeps Send as the primary action and exposes Stop independently so
   // pointer users can queue follow-ups while its current turn is running.
@@ -551,7 +581,7 @@ export function InputBar({
     }
     if (inputActions === undefined) return // absent machine: the button is disabled
     /* v8 ignore next -- defensive: the primary button is disabled while empty||disabled, so a click cannot reach the false arm. */
-    if (!empty && !disabled && !machineBusy) inputActions.submit()
+    if (!empty && !disabled && !machineBusy && !attachmentUploading) inputActions.submit()
   }
 
   // The Access seat: the projection-fed permission chip (renders nothing
@@ -729,6 +759,7 @@ export function InputBar({
         </div>
         <div className={css.row}>
           <div className={css.tools}>
+            <input id="dsh-composer-file-picker" ref={filePickerRef} type="file" multiple hidden onChange={onFilesPicked} />
             <Tooltip label={t('input.commands')} side="top" delayMs={500}>
               <button
                 type="button"
@@ -774,7 +805,7 @@ export function InputBar({
                 type="button"
                 className={css.primary}
                 aria-label={primaryLabel}
-                disabled={primaryStops ? stop === undefined : empty || disabled || machineBusy}
+                disabled={primaryStops ? stop === undefined : empty || disabled || machineBusy || attachmentUploading}
                 onMouseDown={keepFocus}
                 onClick={onPrimary}
               >
@@ -792,7 +823,7 @@ export function InputBar({
           </div>
         </div>
       </div>
-      {preview !== null && (
+      {preview?.kind === 'image' && (
         <ImageLightbox
           src={preview.previewUrl}
           alt={preview.file.name || t('image.original')}

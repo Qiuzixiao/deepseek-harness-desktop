@@ -36,6 +36,10 @@ export interface DesktopSettingsControllerBootstrap {
   scheduleRestart(): void
   /** Open the launcher-owned DSH terminal. */
   openTerminal(): void
+  /** Open the launcher-owned DSH terminal at a validated project path. */
+  openTerminalAt?: (path: string) => void
+  /** Reveal a validated project path in the native file manager. */
+  revealInFileManager?: (path: string) => void
   /** Export diagnostics through the launcher-owned privacy flow. */
   exportDiagnostics(): void | Promise<void>
   /** Open the isolated native Profile creator. */
@@ -151,6 +155,18 @@ export class DesktopSettingsController {
   /** Open the native terminal through the launcher-owned action. */
   openTerminal(): DesktopTerminalOpenResponse {
     this.bootstrap.openTerminal()
+    return Object.freeze({ accepted: true })
+  }
+
+  openTerminalAt(path: string): DesktopTerminalOpenResponse {
+    if (this.bootstrap.openTerminalAt === undefined) throw new Error('dsh-plugin-desktop: project terminal is unavailable')
+    this.bootstrap.openTerminalAt(path)
+    return Object.freeze({ accepted: true })
+  }
+
+  revealInFileManager(path: string): DesktopTerminalOpenResponse {
+    if (this.bootstrap.revealInFileManager === undefined) throw new Error('dsh-plugin-desktop: file manager is unavailable')
+    this.bootstrap.revealInFileManager(path)
     return Object.freeze({ accepted: true })
   }
 

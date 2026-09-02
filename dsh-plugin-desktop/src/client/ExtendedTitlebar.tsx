@@ -26,7 +26,7 @@ export function ExtendedTitlebar({ environment, renderSlot, t }: ExtendedTitleba
       data-material={environment.material}
     >
       <div className="dshDesktopExtendedIdentity">
-        <span className="dshDesktopExtendedProduct">DSH Desktop</span>
+        <span className="dshDesktopExtendedProduct">Zenwit</span>
         <span className="dshDesktopExtendedMode">{t('extendedMode')}</span>
       </div>
       <div className="dshDesktopExtendedActions">

@@ -11,6 +11,21 @@
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { MenuState } from '../core/contract.ts'
+import type { ReactNode } from 'react'
+
+/** A non-trigger action shown at the top of a programmatically opened menu. */
+export interface MenuAction {
+  readonly id: string
+  readonly label: string
+  readonly icon?: ReactNode
+  readonly disabled?: boolean
+  readonly onSelect: () => void
+}
+
+/** Owner-supplied actions for the shared trigger menu. */
+export interface MenuViewOwnerProps {
+  readonly actions?: readonly MenuAction[]
+}
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
@@ -21,7 +36,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * ui-conversation's composer entry; the anchor hides with the input
      * under a takeover.
      */
-    'conversation.input.overlay': { kind: 'list'; scope: 'session' }
+    'conversation.input.overlay': { kind: 'list'; scope: 'session'; owner: MenuViewOwnerProps }
   }
 }
 
@@ -37,4 +52,6 @@ export interface MenuViewInjected {
   onPick: (source: string, index: number) => void
   /** Dismiss the menu (external pointer outside the composer area). */
   onDismiss: () => void
+  /** Programmatic launcher state; actions render only for the plus menu. */
+  launcher: SnapshotStore<string | null>
 }

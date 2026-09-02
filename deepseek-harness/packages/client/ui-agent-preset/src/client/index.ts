@@ -167,19 +167,19 @@ export function apply(ctx: ClientContext): void {
         seat.stage('cordis', true)
         workspaces.startSession()
       }
-      const chip = scope.slots.register({
+      const chip = scope.slots.inject('conversation.hero.agentPreset', () => scope.slots.register({
         name: 'conversation.hero.agentPreset',
         locale: 'settings.agentPreset',
         inject: seatInjected,
-      }, AgentPresetSeat)
-      const label = scope.slots.register({
+      }, AgentPresetSeat))
+      const label = scope.slots.inject('conversation.session.header.actions', () => scope.slots.register({
         name: 'conversation.session.header.actions',
         id: 'agent-preset',
         // Static session context occupies the header's leading negative-order band.
         order: -10,
         locale: 'settings.agentPreset',
         inject: labelInjected,
-      }, AgentPresetLabel)
+      }, AgentPresetLabel))
       return () => {
         // First: a same-tick list notification already in flight must see
         // this before it reaches `currentSession()`, not after `stop()`

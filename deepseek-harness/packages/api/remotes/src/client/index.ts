@@ -30,6 +30,15 @@ export type {} from '@deepseek-ai/dsh-llm/types'
 export type {} from '@deepseek-ai/dsh-agent-presets/types'
 export type {} from '@deepseek-ai/dsh-settings/types'
 
+// Keep the client event vocabulary aligned with the Host allowlist. The skill
+// package has no client-safe types entry yet, but its runtime event is public
+// and carries no arguments.
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    'skills/change'(): void
+  }
+}
+
 /**
  * The carrier's Client-facing types, re-exported so a business package names one
  * assembly package instead of both this facade and the Connection plugin. Type-only:

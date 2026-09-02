@@ -1,17 +1,32 @@
-# Desktop Host operations compose around the existing Web bundle. Compatibility
-# mode keeps upstream ownership of the browser carrier and rendered UI.
+# Desktop Host operations compose around the existing Web bundle. The product
+# opens in the enhanced shell while compatibility remains available in config.
 - insert:
-    # Zenwit screenplay kernel (host plane): provides ctx.screenplayProjects,
-    # the session-keyed state machine the screenplay-v1 preset's tools drive.
+    # General document intake: paperclip, drag/drop, paste, attachment cards,
+    # and the canonical file_path-based read_document tool.
+    - id: file-upload
+      name: dsh-file-upload
+      config:
+        uploadMaxBytes: 26214400
+        allowedExtensions: []
+        uploadTtlMs: 604800000
+        sweepIntervalMs: 3600000
+        maxConcurrentUploads: 4
+        maxFileBytes: 26214400
+        readLimit: 2000
+        sheetRowLimit: 200
+        maxSheets: 5
+        cacheEntries: 16
+        cacheMaxBytes: 67108864
+        markitdownBin: ''
+        markitdownTimeoutMs: 120000
+        allowRemoteVision: false
+    # Project state, domain writes, validation, and Session-bound drafts.
     - id: screenplay-host
       name: dsh-short-drama
     - id: desktop-shell
       name: dsh-plugin-desktop
       config:
-        mode: compatibility
-    - id: desktop-terminal
-      name: dsh-plugin-desktop/terminal
-      disabled: !!js process.platform === 'linux'
+        mode: advanced
     - id: desktop-diagnostics
       name: dsh-plugin-desktop/diagnostics
     - id: desktop-notifications
@@ -20,21 +35,29 @@
       name: dsh-plugin-desktop/pnpm
     - id: desktop-profiles
       name: dsh-plugin-desktop/profiles
+      # Profile recovery remains launcher-owned; ordinary users do not switch it.
+      disabled: true
     - id: desktop-updates
       name: dsh-plugin-desktop/updates
 
-# Zenwit: every session is a screenplay session — default the agent preset to
-# the screenplay kernel's preset (screenplay-v1). The user can still override
-# the default through the agent-preset settings surface.
+# Zenwit: every session starts in the general-purpose short-drama preset. The
+# preset itself is a normal Harness Agent; other Agent presets can be selected
+# per session without changing the workspace shell.
 - id: agent-presets
   config:
-    default: screenplay-v1
+    default: short-drama
 
 # The current Web shell installs the slot renderer through its shell-owned
 # app-shell entry. Older installed Web bundles still contribute ui-renderer;
 # disable that legacy installer when the mixed profile is composed so the
 # renderer is installed exactly once.
 - id: ui-renderer
+  disabled: true
+
+# The Desktop conversation keeps the Chat view as its primary surface. The
+# trajectory ledger remains available to profiles that explicitly enable the
+# upstream plugin, but is not mounted in the Desktop workbench by default.
+- id: ui-trajectory
   disabled: true
 
 # Zenwit owns the root shell. Keep ui-layout's service/theme presenter, but

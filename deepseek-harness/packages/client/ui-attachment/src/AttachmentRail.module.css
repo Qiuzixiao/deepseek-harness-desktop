@@ -32,6 +32,65 @@
   height: 64px;
 }
 
+.documentItem {
+  flex-basis: 190px;
+  width: 190px;
+}
+
+.documentCard {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 190px;
+  height: 64px;
+  box-sizing: border-box;
+  padding: 8px 24px 8px 8px;
+  overflow: hidden;
+  border: 1px solid var(--dsw-alias-border-l2-darkmode-thin);
+  border-radius: 12px;
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.documentIcon {
+  display: grid;
+  flex: 0 0 38px;
+  place-items: center;
+  width: 38px;
+  height: 44px;
+  border-radius: 6px;
+  background: var(--dsw-specific-input-major);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.documentMeta {
+  min-width: 0;
+}
+
+.documentSize {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.documentName {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+  line-height: 18px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.documentSize {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  line-height: 16px;
+}
+
 .thumbnail {
   width: 64px;
   height: 64px;

@@ -57,7 +57,7 @@ describe('Desktop profile health checkpoint', () => {
     const result = target.checkpoint.captureHealthy()
     expect(result.snapshotExists).toBe(true)
     expect(result.manifest.files).toEqual(expect.arrayContaining([
-      { name: '.dsh-market/state.json', present: false },
+      { name: '.zenwit-market/state.json', present: false },
     ]))
     expect(target.checkpoint.inspectRestore()).toMatchObject({
       snapshotExists: true,
@@ -110,18 +110,18 @@ describe('Desktop profile health checkpoint', () => {
     const target = fixture()
     target.checkpoint.captureHealthy()
     writeFileSync(join(target.profile, 'package.json'), '{"name":"broken"}\n')
-    mkdirSync(join(target.profile, '.dsh-market'))
-    writeFileSync(join(target.profile, '.dsh-market', 'state.json'), '{}\n', { flag: 'w' })
+    mkdirSync(join(target.profile, '.zenwit-market'))
+    writeFileSync(join(target.profile, '.zenwit-market', 'state.json'), '{}\n', { flag: 'w' })
     const inspection = target.checkpoint.inspectRestore()
     expect(inspection.currentDiffers).toBe(true)
     expect(inspection.changedFiles).toContain('package.json')
-    expect(inspection.changedFiles).toContain('.dsh-market/state.json')
+    expect(inspection.changedFiles).toContain('.zenwit-market/state.json')
 
     const restored = target.checkpoint.restoreLatest('generation-1')
     expect(restored.status).toBe('restored')
     expect(restored.changedFiles).toContain('package.json')
     expect(readFileSync(join(target.profile, 'package.json'), 'utf8')).toBe('{"name":"healthy"}\n')
-    expect(existsSync(join(target.profile, '.dsh-market', 'state.json'))).toBe(false)
+    expect(existsSync(join(target.profile, '.zenwit-market', 'state.json'))).toBe(false)
     expect(target.checkpoint.inspectRestore()).toMatchObject({
       currentDiffers: false,
       restoreAttempted: true,

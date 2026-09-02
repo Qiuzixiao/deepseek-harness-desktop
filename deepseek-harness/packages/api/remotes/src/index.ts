@@ -14,6 +14,15 @@ import type {} from '@deepseek-ai/dsh-llm/types'
 import type {} from '@deepseek-ai/dsh-agent-presets/types'
 import type {} from '@deepseek-ai/dsh-settings/types'
 
+// The skill package currently exposes no client-safe `./types` subpath. Keep
+// the event's wire shape here until that package publishes one; the runtime
+// owner still emits the same zero-argument event.
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    'skills/change'(): void
+  }
+}
+
 export {
   ApiRemoteSessionNotFound,
   ApiRemoteSubagentSessionOwnership,

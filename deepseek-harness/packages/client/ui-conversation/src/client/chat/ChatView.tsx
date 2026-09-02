@@ -13,11 +13,13 @@
 // lifecycle updates replace only their own row without remounting it.
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { ConversationTimelineSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ChatNodeStore, ConversationTimelineSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
+import { isRunningTool, type ChatNode } from '../contract/chat-nodes.ts'
 import { PendingSteeringBubble } from './MessageItem.tsx'
 import { ChatNodeSeat } from './ChatNodeSeat.tsx'
+import { ExecutionGroup, isProcessNode, processTurn } from './ExecutionGroup.tsx'
 import { formatRunDuration } from './message-chrome.ts'
 import css from './ChatView.module.css'
 
@@ -82,6 +84,55 @@ function pagingAnchor(list: HTMLElement, scrollport: HTMLElement): HTMLElement |
 }
 
 type ChatScrollPosition = NonNullable<ReturnType<ChatViewSlotProps['chatScroll']['read']>>
+
+type FlowItem =
+  | { kind: 'node'; key: string }
+  | { kind: 'group'; key: string; keys: readonly string[] }
+
+function deriveFlow(order: readonly string[], nodeStore: ChatNodeStore): FlowItem[] {
+  const result: FlowItem[] = []
+  let pending: { keys: string[]; turn: number | undefined } | null = null
+  const flush = (): void => {
+    if (pending === null) return
+    if (pending.keys.length >= 2) {
+      result.push({ kind: 'group', key: `execution:${pending.keys[0]}`, keys: pending.keys })
+    } else {
+      for (const key of pending.keys) result.push({ kind: 'node', key })
+    }
+    pending = null
+  }
+  for (const key of order) {
+    const node = nodeStore.get(key) as ChatNode | undefined
+    if (node === undefined || !isProcessNode(node)) {
+      flush()
+      if (node !== undefined) result.push({ kind: 'node', key })
+      continue
+    }
+    const turn = processTurn(node)
+    if (pending === null || (pending.turn !== undefined && turn !== undefined && pending.turn !== turn)) {
+      flush()
+      pending = { keys: [], turn }
+    } else if (pending.turn === undefined && turn !== undefined) {
+      pending.turn = turn
+    }
+    pending.keys.push(key)
+  }
+  flush()
+  return result
+}
+
+function processFlowSignature(order: readonly string[], nodeStore: ChatNodeStore): string {
+  return order.map((key) => {
+    const node = nodeStore.get(key) as ChatNode | undefined
+    if (node === undefined || !isProcessNode(node)) return `${key}:node`
+    if (node.kind === 'assistant-step') {
+      const blocks = node.data.blocks.map(block => `${block.kind}:${'text' in block ? block.text.length : 0}`).join(',')
+      return `${key}:assistant:${processTurn(node) ?? 'unknown'}:${node.data.status}:${blocks}`
+    }
+    const root = node.data.root
+    return `${key}:tool:${processTurn(node) ?? 'unknown'}:${isRunningTool(root) ? 'running' : root.isError ? 'error' : 'done'}`
+  }).join('|')
+}
 
 /** Capture a reflow-resistant reader position from the current rendered window. */
 function scrollPosition(list: HTMLElement, scrollport: HTMLElement): ChatScrollPosition | null {
@@ -165,6 +216,9 @@ export function ChatView({
     [inbox],
   )
   const runningTurnStart = useMemo(() => runningTurnStartTime(timeline), [timeline])
+  const flowSignature = useSession(snapshot => processFlowSignature(snapshot.chat.order, snapshot.chat.nodes))
+
+  const flow = useMemo(() => deriveFlow(order, nodeStore), [flowSignature, nodeStore, order])
 
   const listRef = useRef<HTMLDivElement | null>(null)
   const columnRef = useRef<HTMLDivElement | null>(null)
@@ -379,22 +433,32 @@ export function ChatView({
               </button>
             </div>
           )}
-          {order.map(nodeKey => (
-            <ChatNodeSeat
-              key={nodeKey}
-              nodeKey={nodeKey}
-              useSession={useSession}
-              selectedCallId={selectedCallId}
-              cwd={cwd}
-              openFile={openFile}
-              inspectCall={inspectCall}
-              forkAt={forkAt}
-              loadImage={loadImage}
-              fileMentions={fileMentions}
-              renderSlot={renderSlot}
-              t={t}
-            />
-          ))}
+          {flow.map(item => {
+            const seat = (nodeKey: string) => (
+              <ChatNodeSeat
+                key={nodeKey}
+                nodeKey={nodeKey}
+                useSession={useSession}
+                selectedCallId={selectedCallId}
+                cwd={cwd}
+                openFile={openFile}
+                inspectCall={inspectCall}
+                forkAt={forkAt}
+                loadImage={loadImage}
+                fileMentions={fileMentions}
+                renderSlot={renderSlot}
+                t={t}
+              />
+            )
+            if (item.kind === 'group') {
+              return (
+                <ExecutionGroup key={item.key} nodeKeys={item.keys} useSession={useSession} t={t}>
+                  {item.keys.map(seat)}
+                </ExecutionGroup>
+              )
+            }
+            return seat(item.key)
+          })}
           {/* No pending placeholders: questions (ui-user-questions) and approvals
               (ApprovalPanel) both take over the composer, so a flow card would
               double-render the same wait. */}

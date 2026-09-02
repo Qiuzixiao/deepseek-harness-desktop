@@ -62,8 +62,9 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      *
      * Current-session-optional: the occupant owns both states without
      * changing its React identity, so it keeps its own state across a session
-     * switch. It receives no owner props; session facts arrive through the
-     * framework hooks of the `session-maybe` scope.
+     * switch. Product shells may suppress redundant chrome such as the
+     * Workspace picker or generic hero headline; session facts arrive through
+     * the framework hooks of the `session-maybe` scope.
      *
      * RUNTIME NOTE: the runtime declaration of this slot lives with the Zenwit
      * product frame (ui-short-drama), which shadows AppFrame and renders the
@@ -113,8 +114,13 @@ export interface SidebarOwnerProps {
   settingsOnlyInline?: boolean
 }
 
-/** Conversation owner share: business state and actions belong to the registrant. */
-export interface ConvOwnerProps {}
+/** Conversation owner share: product-shell presentation only; business state belongs to the registrant. */
+export interface ConvOwnerProps {
+  /** Hide the generic Workspace picker when the product shell already binds one project directory. */
+  showWorkspacePicker?: boolean
+  /** Hide the generic hero headline when a product shell supplies its own identity. */
+  showHeroHeadline?: boolean
+}
 
 /** Details owner share: empty — sessionId arrives as a framework-standard prop. */
 export interface DetailsOwnerProps {}

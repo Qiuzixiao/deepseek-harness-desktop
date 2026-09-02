@@ -8,3 +8,5 @@ export { CHINESE_SCREENPLAY_LAYOUT, DEFAULT_SCREENPLAY_LAYOUT, LEGACY_SCREENPLAY
 export { ScreenplayProjectService } from './service.js';
 export { ScreenplayProjectStore } from './store.js';
 export { ScreenplayReferenceStore } from './references/store.js';
+export * from './project-scope.js';
+export { SkillAuthoringStore } from './skill-authoring.js';

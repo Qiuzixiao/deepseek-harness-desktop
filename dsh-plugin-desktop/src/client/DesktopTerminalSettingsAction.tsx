@@ -15,7 +15,7 @@ export type DesktopTerminalSettingsActionProps =
   & PropsLocale<'desktop.settings'>
   & InjectFace<DesktopTerminalSettingsActionInjected>
 
-/** Open DSH Terminal or restart without exposing launcher details to the renderer. */
+/** Open Terminal or restart without exposing launcher details to the renderer. */
 export function DesktopTerminalSettingsAction({ api, t }: DesktopTerminalSettingsActionProps) {
   return <DesktopNativeActions api={api} t={t} placement="settings" />
 }

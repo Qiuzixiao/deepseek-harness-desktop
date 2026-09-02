@@ -17,6 +17,7 @@ import type {
   PasteComponent, QueuedMessage, SessionInput, SubmitAttempt,
 } from './contract.ts'
 import type { InputSubmitMode } from '../contract/composer-submission.ts'
+import type { ComposerDocumentAttachment } from '../contract/slots.ts'
 import { InputMachine } from './machine.ts'
 
 /** Popup face the shell needs (dismissal only; typed structurally to avoid a value import). */
@@ -45,7 +46,10 @@ export interface SessionInputDeps {
    */
   steerQueue?: (() => void) | undefined
   /** The plain-message sink (send choreography / materialize fork — the hub owns it). */
-  defaultSink(text: string, imageIds: readonly DraftAttachmentId[], mode: InputSubmitMode): void
+  defaultSink(text: string, attachmentIds: readonly DraftAttachmentId[], mode: InputSubmitMode): void
+  createDocument?(document: Omit<ComposerDocumentAttachment, 'id' | 'kind'>): DraftAttachmentId
+  updateDocument?(id: DraftAttachmentId, patch: Partial<Omit<ComposerDocumentAttachment, 'id' | 'kind'>>): void
+  intakeFiles?: (files: readonly File[], shell: SessionInputShell) => Promise<void>
 }
 
 /** Guard tier from the machine phase. */
@@ -75,8 +79,11 @@ export class SessionInputShell implements SessionInput {
   readonly actions: InputActions = {
     setDraft: (text) => { this.setDraft(text) },
     addImages: ids => this.addImages(ids),
+    addAttachments: ids => this.addAttachments(ids),
     removeImage: (id) => { this.removeImage(id) },
+    removeAttachment: (id) => { this.removeAttachment(id) },
     pruneImages: (ids) => { this.pruneImages(ids) },
+    pruneAttachments: (ids) => { this.pruneAttachments(ids) },
     submit: () => { this.submit('queue') },
   }
 
@@ -85,7 +92,7 @@ export class SessionInputShell implements SessionInput {
   private readonly core = new InputMachine({ now: () => Date.now() })
   private noticeSeq = 0
   private lastDraft = ''
-  private imageIds: readonly DraftAttachmentId[] = []
+  private attachmentIds: readonly DraftAttachmentId[] = []
   private disposed = false
   /** Draft persistence mirror (chat store write; receives the clipboard projection, never raw placeholders). */
   private mirrorFn: ((text: string) => void) | undefined
@@ -109,18 +116,26 @@ export class SessionInputShell implements SessionInput {
 
   /** Append ordered image ids unless an admission transaction is locked. */
   addImages(ids: readonly DraftAttachmentId[]): boolean {
+    return this.addAttachments(ids)
+  }
+
+  addAttachments(ids: readonly DraftAttachmentId[]): boolean {
     if (this.snapshot.phase === 'adjudicating' || this.snapshot.phase === 'submitting') return false
     if (ids.length === 0) return true
-    this.imageIds = [...this.imageIds, ...ids]
+    this.attachmentIds = [...this.attachmentIds, ...ids]
     this.publish()
     return true
   }
 
   /** Remove one image id from this draft. */
   removeImage(id: DraftAttachmentId): void {
-    const next = this.imageIds.filter(candidate => candidate !== id)
-    if (next.length === this.imageIds.length) return
-    this.imageIds = next
+    this.removeAttachment(id)
+  }
+
+  removeAttachment(id: DraftAttachmentId): void {
+    const next = this.attachmentIds.filter(candidate => candidate !== id)
+    if (next.length === this.attachmentIds.length) return
+    this.attachmentIds = next
     this.publish()
   }
 
@@ -129,11 +144,35 @@ export class SessionInputShell implements SessionInput {
    * @param available - live registry ids.
    */
   pruneImages(available: readonly DraftAttachmentId[]): void {
+    this.pruneAttachments(available)
+  }
+
+  pruneAttachments(available: readonly DraftAttachmentId[]): void {
     const keep = new Set(available)
-    const next = this.imageIds.filter(id => keep.has(id))
-    if (next.length === this.imageIds.length) return
-    this.imageIds = next
+    const next = this.attachmentIds.filter(id => keep.has(id))
+    if (next.length === this.attachmentIds.length) return
+    this.attachmentIds = next
     this.publish()
+  }
+
+  addDocument(document: Omit<ComposerDocumentAttachment, 'id' | 'kind'>): DraftAttachmentId | null {
+    if (this.snapshot.phase === 'adjudicating' || this.snapshot.phase === 'submitting') return null
+    const id = this.deps.createDocument?.(document)
+    if (id === undefined) return null
+    return this.addAttachments([id]) ? id : null
+  }
+
+  updateDocument(id: DraftAttachmentId, patch: Partial<Omit<ComposerDocumentAttachment, 'id' | 'kind'>>): void {
+    this.deps.updateDocument?.(id, patch)
+  }
+
+  /** Re-render attachment metadata after an async upload transition. */
+  refreshAttachments(): void {
+    this.publish()
+  }
+
+  intakeFiles(files: readonly File[]): Promise<void> {
+    return this.deps.intakeFiles?.(files, this) ?? Promise.resolve()
   }
 
   /**
@@ -141,8 +180,8 @@ export class SessionInputShell implements SessionInput {
    * @param ids - failed attempt image ids.
    */
   restoreImages(ids: readonly DraftAttachmentId[]): void {
-    const current = new Set(this.imageIds)
-    this.imageIds = [...ids.filter(id => !current.has(id)), ...this.imageIds]
+    const current = new Set(this.attachmentIds)
+    this.attachmentIds = [...ids.filter(id => !current.has(id)), ...this.attachmentIds]
     this.publish()
   }
 
@@ -154,7 +193,7 @@ export class SessionInputShell implements SessionInput {
    */
   commitSend(imageIds: readonly DraftAttachmentId[]): void {
     const submitted = new Set(imageIds)
-    this.imageIds = this.imageIds.filter(id => !submitted.has(id))
+    this.attachmentIds = this.attachmentIds.filter(id => !submitted.has(id))
     this.run(this.core.dispatch({ type: 'send-committed' }))
   }
 
@@ -196,8 +235,8 @@ export class SessionInputShell implements SessionInput {
    * dismisses and the menu tracks frozen.
    */
   submit(mode: InputSubmitMode = 'queue'): void {
-    if (this.snapshot.draft.trim() === '' && this.imageIds.length > 0) {
-      if (this.snapshot.phase === 'plain') this.deps.defaultSink('', [...this.imageIds], mode)
+    if (this.snapshot.draft.trim() === '' && this.attachmentIds.length > 0) {
+      if (this.snapshot.phase === 'plain') this.deps.defaultSink('', [...this.attachmentIds], mode)
       return
     }
     this.run(this.core.dispatch({ type: 'enter', mode }))
@@ -424,7 +463,7 @@ export class SessionInputShell implements SessionInput {
    * the clipboard text. Chip-free drafts skip the async detour.
    */
   private sinkSerialized(draft: string, mode: InputSubmitMode): void {
-    const imageIds = [...this.imageIds]
+    const imageIds = [...this.attachmentIds]
     const occurrences = this.core.state.occurrences
     if (occurrences.length === 0) {
       this.deps.defaultSink(draft.trim(), imageIds, mode)
@@ -505,7 +544,7 @@ export class SessionInputShell implements SessionInput {
 
   private compose(): InputState {
     const core = this.core.state
-    return { ...core, imageIds: this.imageIds, queue: this.deps.queue?.getSnapshot() ?? EMPTY_QUEUE }
+    return { ...core, imageIds: this.attachmentIds, attachmentIds: this.attachmentIds, queue: this.deps.queue?.getSnapshot() ?? EMPTY_QUEUE }
   }
 
   private publish(): void {

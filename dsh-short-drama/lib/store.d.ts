@@ -1,5 +1,5 @@
 import { type ScreenplayPathLayout } from './layout.js';
-import { type CreateEpisodeOutlineBatchInput, type CreateEpisodeScreenplayInput, type CreateOutlineBundleInput, type CreateScreenplayArtifactsInput, type FinalizeOutlineBundleInput, type RequirementsChanges, type ScreenplayChangeInput, type ScreenplayProjectSnapshot } from './types.js';
+import { type CreateEpisodeOutlineBatchInput, type CreateEpisodeScreenplayInput, type CreateOutlineBundleInput, type CreateScreenplayArtifactsInput, type FinalizeOutlineBundleInput, type RequirementsChanges, type ScreenplayChangeInput, type ScreenplayEvent, type ScreenplayProjectSnapshot } from './types.js';
 /** Legacy exports remain stable for callers that use the low-level Store directly. */
 export declare const CONTRACT_FILE: string;
 export declare const SETTING_FILE: string;
@@ -17,18 +17,20 @@ export declare class ScreenplayProjectStore {
     constructor(workspaceRoot: string, layout?: ScreenplayPathLayout);
     snapshot(view?: 'summary' | 'artifacts' | 'full' | 'contract'): Promise<ScreenplayProjectSnapshot>;
     /**
-     * 70 项清单诊断：对当前正式文件跑机械检查，并给出需模型判断的方法论检查项。
-     * 机械项：正文禁词/抽象动作行/字数档位/头重脚轻/集纲字段空值/角色待确认/连续性环。
-     * checklist 项：四幕功能段、人物发动机、反派压力、中性事件、配角功能、
-     * 开场钩子、悬念信息差、反转兑现、集尾卡点、对白知情边界、伏笔回收、卖点交付。
+     * Return the persisted result for an idempotency key without requiring the
+     * caller to replay the operation's inputs. This is used when a Session-local
+     * draft was consumed by a successful commit but the client needs to retry a
+     * lost response.
      */
-    diagnose(): Promise<Record<string, unknown>>;
+    findOperationResult(operationId: string, expectedType: ScreenplayEvent['type']): Promise<Record<string, unknown> | undefined>;
     createProject(expectedRevision: number, operationId: string, projectName: string, changes: RequirementsChanges, input: CreateScreenplayArtifactsInput): Promise<Record<string, unknown>>;
     createOutline(expectedRevision: number, operationId: string, outlineContent: string): Promise<Record<string, unknown>>;
     createEpisodeOutlineBatch(expectedRevision: number, operationId: string, input: CreateEpisodeOutlineBatchInput): Promise<Record<string, unknown>>;
     createOutlineBundle(expectedRevision: number, operationId: string, input: CreateOutlineBundleInput): Promise<Record<string, unknown>>;
     finalizeOutlineBundle(expectedRevision: number, operationId: string, input: FinalizeOutlineBundleInput): Promise<Record<string, unknown>>;
     writingContext(): Promise<Record<string, unknown>>;
+    /** Validate episode content without mutating state or materializing a version. */
+    validateEpisodeContent(episode: number, content: string): Promise<number>;
     createEpisodeScreenplay(expectedRevision: number, operationId: string, input: CreateEpisodeScreenplayInput): Promise<Record<string, unknown>>;
     mergeDelivery(expectedRevision: number, operationId: string): Promise<Record<string, unknown>>;
     prepareChange(expectedRevision: number, operationId: string, requestedChanges: ScreenplayChangeInput[]): Promise<Record<string, unknown>>;

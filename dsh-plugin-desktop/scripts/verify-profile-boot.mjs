@@ -1,5 +1,6 @@
 /** Headless smoke for the complete published DSH Web profile and renderer manifest. */
 
+import { randomUUID } from 'node:crypto'
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -10,11 +11,13 @@ import {
   createLaunchEnvironmentSnapshot,
   DSH_LAUNCH_ENVIRONMENT_KEY,
 } from '@deepseek-ai/dsh-launch-environment'
+import { CallId } from '@deepseek-ai/dsh-llm'
 import { DESKTOP_SETTINGS_NAMESPACE } from '../lib/index.js'
 import { installDesktopPnpmRuntime } from '../lib/desktop-runtime-environment.js'
 import { installProfilePackageResolver } from '../lib/module-resolution.js'
 import { prepareDesktopProfile } from '../lib/profile.js'
 import { DesktopProfileService } from '../lib/profile-service.js'
+import { SessionId } from '@deepseek-ai/dsh-session'
 
 const BIN_NAME = 'dsh-plugin-desktop-profile-smoke'
 const HOST_SERVICE_PLUGIN_NAME = 'dsh-desktop-host-services-smoke-plugin'
@@ -32,7 +35,7 @@ try {
     'dsh-desktop:',
     '  mode: advanced',
     'agent-presets:',
-    '  default: minimal',
+    '  default: short-drama',
     '',
   ].join('\n'))
   const prepared = prepareDesktopProfile('1', home, 'win32')
@@ -41,24 +44,10 @@ try {
     'node_modules',
     HOST_SERVICE_PLUGIN_NAME,
   )
-  // The Zenwit profile composes its product-owned screenplay host directly
-  // from the repository. Keep this headless smoke self-contained instead of
-  // relying on a developer's persistent ~/.dsh-dev profile or a pre-existing
-  // node_modules symlink.
-  const screenplayHostPluginDir = join(
-    prepared.profile.dir,
-    'node_modules',
-    'dsh-short-drama',
-  )
   mkdirSync(join(prepared.profile.dir, 'node_modules'), { recursive: true })
   cpSync(
     fileURLToPath(new URL('../tests/fixtures/desktop-host-services-smoke-plugin/', import.meta.url)),
     hostServicePluginDir,
-    { recursive: true, force: false, errorOnExist: true },
-  )
-  cpSync(
-    fileURLToPath(new URL('../../dsh-short-drama/', import.meta.url)),
-    screenplayHostPluginDir,
     { recursive: true, force: false, errorOnExist: true },
   )
   const patches = [
@@ -185,15 +174,112 @@ try {
     throw new Error('assembled Windows profile is missing the agent preset roster')
   }
   const presetIds = (await agentPresets.list()).map(preset => preset.id)
-  if (presetIds.includes('minimal') || !presetIds.includes('standard')) {
+  if (presetIds.sort().join(',') !== 'cordis,short-drama') {
     throw new Error(`assembled Windows profile exposes unexpected presets: ${presetIds.join(', ')}`)
   }
-  if (agentPresets.defaultId !== 'standard') {
+  if (agentPresets.defaultId !== 'short-drama') {
     throw new Error(`assembled Windows profile selected unsupported default ${agentPresets.defaultId}`)
   }
-  const legacyPreset = await agentPresets.resolve('minimal')
-  if (legacyPreset.id !== 'minimal') {
-    throw new Error(`assembled Windows profile remapped legacy preset to ${legacyPreset.id}`)
+  const screenplayPreset = await agentPresets.resolve('short-drama')
+  if (screenplayPreset.id !== 'short-drama') {
+    throw new Error(`assembled Windows profile could not resolve short-drama: ${screenplayPreset.id}`)
+  }
+  const screenplayHandle = await ctx.agents.create({
+    sessionId: SessionId(`short-drama-profile-smoke-${randomUUID()}`),
+    setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'short-drama').then(() => undefined),
+  })
+  try {
+    const screenplayTools = new Set(ctx.tools.schemas(screenplayHandle.agent).map(tool => tool.name))
+    for (const name of [
+      'read',
+      'read_image',
+      'glob',
+      'grep',
+      'skill',
+      'ask_user_question',
+      'todo_write',
+      'exit_plan_mode',
+      'screenplay_review_lens',
+      'read_document',
+      'read_project_context',
+      'write_scene',
+      'validate_episode',
+      'diagnose_episode',
+      'commit_episode',
+      'skill_create',
+    ]) {
+      if (!screenplayTools.has(name)) {
+        throw new Error(`short-drama Agent is missing composed tool ${name}`)
+      }
+    }
+    const uploadTools = screenplayTools.has('read_document')
+    if (!uploadTools) {
+      throw new Error('short-drama Agent is missing the dsh-file-upload read_document tool')
+    }
+    for (const name of ['write', 'edit', 'bash', 'pwsh', 'run_code']) {
+      if (screenplayTools.has(name)) {
+        throw new Error(`short-drama Agent unexpectedly exposes generic mutation ${name}`)
+      }
+    }
+    const skill = await ctx.skills.get('short-drama-zonggang', { scope: screenplayHandle.agent })
+    if (skill?.provider !== 'filesystem' || skill.resourceBase?.kind !== 'directory') {
+      throw new Error('short-drama Agent could not load its scoped Skill')
+    }
+    if (await ctx.skills.get('short-drama-zonggang') !== undefined) {
+      throw new Error('short-drama scoped Skill leaked into the global catalog')
+    }
+    const reference = await ctx.tools.execute({
+      callId: CallId('short-drama-skill-reference'),
+      name: 'read_skill_reference',
+      arguments: {
+        skill: 'short-drama-zonggang',
+        path: 'references/00_情绪账务引擎.md',
+      },
+      signal: new AbortController().signal,
+      agent: screenplayHandle.agent,
+    })
+    if (reference.isError
+      || reference.value?.provider !== 'filesystem'
+      || !String(reference.value?.content).includes('情绪')) {
+      throw new Error(`short-drama Agent could not read its Skill reference: ${JSON.stringify(reference)}`)
+    }
+    for (const path of ['../outside.md', '/tmp/outside.md']) {
+      const escaped = await ctx.tools.execute({
+        callId: CallId(`short-drama-skill-escape-${path.startsWith('/') ? 'absolute' : 'parent'}`),
+        name: 'read_skill_reference',
+        arguments: { skill: 'short-drama-zonggang', path },
+        signal: new AbortController().signal,
+        agent: screenplayHandle.agent,
+      })
+      if (!escaped.isError || !JSON.stringify(escaped.content).includes('relative to that Skill')) {
+        throw new Error(`short-drama Skill reference accepted escaped path ${path}: ${JSON.stringify(escaped)}`)
+      }
+    }
+    const unscoped = await ctx.tools.execute({
+      callId: CallId('short-drama-skill-reference-unscoped'),
+      name: 'read_skill_reference',
+      arguments: {
+        skill: 'short-drama-zonggang',
+        path: 'references/00_情绪账务引擎.md',
+      },
+      signal: new AbortController().signal,
+    })
+    if (!unscoped.isError || unscoped.error.info?.code !== 'UNKNOWN_TOOL') {
+      throw new Error(`read_skill_reference was callable without the short-drama Agent scope: ${JSON.stringify(unscoped)}`)
+    }
+  } finally {
+    await screenplayHandle.dispose()
+  }
+  const cordisHandle = await ctx.agents.create({
+    sessionId: SessionId(`cordis-skill-isolation-profile-smoke-${randomUUID()}`),
+    setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'cordis').then(() => undefined),
+  })
+  try {
+    if (await ctx.skills.get('short-drama-zonggang', { scope: cordisHandle.agent }) !== undefined) {
+      throw new Error('short-drama scoped Skill leaked into the cordis Agent catalog')
+    }
+  } finally {
+    await cordisHandle.dispose()
   }
   const hostServiceProbe = ctx.get(HOST_SERVICE_PROBE_KEY)
   if (hostServiceProbe?.current?.name !== 'desktop'
@@ -220,7 +306,7 @@ try {
     throw new Error(`assembled Windows browse picker listed ${listing.path} instead of ${home}`)
   }
 
-  const expectedUrl = `http://127.0.0.1:${String(ctx.webServer.port)}/?dsh-desktop-entry=3&dsh-desktop-mode=advanced&dsh-desktop-platform=win32&dsh-desktop-material=acrylic&dsh-desktop-mica=1`
+  const expectedUrl = `http://127.0.0.1:${String(ctx.webServer.port)}/?dsh-desktop-entry=3&dsh-desktop-mode=advanced&dsh-desktop-platform=win32&dsh-desktop-material=off&dsh-desktop-mica=1`
   if (mountedSpec?.url !== expectedUrl) {
     throw new Error(`desktop plugin produced an unexpected renderer URL: ${String(mountedSpec?.url)}`)
   }
@@ -237,13 +323,11 @@ try {
   if (!trayItems.some(item => item.label() === 'Check for Updates…')) {
     throw new Error('assembled desktop profile is missing the update tray command')
   }
-  if (process.platform !== 'linux'
-    && !trayItems.some(item => item.label() === 'Open DSH Terminal')) {
-    throw new Error('assembled desktop profile is missing the terminal tray command')
+  if (trayItems.some(item => item.label() === 'Open Terminal')) {
+    throw new Error('assembled desktop profile unexpectedly exposes the terminal tray command')
   }
-  const profileMenu = trayItems.find(item => item.label() === 'Profile: desktop')
-  if (profileMenu?.submenu?.()[0]?.label() !== 'desktop') {
-    throw new Error('assembled desktop profile is missing the active profile tray submenu')
+  if (trayItems.some(item => item.label() === 'Profile: desktop')) {
+    throw new Error('assembled desktop profile unexpectedly exposes the launcher profile tray submenu')
   }
   const response = await fetch(expectedUrl)
   const html = await response.text()
@@ -258,6 +342,7 @@ try {
   const ids = new Set(graph.entries.map(entry => entry.id))
   for (const id of [
     'dsh-plugin-desktop',
+    'dsh-file-upload',
     '@deepseek-ai/dsh-client-ui-conversation',
     '@deepseek-ai/dsh-client-ui-sidebar',
     '@deepseek-ai/dsh-client-ui-directory-picker-browse',

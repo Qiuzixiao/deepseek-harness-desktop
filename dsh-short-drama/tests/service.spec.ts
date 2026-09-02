@@ -1,9 +1,14 @@
-import { mkdir, readFile, readdir, rm, mkdtemp, stat } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rm, mkdtemp, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { Context } from '@deepseek-ai/cordis'
+import { Context } from '@deepseek-ai/cordis'
+import { CallId } from '@deepseek-ai/dsh-llm'
+import type { ScopeKey } from '@deepseek-ai/dsh-scope'
 import { Session } from '@deepseek-ai/dsh-session'
+import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
+import ToolRuntime, { defineTool } from '@deepseek-ai/dsh-tools'
+import { installScreenplayFailureGuard, installScreenplayProjectScopeGuard } from '../src/agent.js'
 import { ScreenplayProjectService } from '../src/service.js'
 import { screenplayToolDefinitions } from '../src/tools.js'
 import type { CreateScreenplayArtifactsInput } from '../src/types.js'
@@ -106,8 +111,151 @@ const requirements = {
   constraints: [],
 }
 
+function fullOutlineFor(title: string): string {
+  return [
+    `# 《${title}》全剧大纲`,
+    '',
+    '主角在家庭秘密和现实压力之间重新确认目标，逐步面对真相并完成选择。',
+    '',
+    '外部阻力持续改变关系和行动方向，最终在危机中解决核心矛盾。',
+  ].join('\n').concat('\n')
+}
+
+function episodeOutlinesFor(title: string, count: number): string {
+  const lines = [
+    `# 《${title}》前 ${String(count)} 集大纲`,
+    '',
+    '> 单元结构：连续推进主线冲突。',
+    '> 每集核心公式：开场钩子 → 冲突升级 → 情绪爆发 → 结尾悬念。',
+    '',
+    '---',
+  ]
+  for (let episode = 1; episode <= count; episode += 1) {
+    lines.push(
+      '',
+      `## 第 ${String(episode)} 集《推进${String(episode)}》`,
+      '',
+      '**核心冲突**：主角必须在真相和现实压力之间做出选择。',
+      '**情绪定位**：压力增加，态度发生变化。',
+      '- 钩子开场：新信息打断原有安排。',
+      '- 冲突升级：对手迫使主角采取行动。',
+      '- 情绪爆发：主角公开表达立场。',
+      '- **微反转/钩子**：新证据留下下一集问题。',
+    )
+  }
+  lines.push('', '---', '', `## 后续主线预告（${String(count)} 集内定向）`, '', '- 继续追查证据。')
+  return lines.join('\n').concat('\n')
+}
+
+function validEpisodeFor(episode: number, repeats = 20): string {
+  const lines = [`第${String(episode)}集`, '', `${String(episode)}-1 客厅 清晨 内`, '人物：顾北辰、林母', '']
+  for (let index = 1; index <= repeats; index += 1) {
+    lines.push(
+      `△顾北辰把第${String(index)}份证据放到桌面中央，抬眼等林母回应。`,
+      '顾北辰：这件事必须在今天说清楚。',
+      '△林母按住证据，没有把手收回去。',
+      '林母：你先告诉我，你准备承担什么结果。',
+    )
+  }
+  lines.push('', '【卡点特写：林母仍没有交出最后一张照片。】', '【本集完】')
+  return lines.join('\n').concat('\n')
+}
+
 afterEach(async () => {
   await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })))
+})
+
+describe('ScreenplayProjectService scene authoring', () => {
+  it('keeps scene drafts in the Session, validates them, and commits only after A passes', async () => {
+    const parent = await mkdtemp(join(tmpdir(), 'screenplay-scene-authoring-'))
+    roots.push(parent)
+    const service = new ScreenplayProjectService(fakeContext())
+    const current = session('scene-authoring', parent)
+    const created = await service.createContractForSession(
+      current, parent, 0, 'scene-contract', '场景短剧', requirements, artifacts('场景短剧'),
+    )
+    const projectRoot = created.binding.projectRoot
+    await service.createOutlineBundle(projectRoot, 1, 'scene-outline', {
+      outlineContent: fullOutlineFor('场景短剧'),
+      episodeOutlinesContent: episodeOutlinesFor('场景短剧', 12),
+    })
+
+    const invalid = await service.writeSceneForSession(current, 1, 1, '第1集\n\n1-1 客厅 清晨 内\n人物：顾北辰\n△动作')
+    expect(invalid).toMatchObject({ ok: true, episode: 1, sceneNo: 1 })
+    await expect(service.readArtifactForSession(current, '剧本/episode-001.md')).resolves.toMatchObject({ source: 'session-draft' })
+    await expect(service.validateEpisodeForSession(current, 1)).resolves.toMatchObject({ ok: false, issues: [{ channel: 'A' }] })
+
+    await service.writeSceneForSession(current, 1, 1, validEpisodeFor(1))
+    await expect(service.validateEpisodeForSession(current, 1)).resolves.toMatchObject({ ok: true, issues: [] })
+    const diagnosis = await service.diagnoseEpisodeForSession(current, 1)
+    expect(diagnosis.advisory).toBe(true)
+    expect(diagnosis.reviewAreas.map(item => item.id)).toEqual([
+      'hook', 'pressure', 'reversal', 'dialogue', 'cliffhanger', 'production',
+    ])
+    expect(diagnosis).not.toHaveProperty('reviewQuestions')
+
+    const committed = await service.commitEpisodeForSession(current, 2, 'scene-commit', 1, {
+      endingState: '照片仍未交出',
+      openLoops: ['最后一张照片在哪里'],
+    })
+    expect(committed.result).toMatchObject({ episode: 1, stage: 'EpisodeReady' })
+    await expect(readFile(join(projectRoot, '剧本', 'episode-001.md'), 'utf8')).resolves.toBe(validEpisodeFor(1))
+
+    // A lost response may be retried with the same idempotency key after the
+    // Session draft has already been consumed by the successful commit.
+    await expect(service.commitEpisodeForSession(current, 2, 'scene-commit', 1, {
+      endingState: '照片仍未交出',
+      openLoops: ['最后一张照片在哪里'],
+    })).resolves.toEqual(committed)
+  })
+
+  it('reads only a relative resource from the loaded Skill resourceBase', async () => {
+    const parent = await mkdtemp(join(tmpdir(), 'screenplay-skill-reference-'))
+    roots.push(parent)
+    const skillRoot = await mkdtemp(join(tmpdir(), 'screenplay-skill-root-'))
+    roots.push(skillRoot)
+    await mkdir(join(skillRoot, 'references'))
+    await writeFile(join(skillRoot, 'references', 'lens.md'), 'optional lens')
+    const outsideRoot = await mkdtemp(join(tmpdir(), 'screenplay-skill-outside-'))
+    roots.push(outsideRoot)
+    await writeFile(join(outsideRoot, 'secret.md'), 'outside secret')
+    await symlink(outsideRoot, join(skillRoot, 'escaped'))
+    const current = session('skill-reference', parent)
+    const skillScope: ScopeKey = {}
+    let observedScope: ScopeKey | undefined
+    const context = {
+      reflect: { provide() {} },
+      get(name: string) {
+        if (name !== 'skills') return undefined
+        return {
+          get: async (_skillName: string, options: { scope?: ScopeKey }) => {
+            observedScope = options.scope
+            return ({
+            name: 'review-lens',
+            provider: 'filesystem',
+            resourceBase: { kind: 'directory', path: skillRoot },
+            })
+          },
+        }
+      },
+    } as unknown as Context
+    const service = new ScreenplayProjectService(context)
+    await expect(service.readSkillReferenceForSession(current, 'review-lens', 'references/lens.md', skillScope))
+      .resolves.toMatchObject({ ok: true, content: 'optional lens' })
+    expect(observedScope).toBe(skillScope)
+    await expect(service.readSkillReferenceForSession(current, 'review-lens', '../secret.md', skillScope))
+      .rejects.toMatchObject({ code: 'INVALID_WORKSPACE' })
+    await expect(service.readSkillReferenceForSession(current, 'review-lens', 'escaped/secret.md', skillScope))
+      .rejects.toMatchObject({ code: 'INVALID_WORKSPACE' })
+  })
+
+  it('rejects project-relative traversal in domain artifact reads', async () => {
+    const parent = await mkdtemp(join(tmpdir(), 'screenplay-artifact-scope-'))
+    roots.push(parent)
+    const service = new ScreenplayProjectService(fakeContext())
+    const current = session('artifact-scope', parent)
+    await expect(service.readArtifactForSession(current, '../outside.md')).rejects.toMatchObject({ code: 'INVALID_WORKSPACE' })
+  })
 })
 
 describe('ScreenplayProjectService project bindings', () => {
@@ -388,5 +536,151 @@ describe('ScreenplayProjectService project bindings', () => {
     const snapshot = await service.snapshotForSession(session('unbound', parent), 'full')
     expect(snapshot).toEqual({ initialized: false, phase: 'Uninitialized', revision: 0 })
     expect(service.projectRootForSession(session('unbound', parent))).toBeUndefined()
+  })
+})
+
+describe('screenplay tool failure feedback', () => {
+  it('denies project-scoped generic reads without a bound Session project', async () => {
+    const context = new Context()
+    await context.plugin(SystemPrompt)
+    await context.plugin(ToolRuntime)
+    context.tools.register(defineTool({
+      name: 'read',
+      description: 'test read',
+      parameters: { file_path: { type: 'string', required: true } },
+      output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+      async execute() { return 'should not run' },
+    }))
+    installScreenplayProjectScopeGuard(context)
+
+    const result = await context.tools.execute({
+      callId: CallId('unbound-project-read'),
+      name: 'read',
+      arguments: { file_path: 'secret.md' },
+      signal: new AbortController().signal,
+    })
+
+    expect(result.isError).toBe(true)
+    expect(result.content).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'text', text: expect.stringContaining('bind a screenplay project') }),
+    ]))
+  })
+
+  async function harness(title: string) {
+    const parent = await mkdtemp(join(tmpdir(), 'screenplay-tool-feedback-'))
+    roots.push(parent)
+    const context = new Context()
+    await context.plugin(SystemPrompt)
+    await context.plugin(ToolRuntime)
+    const projects = new ScreenplayProjectService(context)
+    Object.assign(context, { screenplayProjects: projects })
+    for (const definition of screenplayToolDefinitions(context)) context.tools.register(definition)
+    installScreenplayFailureGuard(context)
+    const current = session(`tool-feedback-${title}`, parent)
+    await projects.createContractForSession(
+      current, parent, 0, `create-${title}`, title, requirements, artifacts(title),
+    )
+    const agent = { session: current } as never
+    return { context, projects, current, agent }
+  }
+
+  function invalidOutline(title: string, variation: number): string {
+    return [
+      `# 《${title}》全剧大纲`,
+      '',
+      `全剧主线概述版本${String(variation)}。`,
+      '',
+      '## 第 1 集《错误的逐集结构》',
+      '',
+      '1. 这里不应出现逐集明细。',
+    ].join('\n')
+  }
+
+  it('exposes structured validation details through the real tool runtime', async () => {
+    const title = '工具反馈短剧'
+    const { context, agent } = await harness(title)
+    const result = await context.tools.execute({
+      callId: CallId('outline-feedback'),
+      name: 'screenplay_create_outline',
+      arguments: {
+        expectedRevision: 1,
+        operationId: 'outline-feedback',
+        outlineContent: invalidOutline(title, 1),
+      },
+      signal: new AbortController().signal,
+      agent,
+    })
+
+    expect(result.isError).toBe(true)
+    expect(result.error?.info?.code).toBe('VALIDATION_FAILED')
+    const feedback = result.content.map(block => block.type === 'text' ? block.text : '').join('\n')
+    expect(feedback).toContain('artifact: full-outline')
+    expect(feedback).toContain('location: structure')
+    expect(feedback).toContain('expected:')
+    expect(feedback).toContain('actual:')
+    expect(feedback).toContain('repairHint:')
+  })
+
+  it('requires a diagnostic action after two consecutive matching structural failures', async () => {
+    const title = '循环保护短剧'
+    const { context, agent } = await harness(title)
+    for (let variation = 1; variation <= 2; variation += 1) {
+      const result = await context.tools.execute({
+        callId: CallId(`outline-loop-${String(variation)}`),
+        name: 'screenplay_create_outline',
+        arguments: {
+          expectedRevision: 1,
+          operationId: `outline-loop-${String(variation)}`,
+          outlineContent: invalidOutline(title, variation),
+        },
+        signal: new AbortController().signal,
+        agent,
+      })
+      expect(result.isError).toBe(true)
+      if (variation === 2) {
+        expect(result.additionalContexts).toEqual(expect.arrayContaining([
+          expect.objectContaining({ source: expect.objectContaining({ plugin: 'screenplay-agent' }) }),
+        ]))
+      }
+    }
+
+    const correctedArguments = {
+      expectedRevision: 1,
+      operationId: 'outline-loop-corrected',
+      outlineContent: `# ${title}\n\n主角确认目标并开始行动。\n\n阻力升级后，主角承担选择的结果并处理核心矛盾。`,
+    }
+    await expect(context.tools.execute({
+      callId: CallId('outline-loop-unrelated-read'),
+      name: 'screenplay_list_references',
+      arguments: {},
+      signal: new AbortController().signal,
+      agent,
+    })).resolves.toMatchObject({ isError: false })
+    const blocked = await context.tools.execute({
+      callId: CallId('outline-loop-blocked'),
+      name: 'screenplay_create_outline',
+      arguments: correctedArguments,
+      signal: new AbortController().signal,
+      agent,
+    })
+    expect(blocked.isError).toBe(true)
+    expect(blocked.content).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'text', text: expect.stringContaining('read_project_context') }),
+    ]))
+
+    await expect(context.tools.execute({
+      callId: CallId('outline-loop-diagnostic'),
+      name: 'read_project_context',
+      arguments: {},
+      signal: new AbortController().signal,
+      agent,
+    })).resolves.toMatchObject({ isError: false })
+    await expect(context.tools.execute({
+      callId: CallId('outline-loop-recovered'),
+      name: 'screenplay_create_outline',
+      arguments: correctedArguments,
+      signal: new AbortController().signal,
+      agent,
+    })).resolves.toMatchObject({ isError: false })
   })
 })

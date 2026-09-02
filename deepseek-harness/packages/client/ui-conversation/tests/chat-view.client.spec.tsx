@@ -120,6 +120,11 @@ const toolResult = (seq: number, callId: string, name = 'bash'): ToolResultNode 
 const runningCall = (callId: string, name = 'bash'): RunningToolCall => ({
   callId, name, argsRaw: `{"command":"cmd-${callId}"}`, turn: 2, step: 1, time: 1_000, callView: null, subCalls: [],
 })
+
+const reasoningAssistant = (seq: number, text: string, turn = 1): AssistantMessageNode => ({
+  kind: 'assistant', seq, time: seq * 1_000, turn, step: seq,
+  blocks: [{ kind: 'reasoning', text }],
+})
 const command = (over: Partial<CommandNode> = {}): CommandNode => ({
   kind: 'command', seq: 5, time: 5_000, commandId: 'cmd-1' as CommandNode['commandId'],
   name: 'plan', args: '', outcome: { kind: 'success', text: '已进入 plan mode' },
@@ -327,6 +332,17 @@ function installScrollMetrics(element: HTMLElement, initialHeight: number, clien
 
 describe('Chat node rendering', () => {
 
+  it('projects hidden file references into a card above the user text', () => {
+    const h = makeHarness({
+      nodes: [user(1, '<file_reference path=".dsh-uploads/s1/notes.md"></file_reference>这个文档讲的是什么')],
+    })
+    const view = render(<h.ChatView {...h.props} />)
+
+    expect(view.getByText('这个文档讲的是什么')).toBeTruthy()
+    expect(view.container.querySelector('[data-file-reference=".dsh-uploads/s1/notes.md"]')).toBeTruthy()
+    expect(view.queryByText('<file_reference path=".dsh-uploads/s1/notes.md"></file_reference>这个文档讲的是什么')).toBeNull()
+  })
+
   it('threads the injected file-mention vocabulary into the closing prose only', () => {
     const wrote = (seq: number, callId: string, path: string): ToolResultNode => ({
       ...toolResult(seq, callId, 'write'),
@@ -425,6 +441,10 @@ describe('ChatView', () => {
     const view = render(<h.ChatView {...h.props} />)
     expect(view.getByText('do the thing')).toBeTruthy()
     expect(view.getByText('running tools')).toBeTruthy()
+    const executionGroup = view.getByTestId('execution-group')
+    expect(executionGroup.textContent).toContain('2 次工具调用')
+    expect(view.queryByTestId('tool-seat-a')).toBeNull()
+    fireEvent.click(within(executionGroup).getByRole('button'))
     expect(view.getByTestId('tool-seat-a').textContent).toBe('bash:a')
     expect(view.getByTestId('tool-seat-b').textContent).toBe('bash:b')
     expect([...view.container.querySelectorAll('[data-chat-flow-key]')].map(row => ({
@@ -443,6 +463,81 @@ describe('ChatView', () => {
         'fixture:user:1', 'fixture:assistant:2',
         'fixture:tool:a', 'call:a', 'fixture:tool:b', 'call:b',
       ])
+  })
+
+  it('summarizes consecutive thinking and tool calls with explicit errors', () => {
+    const failed = { ...toolResult(4, 'failed'), isError: true }
+    const h = makeHarness({
+      nodes: [
+        user(1, 'inspect the project'),
+        reasoningAssistant(2, 'checking the project structure'),
+        toolResult(3, 'ok'),
+        failed,
+        assistant(5, 'The project is ready.', 1),
+      ],
+    })
+    const view = render(<h.ChatView {...h.props} />)
+    const group = view.getByTestId('execution-group')
+
+    expect(group.textContent).toContain('已完成')
+    expect(group.textContent).toContain('2 次工具调用')
+    expect(group.textContent).toContain('1 段思考')
+    expect(group.textContent).toContain('1 个错误')
+    expect(view.queryByText('checking the project structure')).toBeNull()
+    expect(view.queryByTestId('tool-seat-ok')).toBeNull()
+
+    fireEvent.click(within(group).getByRole('button'))
+    expect(view.getByText('checking the project structure')).toBeTruthy()
+    expect(view.getByTestId('tool-seat-ok')).toBeTruthy()
+    expect(view.getByTestId('tool-seat-failed')).toBeTruthy()
+  })
+
+  it('keeps a mixed assistant answer outside the execution summary', () => {
+    const mixed: AssistantMessageNode = {
+      kind: 'assistant', seq: 2, time: 2_000, turn: 1, step: 1,
+      blocks: [{ kind: 'reasoning', text: 'thinking' }, { kind: 'text', text: 'visible answer' }],
+    }
+    const h = makeHarness({ nodes: [user(1, 'question'), mixed, toolResult(3, 'tool')] })
+    const view = render(<h.ChatView {...h.props} />)
+
+    expect(view.getByText('visible answer')).toBeTruthy()
+    expect(view.queryByTestId('execution-group')).toBeNull()
+    expect(view.getByTestId('tool-seat-tool')).toBeTruthy()
+  })
+
+  it('does not merge process nodes across a user message', () => {
+    const h = makeHarness({
+      nodes: [
+        reasoningAssistant(1, 'first thought', 1),
+        user(2, 'follow up'),
+        toolResult(3, 'second'),
+      ],
+    })
+    const view = render(<h.ChatView {...h.props} />)
+
+    expect(view.queryByTestId('execution-group')).toBeNull()
+    expect(view.getByText('first thought')).toBeTruthy()
+    expect(view.getByTestId('tool-seat-second')).toBeTruthy()
+  })
+
+  it('updates grouping when a streaming Think node gains visible text', () => {
+    const h = makeHarness({
+      partial: { turn: 2, step: 1, blocks: [{ kind: 'reasoning', text: 'thinking' }] },
+      runningCalls: [runningCall('streamed')],
+      running: true,
+    })
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.getByTestId('execution-group')).toBeTruthy()
+
+    act(() => {
+      h.set({ partial: { turn: 2, step: 1, blocks: [
+        { kind: 'reasoning', text: 'thinking' },
+        { kind: 'text', text: 'visible answer' },
+      ] } })
+    })
+    expect(view.getByText('visible answer')).toBeTruthy()
+    expect(view.queryByTestId('execution-group')).toBeNull()
+    expect(view.getByTestId('tool-seat-streamed')).toBeTruthy()
   })
 
   it('renders Host-pending steering at the flow tail and hands off to the durable node', () => {

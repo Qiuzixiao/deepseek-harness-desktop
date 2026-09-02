@@ -68,6 +68,19 @@ export interface ReferencePreview {
   structure: ReferenceDocumentStructure
 }
 
+/** One bounded page returned by the model-facing document reader. */
+export interface ReferenceDocumentPage {
+  referenceId: string
+  originalName: string
+  format: ReferenceFormat
+  page: number
+  pageSize: number
+  totalPages: number
+  content: string
+  hasMore: boolean
+  nextPage?: number
+}
+
 export interface ReferenceRecord {
   referenceId: string
   originalName: string

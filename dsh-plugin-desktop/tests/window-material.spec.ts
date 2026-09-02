@@ -37,8 +37,8 @@ describe('desktop window material capabilities', () => {
   })
 
   it('validates persisted material values independently for each platform', () => {
-    expect(parseMacosWindowMaterial(undefined)).toBe('transparent')
-    expect(parseWindowsWindowMaterial(undefined)).toBe('acrylic')
+    expect(parseMacosWindowMaterial(undefined)).toBe('off')
+    expect(parseWindowsWindowMaterial(undefined)).toBe('off')
     expect(() => parseMacosWindowMaterial('mica')).toThrow('macosMaterial')
     expect(() => parseWindowsWindowMaterial('transparent')).toThrow('windowsMaterial')
   })

@@ -1,3 +1,5 @@
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import type { ClientContext, SettingsScope } from '@deepseek-ai/dsh-client-runtime/client'
 import { DesktopSettingsSection } from '../src/client/DesktopSettingsSection.tsx'
@@ -16,6 +18,7 @@ import {
   DESKTOP_SETTINGS_LOCALE_NAMESPACE,
   DESKTOP_SHELL_SETTINGS_NAMESPACE,
 } from '../src/client/desktop-settings.ts'
+import { zh } from '../src/client/desktop-settings-locales.ts'
 
 const VIEW: DesktopSettingsView = {
   current: 'desktop',
@@ -110,6 +113,41 @@ describe('Desktop settings API', () => {
 })
 
 describe('Desktop settings Slot registration', () => {
+  it('shows notifications without exposing Profile, Market, or presentation controls', () => {
+    const snapshot = {
+      status: 'ready' as const,
+      value: {
+        enabled: true,
+        notifyOnTurnCompletion: true,
+        notifyOnTurnFailure: true,
+        notifyOnJobCompletion: true,
+        notifyOnJobFailure: true,
+      },
+      base: undefined,
+      user: undefined,
+      revision: '1',
+      writable: true,
+      mode: 'host' as const,
+    }
+    const notificationSettings = {
+      getSnapshot: () => snapshot,
+      subscribe: () => () => {},
+      set: vi.fn(async () => {}),
+      unset: vi.fn(async () => {}),
+    }
+    const html = renderToStaticMarkup(createElement(DesktopSettingsSection, {
+      t: (key: keyof typeof zh) => zh[key],
+      notificationSettings,
+    } as never))
+
+    expect(html).toContain('Zenwit 设置')
+    expect(html).toContain('选择 Zenwit 何时发出系统通知。通知不包含会话内容。')
+    expect(html).toContain('桌面通知')
+    expect(html).not.toContain('Profile')
+    expect(html).not.toContain('插件市场')
+    expect(html).not.toContain('桌面外观与行为')
+  })
+
   it('registers the official Desktop section, native actions, and both settings scopes', () => {
     const scope = {
       getSnapshot: () => ({

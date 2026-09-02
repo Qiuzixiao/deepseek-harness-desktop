@@ -12,11 +12,11 @@ import clsx from 'clsx'
 import { useAnchoredMaxHeight } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import css from './MenuView.module.css'
-import type { MenuViewInjected } from './slots.ts'
+import type { MenuViewInjected, MenuViewOwnerProps } from './slots.ts'
 import type { MenuKey } from './locales.ts'
 
 /** Full menu props: injected face + the locale seat. */
-export type MenuViewProps = MenuViewInjected & PropsLocale<'slash.menu'>
+export type MenuViewProps = MenuViewInjected & MenuViewOwnerProps & PropsLocale<'slash.menu'>
 
 /** Design cap on the list height (figma SLASH 39:26572 MenuDropdown). */
 const MAX_HEIGHT = 320
@@ -31,10 +31,14 @@ function optionId(source: string, index: number): string {
  * @param props - injected face (the menu store and the pick route); `t` rides the standard locale seat.
  * @returns the dropdown while open; null while closed.
  */
-export function MenuView({ menu, onPick, onDismiss, t }: MenuViewProps) {
+export function MenuView({ menu, onPick, onDismiss, launcher, actions, t }: MenuViewProps) {
   const state = useSyncExternalStore(
     fn => menu.subscribe(fn),
     () => menu.getSnapshot(),
+  )
+  const launched = useSyncExternalStore(
+    fn => launcher.subscribe(fn),
+    () => launcher.getSnapshot(),
   )
   const listRef = useRef<HTMLDivElement>(null)
   // The list is bottom-anchored above the composer; clamp the design cap to
@@ -74,6 +78,24 @@ export function MenuView({ menu, onPick, onDismiss, t }: MenuViewProps) {
       aria-activedescendant={highlight !== null ? optionId(highlight.source, highlight.index) : undefined}
     >
       <div className={css.viewport}>
+        {launched !== null && actions?.map(action => (
+          <button
+            key={action.id}
+            type="button"
+            role="option"
+            className={css.item}
+            disabled={action.disabled}
+            onMouseDown={ev => { ev.preventDefault() }}
+            onClick={() => {
+              if (action.disabled) return
+              action.onSelect()
+              onDismiss()
+            }}
+          >
+            {action.icon !== undefined && <span className={css.itemIcon} aria-hidden>{action.icon}</span>}
+            <span className={css.itemName}>{action.label}</span>
+          </button>
+        ))}
         {state.groups.map(group => (group.status === 'ready' && group.items.length === 0)
           ? null
           : (
@@ -103,7 +125,7 @@ export function MenuView({ menu, onPick, onDismiss, t }: MenuViewProps) {
                       }}
                     >
                       {item.icon !== undefined && <span className={css.itemIcon} aria-hidden>{item.icon}</span>}
-                      <span className={css.itemName}>{item.name}</span>
+                      <span className={css.itemName}>{item.label ?? item.name}</span>
                       {item.description !== undefined && <span className={css.itemDescription}>{item.description}</span>}
                     </button>
                   )

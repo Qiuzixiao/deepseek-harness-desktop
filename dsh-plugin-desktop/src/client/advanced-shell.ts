@@ -2,17 +2,12 @@ import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 import type {} from './contracts.ts'
 import type { DesktopClientEnvironment } from './environment.ts'
-import { AdvancedFrame } from './AdvancedFrame.tsx'
 import { DesktopLayoutState } from './layout-state.ts'
 import { provideDesktopLayout } from './layout-service.ts'
 import { installAdvancedStyles } from './styles.ts'
 import { DesktopThemePresenter } from './theme-presenter.ts'
 
-/**
- * Provide the advanced layout service and own the desktop root slot.
- * @param ctx - active browser Cordis context.
- * @param environment - validated mode and platform marker.
- */
+/** Provide advanced desktop services around the Zenwit-owned root frame. */
 export function applyAdvancedShell(ctx: ClientContext, environment: DesktopClientEnvironment): void {
   if (environment.mode !== 'advanced') {
     throw new Error(`dsh-plugin-desktop: advanced shell received mode ${JSON.stringify(environment.mode)}`)
@@ -46,15 +41,4 @@ export function applyAdvancedShell(ctx: ClientContext, environment: DesktopClien
       presenter.dispose()
     }
   }, 'desktop: theme presenter')
-
-  ctx.effect(() => ctx.slots.register({
-    name: 'root',
-    children: {
-      'sidebar': { kind: 'single', scope: 'root' },
-      'conversation': { kind: 'single', scope: 'session-maybe' },
-      'details': { kind: 'single', scope: 'session' },
-      'shell.overlay': { kind: 'list', scope: 'root' },
-    },
-    inject: () => ({ layout: desktopLayout, platform: environment.platform }),
-  }, AdvancedFrame), 'desktop: advanced root slot')
 }

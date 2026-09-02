@@ -22,6 +22,7 @@ All keys are optional; the defaults are the shipped read caps.
 
 | Key | Default | Meaning |
 |---|---|---|
+| `allowMutations` | `true` | Register the mutating `write` and `edit` tools. Set `false` for a read-only composition that still provides `read` and `read_image`. |
 | `readLimit` | `2000` | Default and maximum lines returned by one `read` call (the tool schema advertises it as the `limit` default). |
 | `readMaxLineLength` | `2000` | Characters kept per line before truncation (the suffix names the cap). |
 | `readMaxBytes` | `51200` | Byte cap on one `read` call's selected lines; overflow ends the window with a "capped" footer. |

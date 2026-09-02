@@ -110,6 +110,7 @@ export function attachmentRailLabels(t: Translate<ConversationKey>): AttachmentR
   return {
     group: t('image.pending'),
     open: t('image.openOriginal'),
+    uploading: t('image.uploading'),
     scrollLeft: t('image.scrollLeft'),
     scrollRight: t('image.scrollRight'),
   }

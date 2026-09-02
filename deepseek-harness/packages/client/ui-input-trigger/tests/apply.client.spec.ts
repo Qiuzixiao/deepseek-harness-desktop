@@ -81,6 +81,7 @@ describe('apply', () => {
       (ctx.get('sessions') as { scope(id: SessionId): Context }).scope(sid('a')),
     )
     expect(injected.menu).toBe(controller.menu)
+    expect(injected.launcher).toBe(controller.launcher)
     // The pick face routes into the controller pipeline (closed menu → no-op).
     injected.onPick('command', 0)
     expect(controller.menu.getSnapshot().open).toBe(false)

@@ -1,8 +1,9 @@
 # QNovel brand assets
 
-Source artwork reserved for the short-drama product. These files are not wired
-to the DSH Desktop packaging configuration yet and must not replace
-`dsh-plugin-desktop/build/app-icon.png` without a separate packaging change.
+Source artwork for the short-drama product. The 1024-pixel layer in `icon.icns`
+is the source for `dsh-plugin-desktop/build/app-icon.png`; the desktop build
+derives the platform application icons from that packaged PNG. The tray uses a
+separate simplified vector mark so it remains legible at native menu-bar sizes.
 
 | File | Format | Intended role |
 | --- | --- | --- |

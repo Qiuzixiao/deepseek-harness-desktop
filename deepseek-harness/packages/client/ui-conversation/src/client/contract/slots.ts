@@ -23,12 +23,28 @@ import type { ChatNode, ChatNodeKind } from './chat-nodes.ts'
 import type { CallId, SelectionTarget, ViewTab } from './views.ts'
 
 /** Browser-owned image that has not crossed the durable host boundary. */
-export interface ComposerAttachment {
+export interface ComposerImageAttachment {
   kind: 'image'
   id: DraftAttachmentId
   file: File
   previewUrl: string
 }
+
+/** Uploaded document reference owned by the current session draft. */
+export interface ComposerDocumentAttachment {
+  kind: 'document'
+  id: DraftAttachmentId
+  ref: string
+  /** Session-relative reference used for model context and message presentation. */
+  relativePath?: string
+  name: string
+  extension: string
+  bytes: number
+  status: 'uploading' | 'ready' | 'error'
+  error?: string
+}
+
+export type ComposerAttachment = ComposerImageAttachment | ComposerDocumentAttachment
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
@@ -495,8 +511,12 @@ export interface ComposerBarInjected {
   keyboard: ComposerKeyboard | undefined
   /** Create previews and append image ids to the session input. */
   addImages: ((files: readonly File[]) => string | null) | undefined
+  /** Unified file intake for images and documents. */
+  intakeFiles?: ((files: readonly File[]) => Promise<void>)
   /** Release one preview and remove its id from session input. */
   removeImage: ((id: DraftAttachmentId) => void) | undefined
+  /** Resolve all attachment records in draft order. */
+  draftAttachments?: ((ids: readonly DraftAttachmentId[]) => readonly ComposerAttachment[])
   /** Resolve ordered input ids to browser-owned draft images. */
   draftImages: ((ids: readonly DraftAttachmentId[]) => readonly ComposerAttachment[]) | undefined
   /** Resolve one keyboard submission gesture against the current running state and persisted preference. */

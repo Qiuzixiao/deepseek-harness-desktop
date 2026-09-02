@@ -13,8 +13,10 @@ import type { CommandResult } from '@deepseek-ai/dsh-commands/types'
 import { createScope, scopeOf } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ClientSessionContext, ConsumeTokenRequest, InputTriggerPick, InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { CommandContribution, CommandDecoration, CommandUiSpec, SelectOption } from '../src/client/contract.ts'
 import type { CommandDescriptor } from '../src/client/directory.ts'
+import { en, zh } from '../src/client/locales.ts'
 import { CommandUiRuntime } from '../src/client/service.ts'
 
 const sid = (k: string): SessionId => k as SessionId
@@ -39,6 +41,7 @@ interface BenchOptions {
   commands?: (payload: { sessionId: SessionId }) => Promise<{ commands: CommandDescriptor[] }>
   execute?: (payload: { sessionId: SessionId; line: string }) => Promise<ExecuteValue>
   addressed?: SessionId
+  localized?: boolean
 }
 
 /**
@@ -121,6 +124,13 @@ async function bench(opts: BenchOptions = {}) {
     },
   })
   ctx.provide('remote.commands', commandsRemote)
+  let locale: LocaleRuntime | undefined
+  if (opts.localized === true) {
+    locale = new LocaleRuntime(ctx)
+    ctx.provide('locale', locale)
+    locale.register('command', 'zh', zh)
+    locale.register('command', 'en', en)
+  }
   const executions: Array<{ sessionId: SessionId; name: string; result: CommandResult }> = []
   ctx.on('command/executed', (sessionId, name, result) => {
     executions.push({ sessionId, name, result })
@@ -150,7 +160,7 @@ async function bench(opts: BenchOptions = {}) {
   const warm = async (session: ClientSessionContext) => {
     await source.candidates(session, { query: '', position: 'leading', signal: new AbortController().signal })
   }
-  return { ctx, fiber, command, source, mint, warm, listCalls, executeCalls, executions, registered, notices }
+  return { ctx, fiber, command, source, mint, warm, listCalls, executeCalls, executions, registered, notices, locale }
 }
 
 function menuPick(source: InputTriggerSource, name: string, session: ClientSessionContext, end?: number) {
@@ -216,6 +226,17 @@ describe('candidates', () => {
     const list = await source.candidates(proj('s1'), req('g'))
     expect(listCalls).toEqual([{ sessionId: sid('s1') }])
     expect(list).toEqual([{ name: 'goal', description: 'leadingInput kind', hint: 'goal text' }])
+  })
+
+  it('localizes built-in command descriptions at presentation time', async () => {
+    const b = await bench({ localized: true })
+    const chinese = await b.source.candidates(proj('s1'), req(''))
+    expect(chinese.find(row => row.name === 'goal')?.label).toBe('目标')
+    expect(chinese.find(row => row.name === 'goal')?.description).toBe('设置或查看长期任务目标')
+    b.locale?.setLocale('en')
+    const english = await b.source.candidates(proj('s1'), req(''))
+    expect(english.find(row => row.name === 'goal')?.label).toBeUndefined()
+    expect(english.find(row => row.name === 'goal')?.description).toBe('Set or view the goal for a long-running task')
   })
 
   it('matches case-insensitive subsequences and ranks prefixes, boundaries, adjacency, gaps, then source order', async () => {

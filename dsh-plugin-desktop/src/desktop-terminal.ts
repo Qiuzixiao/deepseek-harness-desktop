@@ -1,4 +1,4 @@
-/** Isolated command-line environment launched from the DSH Desktop tray. */
+/** Isolated command-line environment launched from the Zenwit tray. */
 
 import type { ChildProcess, SpawnOptions } from 'node:child_process'
 import {
@@ -24,6 +24,7 @@ const WINDOWS_DSH_BOOTSTRAP = 'DSH_DESKTOP_DSH_BOOTSTRAP'
 const WINDOWS_ELECTRON_VERSION = 'DSH_DESKTOP_ELECTRON_VERSION'
 const WINDOWS_PNPM_ENTRY = 'DSH_DESKTOP_PNPM_ENTRY'
 const WINDOWS_PROFILE_DIRECTORY = 'DSH_DESKTOP_PROFILE_DIRECTORY'
+const WINDOWS_WORKING_DIRECTORY = 'DSH_DESKTOP_WORKING_DIRECTORY'
 const WINDOWS_PRODUCT_VERSION = 'DSH_DESKTOP_PRODUCT_VERSION'
 const WINDOWS_SHIM_DIRECTORY = 'DSH_DESKTOP_SHIM_DIRECTORY'
 const WINDOWS_POWERSHELL_WELCOME = 'DSH_DESKTOP_POWERSHELL_WELCOME'
@@ -36,6 +37,7 @@ const WINDOWS_GENERATED_ENVIRONMENT_KEYS = new Set([
   WINDOWS_ELECTRON_VERSION,
   WINDOWS_PNPM_ENTRY,
   WINDOWS_PROFILE_DIRECTORY,
+  WINDOWS_WORKING_DIRECTORY,
   WINDOWS_PRODUCT_VERSION,
   WINDOWS_SHIM_DIRECTORY,
   WINDOWS_POWERSHELL_WELCOME,
@@ -48,7 +50,7 @@ const PRIVATE_FILE_MODE = 0o600
 const WINDOWS_SHELL_COMMANDS = ['pwsh.exe', 'powershell.exe', 'cmd.exe'] as const
 const ELECTRON_HEADERS_URL = 'https://electronjs.org/headers'
 
-/** Platforms with a native terminal launch contract owned by DSH Desktop. */
+/** Platforms with a native terminal launch contract owned by Zenwit. */
 export type DesktopTerminalPlatform = 'darwin' | 'win32'
 
 /** Process launcher injected by the Electron adapter. */
@@ -94,6 +96,8 @@ export interface DesktopTerminalOptions {
   productVersion: string
   /** Absolute working directory of the selected profile. */
   profileDir: string
+  /** Optional initial working directory for a terminal opened from the workspace. */
+  workingDirectory?: string
   /** Harness home exported as `DSH_HOME` inside the terminal. */
   homeDir: string
   /** Desktop-private recovery WAL used by plugin installs from this terminal. */
@@ -331,6 +335,7 @@ function macWelcome(
   shimDir: string,
   bashRcPath: string,
 ): string {
+  const workingDirectory = options.workingDirectory ?? options.profileDir
   const commandHelp = 'dsh --dump-config'
   const pluginAdd = 'dsh plugin add <third-party-plugin>'
   const pluginRemove = 'dsh plugin remove <third-party-plugin>'
@@ -340,9 +345,9 @@ function macWelcome(
     `unset ${RUN_AS_NODE}`,
     `export ${DSH_HOME}=${quoteSh(options.homeDir)}`,
     `export PATH=${quoteSh(shimDir)}:"\${PATH:-}"`,
-    `cd ${quoteSh(options.profileDir)}`,
+    `cd ${quoteSh(workingDirectory)}`,
     "printf '\\033[2J\\033[3J\\033[H'",
-    `printf '%s\\n' ${quoteSh(`DSH Desktop ${options.productVersion} terminal`)}`,
+    `printf '%s\\n' ${quoteSh(`Zenwit ${options.productVersion} terminal`)}`,
     `printf '%s\\n' ${quoteSh(`Profile: ${options.profileName}`)}`,
     `printf '%s\\n' ${quoteSh(`Profile directory: ${options.profileDir}`)}`,
     `printf '%s\\n' ${quoteSh(`Harness home: ${options.homeDir}`)}`,
@@ -352,7 +357,7 @@ function macWelcome(
     `printf '  %s\\n' ${quoteSh(pluginAdd)}`,
     `printf '  %s\\n' ${quoteSh(pluginRemove)}`,
     `printf '  %s\\n' ${quoteSh(pluginUpdate)}`,
-    `printf '%s\\n' ${quoteSh('Restart DSH Desktop after plugin changes.')}`,
+    `printf '%s\\n' ${quoteSh('Restart Zenwit after plugin changes.')}`,
     'case "${SHELL:-/bin/zsh}" in',
     '  */bash)',
     '    export DSH_DESKTOP_USER_BASHRC="${HOME:-}/.bashrc"',
@@ -374,7 +379,7 @@ function macWelcome(
 }
 
 /** Build the PowerShell script that remains active in the new console. */
-function windowsWelcome(): string {
+function windowsWelcome(options: DesktopTerminalOptions): string {
   const commandHelp = 'dsh --dump-config'
   const pluginAdd = 'dsh plugin add <third-party-plugin>'
   const pluginRemove = 'dsh plugin remove <third-party-plugin>'
@@ -384,8 +389,10 @@ function windowsWelcome(): string {
     `$dshDesktopShimDir = $env:${WINDOWS_SHIM_DIRECTORY}`,
     `$dshDesktopPath = @($env:${PATH} -split ';' | Where-Object { -not [string]::Equals($_, $dshDesktopShimDir, [StringComparison]::OrdinalIgnoreCase) })`,
     `$env:${PATH} = (@($dshDesktopShimDir) + $dshDesktopPath) -join ';'`,
-    `Set-Location -LiteralPath $env:${WINDOWS_PROFILE_DIRECTORY}`,
-    `Write-Host ("DSH Desktop {0} terminal" -f $env:${WINDOWS_PRODUCT_VERSION})`,
+    options.workingDirectory === undefined
+      ? `Set-Location -LiteralPath $env:${WINDOWS_PROFILE_DIRECTORY}`
+      : `Set-Location -LiteralPath $env:${WINDOWS_WORKING_DIRECTORY}`,
+    `Write-Host ("Zenwit {0} terminal" -f $env:${WINDOWS_PRODUCT_VERSION})`,
     `Write-Host ("Profile: {0}" -f $env:${DEFAULT_PROFILE})`,
     `Write-Host ("Profile directory: {0}" -f $env:${WINDOWS_PROFILE_DIRECTORY})`,
     `Write-Host ("Harness home: {0}" -f $env:${DSH_HOME})`,
@@ -395,13 +402,13 @@ function windowsWelcome(): string {
     `Write-Host '  ${pluginAdd}'`,
     `Write-Host '  ${pluginRemove}'`,
     `Write-Host '  ${pluginUpdate}'`,
-    `Write-Host 'Restart DSH Desktop after plugin changes.'`,
+    `Write-Host 'Restart Zenwit after plugin changes.'`,
     '',
   ].join('\r\n')
 }
 
 /** Build the fallback batch welcome script used when PowerShell is unavailable. */
-function windowsCmdWelcome(): string {
+function windowsCmdWelcome(options: DesktopTerminalOptions): string {
   const commandHelp = 'dsh --dump-config'
   const pluginAdd = 'dsh plugin add <third-party-plugin>'
   const pluginRemove = 'dsh plugin remove <third-party-plugin>'
@@ -410,8 +417,10 @@ function windowsCmdWelcome(): string {
     '@echo off',
     'setlocal EnableDelayedExpansion',
     `set "${RUN_AS_NODE}="`,
-    `cd /d "!${WINDOWS_PROFILE_DIRECTORY}!"`,
-    `echo(DSH Desktop !${WINDOWS_PRODUCT_VERSION}! terminal`,
+    options.workingDirectory === undefined
+      ? `cd /d "!${WINDOWS_PROFILE_DIRECTORY}!"`
+      : `cd /d "!${WINDOWS_WORKING_DIRECTORY}!"`,
+    `echo(Zenwit !${WINDOWS_PRODUCT_VERSION}! terminal`,
     `echo(Profile: !${DEFAULT_PROFILE}!`,
     `echo(Profile directory: !${WINDOWS_PROFILE_DIRECTORY}!`,
     `echo(Harness home: !${DSH_HOME}!`,
@@ -421,7 +430,7 @@ function windowsCmdWelcome(): string {
     `echo(  ${escapeBatchText(pluginAdd)}`,
     `echo(  ${escapeBatchText(pluginRemove)}`,
     `echo(  ${escapeBatchText(pluginUpdate)}`,
-    `echo(${escapeBatchText('Restart DSH Desktop after plugin changes.')}`,
+    `echo(${escapeBatchText('Restart Zenwit after plugin changes.')}`,
     'endlocal & set "ELECTRON_RUN_AS_NODE="',
     '',
   ].join('\r\n')
@@ -433,12 +442,14 @@ function prepareDesktopTerminalFiles(options: DesktopTerminalOptions): DesktopTe
     throw new Error(`dsh-plugin-desktop: terminal is unsupported on ${options.platform}`)
   }
   assertDesktopProfileName(options.profileName)
+  const workingDirectory = options.workingDirectory ?? options.profileDir
   for (const [label, value] of [
     ['application executable', options.appExecutable],
     ['dsh bootstrap', options.dshBootstrapPath],
     ['pnpm entry', options.pnpmBinPath],
     ['Electron version', options.electronVersion],
     ['profile directory', options.profileDir],
+    ['working directory', workingDirectory],
     ['Harness home', options.homeDir],
     ['install recovery state', options.installRecoveryStatePath],
     ['state directory', options.stateDir],
@@ -462,7 +473,7 @@ function prepareDesktopTerminalFiles(options: DesktopTerminalOptions): DesktopTe
     replacePrivateFile(files.nodeShimPath, macShim(options.appExecutable), EXECUTABLE_FILE_MODE)
     replacePrivateFile(join(options.stateDir, '.zshrc'), macZshRc(options, shimDir), PRIVATE_FILE_MODE)
     replacePrivateFile(bashRcPath, macBashRc(options, shimDir), PRIVATE_FILE_MODE)
-    replacePrivateFile(files.welcomePath, macWelcome(options, shimDir, bashRcPath), EXECUTABLE_FILE_MODE)
+    replacePrivateFile(files.welcomePath, macWelcome({ ...options, workingDirectory }, shimDir, bashRcPath), EXECUTABLE_FILE_MODE)
     return files
   }
   if (options.platform === 'win32') {
@@ -478,8 +489,8 @@ function prepareDesktopTerminalFiles(options: DesktopTerminalOptions): DesktopTe
     replacePrivateFile(files.dshShimPath, windowsDshShim(), PRIVATE_FILE_MODE)
     replacePrivateFile(files.pnpmShimPath, windowsPnpmShim(), PRIVATE_FILE_MODE)
     replacePrivateFile(files.nodeShimPath, windowsShim(), PRIVATE_FILE_MODE)
-    replacePrivateFile(files.welcomePath, windowsWelcome(), PRIVATE_FILE_MODE)
-    replacePrivateFile(windowsCmdWelcomePath, windowsCmdWelcome(), PRIVATE_FILE_MODE)
+    replacePrivateFile(files.welcomePath, windowsWelcome(options), PRIVATE_FILE_MODE)
+    replacePrivateFile(windowsCmdWelcomePath, windowsCmdWelcome(options), PRIVATE_FILE_MODE)
     return files
   }
   throw new Error(`dsh-plugin-desktop: terminal is unsupported on ${options.platform}`)
@@ -517,6 +528,7 @@ function terminalEnvironment(options: DesktopTerminalOptions, files: DesktopTerm
     env[WINDOWS_ELECTRON_VERSION] = options.electronVersion
     env[WINDOWS_PNPM_ENTRY] = options.pnpmBinPath
     env[WINDOWS_PROFILE_DIRECTORY] = options.profileDir
+    if (options.workingDirectory !== undefined) env[WINDOWS_WORKING_DIRECTORY] = options.workingDirectory
     env[WINDOWS_PRODUCT_VERSION] = options.productVersion
     env[WINDOWS_SHIM_DIRECTORY] = files.shimDir
     env[WINDOWS_POWERSHELL_WELCOME] = files.welcomePath
@@ -641,7 +653,7 @@ function windowsLaunchBroker(
   return [
     '@echo off',
     'setlocal EnableDelayedExpansion',
-    `start "DSH Desktop" /D "!${WINDOWS_PROFILE_DIRECTORY}!" ${target}`,
+    `start "Zenwit" /D "!${WINDOWS_PROFILE_DIRECTORY}!" ${target}`,
     'exit /b %errorlevel%',
     '',
   ].join('\r\n')
@@ -674,7 +686,7 @@ export function openDesktopTerminal(options: DesktopTerminalOptions): DesktopTer
   let args: string[]
   let detached = true
   let windowsHide = false
-  let launcherCwd = options.profileDir
+  let launcherCwd = options.workingDirectory ?? options.profileDir
   let windowsLauncherPath: string | undefined
   if (options.platform === 'darwin') {
     command = '/usr/bin/open'

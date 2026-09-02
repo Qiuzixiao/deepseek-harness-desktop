@@ -12,17 +12,41 @@ import type { Context } from '@deepseek-ai/cordis'
 // Type-only: pulls the ctx.remote merge and the forwarded-event key face
 // (`commands/change` rides the allowlist) into this program.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
+// Type-only: the optional locale face supplies the active UI language.
+import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { CommandResult } from '@deepseek-ai/dsh-commands/types'
 import type { ClientContext, ISessions, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   CandidateRequest, ClientSessionContext, CommandClaim, PickOutcome, InputTriggerCandidate, InputTriggerPick,
   SubmitOutcome,
 } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { CommandContribution, CommandDecoration, CommandUiContract } from './contract.ts'
 import type { CommandDescriptor } from './directory.ts'
 import { CommandDirectory } from './directory.ts'
 import { PopupSelectController } from './popup.ts'
 import type { TokenSegment } from './popup.ts'
+import { type CommandKey } from './locales.ts'
+
+const COMMAND_NS = 'command'
+const DESCRIPTION_KEYS: Partial<Record<string, CommandKey>> = {
+  export: 'description.export',
+  feedback: 'description.feedback',
+  goal: 'description.goal',
+  permission: 'description.permission',
+  plan: 'description.plan',
+  compact: 'description.compact',
+}
+const LABEL_KEYS: Partial<Record<string, CommandKey>> = {
+  export: 'label.export',
+  feedback: 'label.feedback',
+  goal: 'label.goal',
+  permission: 'label.permission',
+  plan: 'label.plan',
+  compact: 'label.compact',
+  'skill-create': 'label.skill-create',
+  model: 'label.model',
+}
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -122,6 +146,7 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
 
   private readonly directory: CommandDirectory
   private readonly live: LiveState = { contributions: new Map(), decorations: new Map(), popups: new Map() }
+  private readonly translate: TranslateNS<'command'> | undefined
 
   /**
    * @param ctx - owning root context (plugin fiber; the service registers
@@ -129,6 +154,7 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
    */
   constructor(ctx: Context) {
     super(ctx, 'commandUi')
+    this.translate = ctx.get('locale')?.bind(COMMAND_NS)
     this.directory = new CommandDirectory(async (sessionId) => {
       if (this.sessions().subagentAddress(sessionId) !== undefined) return []
       const result = await ctx.remote.commands.list(sessionId)
@@ -246,19 +272,44 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
     const seen = new Set<string>()
     for (const c of list) {
       seen.add(c.name)
-      rows.push({ name: c.name, description: c.description, ...(c.input !== undefined ? { hint: c.input.hint } : {}) })
+      const label = this.localizedLabel(c.name)
+      rows.push({
+        name: c.name,
+        ...(label === c.name ? {} : { label }),
+        description: this.localizedDescription(c.name, c.description),
+        ...(c.input !== undefined ? { hint: c.input.hint } : {}),
+      })
     }
     for (const contribution of this.live.contributions.values()) {
       if (!contribution.available(session)) continue
       if (seen.has(contribution.name)) {
         throw new Error(`ui-commands: contribution /${contribution.name} collides with a host command`)
       }
-      rows.push({ name: contribution.name, description: contribution.description })
+      const label = this.localizedLabel(contribution.name)
+      rows.push({
+        name: contribution.name,
+        ...(label === contribution.name ? {} : { label }),
+        description: contribution.description,
+      })
     }
     return fuzzyCandidates(
       rows.filter(c => req.position === 'leading' || c.hint === undefined),
       req.query,
     )
+  }
+
+  /** Translate shipped command copy at presentation time; unknown commands keep their source text. */
+  private localizedDescription(name: string, fallback: string): string {
+    const key = DESCRIPTION_KEYS[name]
+    if (key === undefined || this.translate === undefined) return fallback
+    return this.translate(key)
+  }
+
+  /** Localize known command labels without changing the command identity. */
+  private localizedLabel(name: string): string {
+    const key = LABEL_KEYS[name]
+    if (key === undefined || this.translate === undefined) return name
+    return this.translate(key)
   }
 
   /** Decision table, menu column: contribution/decorated-host → popup; host input → claim; host bare → detached execute. */
@@ -371,7 +422,7 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
     session: ClientSessionContext,
     line: string,
   ): Promise<SubmitOutcome> {
-    const result = await this.ctx.remote.commands.execute(session.sessionId, line)
+    const result = await this.ctx.remote.commands.execute(session.sessionId, line, [])
     if (!result.ok) throw new Error(`command.execute failed: ${result.error.code}: ${result.error.message}`)
     if (result.value === undefined) return { kind: 'error', text: `unknown or malformed command: ${line}` }
     this.notifyExecuted(session.sessionId, submittedCommandName(line), result.value.result)

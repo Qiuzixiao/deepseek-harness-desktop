@@ -4,11 +4,11 @@
  * lowest renders) and seats ZenwitFrame as the product frame.
  *
  * ZenwitFrame owns both surface states: no current session renders the home
- * project library; a current session renders the three-pane screenplay
+ * project library; a current session renders the three-pane workspace
  * workspace (structure tree | editor | AI chat).
  */
 import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
-import type { WorkspaceId } from '@deepseek-ai/dsh-api-remotes/client'
+import type { ConnectionHandle, WorkspaceId } from '@deepseek-ai/dsh-api-remotes/client'
 import type { InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { ProjectSummary } from '@deepseek-ai/dsh-screenplay-project-library/types'
@@ -22,16 +22,13 @@ import { registerProjectFileSource } from './project-file-source.ts'
 
 /** Required services (cordis fiber inject — the loader passes all module exports as an object plugin). */
 // ui-conversation now injects on the 'conversation' slot (order-independent).
-export const inject = ['slots', 'inputTriggers', 'sessions', 'conversation']
+export const inject = ['slots', 'inputTriggers', 'sessions', 'conversation', 'connection']
 
 /**
  * Demo fallback rows used while the running desktop has not yet mounted the
  * projectLibrary Remote (the api-remotes assembly that mounts it ships later).
  */
-const DEMO_PROJECTS: ProjectSummary[] = [
-  { name: '外卖员的千万现金', path: 'demo-1', layout: 'zh-CN-v1', phase: 'Ready', revision: 3, updatedAt: Date.now(), hasContract: true, writing: { completed: 3, total: 24 } },
-  { name: '重生之我是外卖骑手', path: 'demo-2', layout: 'zh-CN-v1', phase: 'Intake', revision: 0, updatedAt: Date.now() - 86400000, hasContract: false },
-]
+const DEMO_PROJECTS: ProjectSummary[] = []
 
 /**
  * Client plugin body: register ZenwitFrame into 'root' with a lower shadow
@@ -41,8 +38,10 @@ const DEMO_PROJECTS: ProjectSummary[] = [
  * @param ctx - client root context.
  */
 const PROJECT_LIBRARY_API = '/api/desktop/projects'
+const PROJECT_DELETE_API = '/api/desktop/projects/delete'
 
 export function apply(ctx: ClientContext): void {
+  const connection = ctx.get('connection') as ConnectionHandle
   ctx.effect(() => registerProjectFileSource(ctx), 'ui-short-drama: @ project-file source')
   ctx.effect(() => {
     const source: InputTriggerSource = {
@@ -60,31 +59,68 @@ export function apply(ctx: ClientContext): void {
     }
     return (ctx as unknown as { get: (name: string) => { registerSource(source: InputTriggerSource): () => void } }).get('inputTriggers').registerSource(source)
   }, 'ui-short-drama: local selection reference source')
-  // The DSH Desktop serves a private loopback project-library API; when it is
+  // Zenwit serves a private loopback project-library API; when it is
   // absent (e.g. an unpatched installed desktop) the faces fall back to demo data.
   const list = async (): Promise<ProjectSummary[]> => {
     try {
       const res = await fetch(PROJECT_LIBRARY_API)
       if (!res.ok) return DEMO_PROJECTS
       const body = await res.json() as { projects?: ProjectSummary[] }
-      return body.projects ?? []
+      return (body.projects ?? []).map(project => ({ ...project, tags: Array.isArray(project.tags) ? project.tags : [] }))
     } catch {
       return DEMO_PROJECTS
     }
   }
-  const create = async (name: string): Promise<ProjectSummary> => {
+  const create = async (name: string, tags: string[]): Promise<ProjectSummary> => {
     try {
-      const res = await fetch(PROJECT_LIBRARY_API, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name }) })
+      const res = await fetch(PROJECT_LIBRARY_API, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, tags }) })
       if (!res.ok) throw new Error('projectLibrary.create failed: ' + res.status)
       const body = await res.json() as { project: ProjectSummary }
-      return body.project
-    } catch {
-      return { name, path: 'demo-' + name, layout: 'zh-CN-v1', phase: 'Intake', revision: 0, updatedAt: Date.now(), hasContract: false }
+      return { ...body.project, tags: Array.isArray(body.project.tags) ? body.project.tags : [] }
+    } catch (error) {
+      throw error instanceof Error ? error : new Error(String(error))
     }
+  }
+  const updateProjectTags = async (projectPath: string, tags: string[]): Promise<ProjectSummary> => {
+    const res = await fetch(PROJECT_LIBRARY_API, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: projectPath, tags }),
+    })
+    if (!res.ok) throw new Error('projectLibrary.updateTags failed: ' + res.status)
+    const body = await res.json() as { project: ProjectSummary }
+    return { ...body.project, tags: Array.isArray(body.project.tags) ? body.project.tags : [] }
+  }
+  const listAgentNames = async (): Promise<Record<string, string>> => {
+    try {
+      const response = await connection.api.agentPresets.list({})
+      if (!response.result.ok) return {}
+      return Object.fromEntries(response.result.value.presets.map(preset => [preset.id, preset.name ?? preset.id]))
+    } catch {
+      return {}
+    }
+  }
+  const deleteProject = async (projectPath: string): Promise<void> => {
+    const res = await fetch(PROJECT_DELETE_API, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: projectPath }),
+    })
+    if (!res.ok) throw new Error('projectLibrary.delete failed: ' + res.status)
   }
   // Open a project: register its directory as a Workspace and connect its
   // blank/reusable session, so ZenwitFrame flips to the three-pane workspace.
   const openProject = async (projectPath: string): Promise<void> => {
+    let projectAgentId: string | undefined
+    try {
+      const structure = await fetch('/api/desktop/projects/structure?path=' + encodeURIComponent(projectPath))
+      if (structure.ok) {
+        const payload = await structure.json() as { agentId?: unknown }
+        if (typeof payload.agentId === 'string' && payload.agentId.trim() !== '') projectAgentId = payload.agentId.trim()
+      }
+    } catch {
+      // A missing metadata read should fall back to the current default Agent.
+    }
     const workspaces = (ctx as unknown as { get: (name: string) => {
       create(input: { path: string }): Promise<{ workspaceId: string }>
       connectWorkspace(workspaceId: string): Promise<unknown>
@@ -119,20 +155,15 @@ export function apply(ctx: ClientContext): void {
         if (typeof view.workspaceId !== 'string' || view.workspaceId.length === 0) {
           throw new Error('workspaces.create 未返回 workspaceId')
         }
-        // Reuse the project's bound screenplay session (cwd === projectPath). Zenwit
-        // is a screenplay product, so ONLY a session that actually ran the
-        // screenplay agent (screenplay-v1) is reusable: a legacy 'standard'
-        // session carries no DLKJB instruction and would silently regress the
-        // output format, so it is never reused. Among screenplay-v1 sessions we
-        // prefer one with a real conversation (non-blank), newest among them;
-        // if none exists, the connectWorkspace fall-through creates one from the
-        // deployment's default preset (screenplay-v1).
+        // Reuse any session bound to this project and its stored Agent. A
+        // project may be used by different domains, so do not enforce a
+        // screenplay-specific preset here.
         const list = sessions.list.getSnapshot()
         let best: { id: string, blank?: boolean, updatedAt?: number, agentPreset?: string } | undefined
         for (const id of list.ids) {
           const summary = list.byId[id]
           if (summary === undefined || summary.cwd !== projectPath) continue
-          if (summary.agentPreset !== 'screenplay-v1') continue
+          if (projectAgentId !== undefined && summary.agentPreset !== projectAgentId) continue
           if (best === undefined) { best = summary; continue }
           if (summary.blank === false && best.blank !== false) { best = summary; continue }
           if (summary.blank === true && best.blank === false) continue
@@ -201,28 +232,26 @@ export function apply(ctx: ClientContext): void {
   }
 
   ctx.effect(() => {
-    // ui-layout owns the root child declarations in extended/advanced modes.
-    // The Zenwit shell only declares them in compatibility mode, where the
-    // layout plugin intentionally releases its AppFrame registration.
-    const compatibility = typeof window === 'undefined'
-      || new URLSearchParams(window.location.search).get('dsh-desktop-mode') === 'compatibility'
     const dispose = ctx.slots.register({
       name: 'root',
       priority: -1,
-      ...(compatibility ? {
-        children: {
-          'sidebar': { kind: 'single', scope: 'root' },
-          'conversation': { kind: 'single', scope: 'session-maybe' },
-        },
-      } : {}),
+      // ZenwitFrame renders these children in both compatibility and advanced
+      // modes, so its root registration must own their declarations in both.
+      children: {
+        'sidebar': { kind: 'single', scope: 'root' },
+        'conversation': { kind: 'single', scope: 'session-maybe' },
+      },
       inject: () => ({
         list,
         create,
+        updateProjectTags,
+        listAgentNames,
         openProject,
         openSession,
         startSession,
         addSelectionToConversation,
         closeProject,
+        deleteProject,
       }),
     }, ZenwitFrame)
     return () => {

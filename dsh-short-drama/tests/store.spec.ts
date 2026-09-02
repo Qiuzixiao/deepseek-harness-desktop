@@ -326,6 +326,22 @@ describe('ScreenplayProjectStore', () => {
     expect((await readFile(join(root, '.screenplay', 'events.jsonl'), 'utf8')).trim().split('\n')).toHaveLength(1)
   })
 
+  it('accepts facts-oriented initial artifacts without forcing a complete legacy template', async () => {
+    const root = await workspace()
+    const store = new ScreenplayProjectStore(root, CHINESE_SCREENPLAY_LAYOUT)
+    const created = await store.createProject(0, 'op-flexible-initial-artifacts', '测试短剧', requirements, {
+      contractContent: '# 《测试短剧》创作合同\n\n## 一、项目定位\n由用户确认的项目事实。',
+      settingContent: '# 《测试短剧》核心设定\n\n## 世界与边界\n当代城市。',
+      mainCharacters: [{
+        name: '顾北辰',
+        content: '# 顾北辰\n\n## 基本信息\n创业者，其他信息待用户确认。',
+      }],
+      otherCharactersContent: '# 《测试短剧》其他人物\n\n## 待补人物\n随剧情方向确认。',
+    })
+
+    expect(created).toMatchObject({ ok: true, revision: 1 })
+  })
+
   it('uses the explicit project folder name as the canonical title for all initial artifacts', async () => {
     const root = await workspace()
     const store = new ScreenplayProjectStore(root, LEGACY_SCREENPLAY_LAYOUT)
@@ -402,6 +418,20 @@ describe('ScreenplayProjectStore', () => {
     })
     const episodes = await readFile(join(root, 'episodes', 'episode-outlines.md'), 'utf8')
     expect(episodes.match(/^##\s+第\s+\d+\s+集《/gmu)).toHaveLength(5)
+  })
+
+  it('accepts a full-outline H1 that contains the project name without fixed decorative wording', async () => {
+    const root = await workspace()
+    const { store } = await readyProject(root)
+    const created = await store.createOutline(1, 'op-flexible-outline-title', [
+      '# 测试短剧',
+      '',
+      '顾北辰在家庭关系和现实压力同时逼近时确认了自己必须解决的核心问题。',
+      '',
+      '他在阻力持续变化的过程中采取行动，最终承担选择的后果并处理核心矛盾。',
+    ].join('\n'))
+
+    expect(created).toMatchObject({ ok: true, stage: 'OutlineReady' })
   })
 
   it('honors an explicitly requested 1-3 episode batch without changing the total-count title', async () => {
@@ -755,7 +785,10 @@ describe('ScreenplayProjectStore', () => {
       0, 'op-invalid-format', '测试短剧', requirements, invalid,
     )).rejects.toMatchObject({
       code: 'VALIDATION_FAILED',
-      details: { missingSections: expect.arrayContaining(['## 一、故事世界观']) },
+      details: {
+        artifact: 'core-setting',
+        issues: expect.arrayContaining([expect.objectContaining({ field: 'sections' })]),
+      },
     })
   })
 

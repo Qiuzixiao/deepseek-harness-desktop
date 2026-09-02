@@ -1,31 +1,19 @@
 /** Zenwit project library Remote service: scan/create screenplay projects. */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
-import { basename, join } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs'
+import { basename, dirname, join, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import type { Context } from '@deepseek-ai/cordis'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
-import type { ProjectCreated, ProjectLibrarySnapshot, ProjectSummary } from './types.js'
+import {
+  normalizeProjectTags, readProjectTags,
+  type ProjectCreated, type ProjectLibrarySnapshot, type ProjectSummary,
+} from './types.js'
 
 /** Default project-library root when no explicit root is configured. */
-export const DEFAULT_PROJECT_ROOT = join(homedir(), 'ShortDrama')
-
-const LAYOUT_MARKER = join('.screenplay', 'layout.json')
-const LAUNCHER_MARKER = join('.screenplay', 'launcher')
-const STATE_FILE = join('.screenplay', 'state.json')
-
-/** Project subdirectories created for a new screenplay project (zh-CN-v1 layout). */
-const PROJECT_DIRECTORIES = [
-  '参考文件',
-  '创作合同',
-  '设定',
-  join('人物', '主要人物'),
-  join('人物', '其他人物'),
-  '大纲',
-  '分集大纲',
-  '剧本',
-  '交付',
-] as const
+export const DEFAULT_PROJECT_ROOT = join(homedir(), 'Projects')
+const PROJECT_METADATA_DIR = '.zenwit-project'
+const PROJECT_METADATA_FILE = join(PROJECT_METADATA_DIR, 'project.json')
 
 function projectSlug(name: string): string {
   const slug = name.trim()
@@ -39,58 +27,35 @@ function projectSlug(name: string): string {
 }
 
 function readSummary(dir: string): ProjectSummary | undefined {
-  const marker = join(dir, LAYOUT_MARKER)
-  const launcher = join(dir, LAUNCHER_MARKER)
-  let layout: ProjectSummary['layout'] = 'zh-CN-v1'
+  try { if (!statSync(dir).isDirectory()) return undefined } catch { return undefined }
+  let agentId: string | undefined
+  let tags: string[] = []
   try {
-    const parsed = JSON.parse(readFileSync(marker, 'utf8')) as { layout?: string }
-    if (parsed.layout === 'zh-CN-v1' || parsed.layout === 'legacy-en-v1') layout = parsed.layout
+    const parsed = JSON.parse(readFileSync(join(dir, PROJECT_METADATA_FILE), 'utf8')) as { agentId?: unknown, tags?: unknown }
+    if (typeof parsed.agentId === 'string' && parsed.agentId.trim() !== '') agentId = parsed.agentId.trim()
+    tags = readProjectTags(parsed.tags)
   } catch {
-    // fall through to launcher/state detection
+    // Metadata is optional for existing folders.
   }
-  const hasMarker = existsSync(launcher) || existsSync(join(dir, '创作合同'))
-  if (!hasMarker) return undefined
+  const summary: ProjectSummary = { name: basename(dir), path: dir, updatedAt: statSync(dir).mtimeMs, tags }
+  if (agentId !== undefined) summary.agentId = agentId
+  return summary
+}
 
-  const base: Omit<ProjectSummary, 'phase' | 'revision' | 'updatedAt' | 'hasContract'> = {
-    name: basename(dir),
-    path: dir,
-    layout,
-  }
+function writeMetadata(projectRoot: string, patch: { agentId?: string, tags: string[] }): void {
+  const metadataPath = join(projectRoot, PROJECT_METADATA_FILE)
+  let current: Record<string, unknown> = {}
   try {
-    const state = JSON.parse(readFileSync(join(dir, STATE_FILE), 'utf8')) as {
-      phase?: string
-      revision?: number
-      updatedAt?: number
-      writingProgress?: { status?: string, completedEpisodes?: number[], totalEpisodes?: number }
-    }
-    const phase: ProjectSummary['phase'] =
-      state.phase === 'ChangePending' ? 'ChangePending'
-        : state.phase === 'Ready' ? 'Ready'
-          : 'Intake'
-    const progress = state.writingProgress
-    const writing = progress !== undefined && typeof progress.totalEpisodes === 'number'
-      ? {
-        completed: progress.completedEpisodes?.length ?? 0,
-        total: progress.totalEpisodes,
-      }
-      : undefined
-    return {
-      ...base,
-      phase,
-      revision: typeof state.revision === 'number' ? state.revision : 0,
-      updatedAt: typeof state.updatedAt === 'number' ? state.updatedAt : 0,
-      hasContract: existsSync(join(dir, '创作合同', 'creative-contract.md')),
-      ...(writing === undefined ? {} : { writing }),
-    }
+    const parsed = JSON.parse(readFileSync(metadataPath, 'utf8')) as unknown
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) current = parsed as Record<string, unknown>
   } catch {
-    return {
-      ...base,
-      phase: 'Intake',
-      revision: 0,
-      updatedAt: statSync(dir).mtimeMs,
-      hasContract: false,
-    }
+    // A missing metadata file is created below.
   }
+  mkdirSync(dirname(metadataPath), { recursive: true })
+  const next = { ...current, version: 2, ...(patch.agentId ? { agentId: patch.agentId } : {}), tags: patch.tags }
+  const temporary = `${metadataPath}.tmp-${process.pid}-${Date.now()}`
+  writeFileSync(temporary, JSON.stringify(next) + '\n')
+  renameSync(temporary, metadataPath)
 }
 
 /** Remote-only service exposing the Zenwit project library. */
@@ -102,8 +67,8 @@ export class ProjectLibraryService extends TypertRemoteService {
   }
 
   /**
-   * Scan the project-library root for screenplay projects.
-   * @param request - optional explicit root override (defaults to ~/ShortDrama).
+   * Scan the project-library root for projects.
+   * @param request - optional explicit root override (defaults to ~/Projects).
    * @returns the resolved root and every detected project summary.
    */
   @Remote('list')
@@ -125,18 +90,17 @@ export class ProjectLibraryService extends TypertRemoteService {
   }
 
   /**
-   * Create a new screenplay project directory (launcher marker + layout marker
-   * + zh-CN-v1 subdirectories) under the library root.
-   * @param request - the project name; the directory basename is the single
-   *   canonical title.
-   * @returns the created project summary (Intake).
+   * Create an empty project directory and its private metadata.
    */
   @Remote('create')
-  create(request: { name: string; parentRoot?: string }): ProjectCreated {
+  create(request: { name: string; parentRoot?: string; agentId?: string; tags?: string[] }): ProjectCreated {
     const name = request?.name?.trim()
     if (name === undefined || name.length === 0) {
       throw new Error('project name must not be empty')
     }
+    // Validate user-owned metadata before touching the filesystem. This keeps
+    // rejected requests from leaving an empty project directory behind.
+    const tags = normalizeProjectTags(request?.tags ?? [])
     const parent = request?.parentRoot?.trim() || DEFAULT_PROJECT_ROOT
     mkdirSync(parent, { recursive: true })
     const slug = projectSlug(name)
@@ -145,20 +109,32 @@ export class ProjectLibraryService extends TypertRemoteService {
       if (!existsSync(projectRoot)) break
       projectRoot = join(parent, slug + '-' + String(index + 1))
     }
-    mkdirSync(projectRoot, { recursive: false })
-    mkdirSync(join(projectRoot, '.screenplay'), { recursive: true })
-    mkdirSync(join(projectRoot, LAUNCHER_MARKER), { recursive: true })
-    for (const directory of PROJECT_DIRECTORIES) {
-      mkdirSync(join(projectRoot, directory), { recursive: true })
-    }
-    const layoutPath = join(projectRoot, LAYOUT_MARKER)
-    if (!existsSync(layoutPath)) {
-      writeFileSync(layoutPath, JSON.stringify({ layout: 'zh-CN-v1' }) + '\n')
-    }
+    mkdirSync(join(projectRoot, PROJECT_METADATA_DIR), { recursive: true })
+    const agentId = request?.agentId?.trim()
+    writeMetadata(projectRoot, { ...(agentId ? { agentId } : {}), tags })
     const project = readSummary(projectRoot)
     if (project === undefined) {
       throw new Error('created project directory could not be summarized: ' + projectRoot)
     }
+    return { project }
+  }
+
+  /** Update user-owned project tags without changing its Agent binding. */
+  @Remote('updateTags')
+  updateTags(request: { path: string; parentRoot?: string; tags: string[] }): ProjectCreated {
+    const parent = resolve(request?.parentRoot?.trim() || DEFAULT_PROJECT_ROOT)
+    const projectRoot = resolve(request?.path?.trim() || '')
+    if (projectRoot === parent || dirname(projectRoot) !== parent) {
+      throw new Error('project path must be directly under the project library')
+    }
+    const summary = readSummary(projectRoot)
+    if (summary === undefined) throw new Error('project does not exist')
+    writeMetadata(projectRoot, {
+      ...(summary.agentId === undefined ? {} : { agentId: summary.agentId }),
+      tags: normalizeProjectTags(request.tags),
+    })
+    const project = readSummary(projectRoot)
+    if (project === undefined) throw new Error('updated project could not be summarized')
     return { project }
   }
 }

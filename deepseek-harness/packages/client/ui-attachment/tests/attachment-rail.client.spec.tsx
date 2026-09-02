@@ -30,6 +30,7 @@ afterEach(() => { vi.unstubAllGlobals() })
 const labels: AttachmentRailLabels = {
   group: '待发送图片',
   open: '查看原图',
+  uploading: '上传中…',
   scrollLeft: '向左滚动图片',
   scrollRight: '向右滚动图片',
 }
@@ -67,6 +68,34 @@ describe('AttachmentRail', () => {
     expect(onOpen).toHaveBeenCalledWith(items[0])
     fireEvent.click(view.getByRole('button', { name: '移除图片 b.png' }))
     expect(onRemove).toHaveBeenCalledWith(items[1])
+  })
+
+  it('renders document metadata in the same rail and does not open an image preview', () => {
+    const onOpen = vi.fn()
+    const onRemove = vi.fn()
+    const documentItem: AttachmentRailItem = {
+      id: 'doc', alt: 'notes.pdf', kind: 'document', name: 'notes.pdf', extension: 'pdf',
+      bytes: 2048, status: 'ready', removeLabel: '移除文档 notes.pdf',
+    }
+    const view = render(<AttachmentRail items={[documentItem]} labels={labels} onOpen={onOpen} onRemove={onRemove} />)
+    expect(view.getByText('PDF')).toBeTruthy()
+    expect(view.getByText('notes.pdf')).toBeTruthy()
+    expect(view.getByText('2 KB')).toBeTruthy()
+    expect(view.queryByTitle('查看原图')).toBeNull()
+    fireEvent.click(view.getByRole('button', { name: '移除文档 notes.pdf' }))
+    expect(onRemove).toHaveBeenCalledWith(documentItem)
+    expect(onOpen).not.toHaveBeenCalled()
+  })
+
+  it('uses the localized uploading label for document attachments', () => {
+    const documentItem: AttachmentRailItem = {
+      id: 'uploading-document', kind: 'document', name: 'notes.md', extension: 'md', bytes: 512,
+      status: 'uploading', alt: 'notes.md', removeLabel: '移除文档 notes.md',
+    }
+    const view = render(<AttachmentRail items={[documentItem]} labels={labels} onOpen={vi.fn()} onRemove={vi.fn()} />)
+
+    expect(view.getByText('上传中…')).toBeTruthy()
+    expect(view.queryByText('Uploading...')).toBeNull()
   })
 
   it('shows edge arrows from scroll geometry and pages a viewport at a time', () => {

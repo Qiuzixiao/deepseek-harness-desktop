@@ -13,6 +13,7 @@ import type { InputTriggerController } from '@deepseek-ai/dsh-client-ui-input-tr
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { queueReadFaceOf } from '../queue/store.ts'
 import type { ComposerKeyboard, DraftAttachmentId, SessionInputResolver, SessionInput } from './contract.ts'
+import type { ComposerAttachment, ComposerDocumentAttachment } from '../contract/slots.ts'
 import type { InputSubmitMode } from '../contract/composer-submission.ts'
 import type { PopupDismissFace } from './facade.ts'
 import { SessionInputShell } from './facade.ts'
@@ -31,6 +32,12 @@ interface ConversationAttachmentFace {
     mode: InputSubmitMode,
   ): Promise<void>
   releaseDraftImage(id: DraftAttachmentId): void
+  releaseDraftAttachment(id: DraftAttachmentId): void
+  removeDraftAttachment(sessionId: SessionId, id: DraftAttachmentId): void
+  createDraftDocument(document: Omit<ComposerDocumentAttachment, 'id' | 'kind'>): DraftAttachmentId
+  updateDraftDocument(id: DraftAttachmentId, patch: Partial<Omit<ComposerDocumentAttachment, 'id' | 'kind'>>, shell: SessionInputShell): void
+  draftAttachmentsFor(ids: readonly DraftAttachmentId[]): readonly ComposerAttachment[]
+  intakeFiles(session: SessionFace, files: readonly File[], shell: SessionInputShell): Promise<void>
 }
 
 /** Session-addressed input facade registry (SessionInputResolver face + composer-layer extras). */
@@ -76,6 +83,11 @@ export class InputHub implements SessionInputResolver {
       popup: () => this.popup(actx),
       queue: queueReadFaceOf(session),
       defaultSink: (text, imageIds, mode) => { this.sink(session, text, imageIds, mode) },
+      createDocument: document => this.conversation().createDraftDocument(document),
+      updateDocument: (id, patch) => { this.conversation().updateDraftDocument(id, patch, shell) },
+      intakeFiles: async (files, shell) => {
+        await this.conversation().intakeFiles(session, files, shell)
+      },
       steerQueue: () => { void this.steerQueue(session, shell) },
     })
     this.shells.set(id, shell)
@@ -94,11 +106,11 @@ export class InputHub implements SessionInputResolver {
       ]
       return () => {
         for (const off of offs) off()
-        const drafts = shell.snapshot.imageIds
+        const drafts = shell.snapshot.attachmentIds ?? shell.snapshot.imageIds ?? []
         shell.dispose()
         this.shells.delete(id)
         const conversation = this.rootCtx.get('conversation') as ConversationAttachmentFace | undefined
-        for (const imageId of drafts) conversation?.releaseDraftImage(imageId)
+        for (const id of drafts) conversation?.releaseDraftAttachment(id)
       }
     }, 'conversation.input: session shell')
     return shell

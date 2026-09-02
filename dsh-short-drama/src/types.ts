@@ -122,6 +122,45 @@ export interface CreateEpisodeScreenplayInput {
   continuity: ScreenplayContinuityState
 }
 
+export type ValidationChannel = 'A' | 'B'
+
+export interface ValidationIssue {
+  channel: ValidationChannel
+  code: string
+  severity: 'error' | 'warning' | 'info'
+  artifact: string
+  location?: string
+  message: string
+  repairHint?: string
+}
+
+export interface EpisodeDraft {
+  episode: number
+  baseRevision: number
+  scenes: Record<number, string>
+  continuity?: ScreenplayContinuityState
+  updatedAt: number
+}
+
+export interface EpisodeDraftSnapshot extends EpisodeDraft {
+  content: string
+}
+
+export interface EpisodeValidationResult {
+  ok: boolean
+  episode: number
+  revision: number
+  issues: ValidationIssue[]
+  effectiveCharacterCount?: number
+}
+
+export interface EpisodeDiagnosisResult extends EpisodeValidationResult {
+  /** Channel B is produced by the Agent/Skills/review subagent, not by the validator. */
+  advisory: true
+  /** Explicit evidence areas for the Agent, loaded Skills, or read-only review lens. */
+  reviewAreas: Array<{ id: string, prompt: string }>
+}
+
 export interface ScreenplayVersionArtifact {
   kind: ScreenplayArtifactKind
   logicalPath: string
@@ -261,44 +300,3 @@ export interface ChangePreview {
   fromPath?: string
   toPath?: string
 }
-
-
-/** 70 项清单诊断：机械检查发现的一个问题。 */
-export interface ScreenplayDiagnosticIssue {
-  severity: 'error' | 'warning' | 'info'
-  category:
-    | 'forbidden-terms'
-    | 'abstract-action'
-    | 'episode-length'
-    | 'front-heavy'
-    | 'episode-outline-field'
-    | 'character-pending'
-    | 'continuity-loops'
-    | 'writing-progress'
-  message: string
-  path?: string
-  detail?: Record<string, unknown>
-}
-
-/** 70 项清单诊断：需要模型判断的方法论检查项。 */
-export interface ScreenplayChecklistItem {
-  id: string
-  label: string
-  status: 'check'
-}
-
-/** screenplay_diagnose 的返回结构。 */
-export interface ScreenplayDiagnosis {
-  ok: true
-  projectName: string
-  revision: number
-  phase: string
-  issues: ScreenplayDiagnosticIssue[]
-  checklist: ScreenplayChecklistItem[]
-  summary: {
-    errorCount: number
-    warningCount: number
-    infoCount: number
-  }
-}
-

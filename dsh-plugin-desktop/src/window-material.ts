@@ -7,8 +7,8 @@ export type MacosWindowMaterial = 'off' | 'transparent'
 export type WindowsWindowMaterial = 'off' | 'acrylic' | 'mica'
 export type DesktopWindowMaterial = MacosWindowMaterial | WindowsWindowMaterial
 
-export const DEFAULT_MACOS_WINDOW_MATERIAL: MacosWindowMaterial = 'transparent'
-export const DEFAULT_WINDOWS_WINDOW_MATERIAL: WindowsWindowMaterial = 'acrylic'
+export const DEFAULT_MACOS_WINDOW_MATERIAL: MacosWindowMaterial = 'off'
+export const DEFAULT_WINDOWS_WINDOW_MATERIAL: WindowsWindowMaterial = 'off'
 export const WINDOWS_ACRYLIC_MIN_BUILD = 17_763
 export const WINDOWS_MICA_MIN_BUILD = 22_621
 

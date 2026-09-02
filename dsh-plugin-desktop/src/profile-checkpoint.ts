@@ -43,7 +43,7 @@ export const DESKTOP_PROFILE_CHECKPOINT_FILES = [
   'pnpm-lock.yaml',
   'pnpm-workspace.yaml',
   'cordis.patch.yml',
-  '.dsh-market/state.json',
+  '.zenwit-market/state.json',
 ] as const
 
 export type DesktopProfileCheckpointFilename = typeof DESKTOP_PROFILE_CHECKPOINT_FILES[number]
@@ -53,7 +53,7 @@ const FILE_LIMITS: Record<DesktopProfileCheckpointFilename, number> = {
   'pnpm-lock.yaml': 32 * 1024 * 1024,
   'pnpm-workspace.yaml': 1 * 1024 * 1024,
   'cordis.patch.yml': 1 * 1024 * 1024,
-  '.dsh-market/state.json': 1 * 1024 * 1024,
+  '.zenwit-market/state.json': 1 * 1024 * 1024,
 }
 
 export interface ProfileCheckpointOptions {

@@ -1,4 +1,4 @@
-import type { ReferenceRecord, ReferenceSelectionRecord, ReferenceUploadFile, ReferenceUploadResult, ReferencePreview } from './types.js';
+import type { ReferenceRecord, ReferenceSelectionRecord, ReferenceUploadFile, ReferenceUploadResult, ReferencePreview, ReferenceDocumentPage } from './types.js';
 export declare class ScreenplayReferenceStore {
     readonly projectRoot: string;
     readonly visibleRoot: string;
@@ -12,6 +12,8 @@ export declare class ScreenplayReferenceStore {
     contextSummary(): string;
     structure(referenceId: string): Promise<unknown>;
     preview(originalName: string): Promise<ReferencePreview>;
+    /** Read a bounded paragraph page without exposing the stored source path. */
+    readDocument(referenceId: string, page?: number, pageSize?: number): Promise<ReferenceDocumentPage>;
     readSelection(selectionId: string): Promise<ReferenceSelectionRecord>;
     saveBatch(files: readonly ReferenceUploadFile[]): Promise<ReferenceUploadResult>;
     private saveBatchLocked;

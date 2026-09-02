@@ -1,0 +1,60 @@
+# Zenwit short-drama Agent composition. Keep this aligned with the managed
+# screenplay-v1 copy; project scope and formal-write policy live in the agent.
+- id: tool-fs
+  name: '@deepseek-ai/dsh-tool-fs'
+  config:
+    allowMutations: false
+
+- id: tool-fs-search
+  name: '@deepseek-ai/dsh-tool-fs-search'
+  config:
+    sampleOverCapGlobResults: false
+
+- id: screenplay-agent
+  name: dsh-short-drama/agent
+
+- id: skill-filesystem
+  name: '@deepseek-ai/dsh-skill-filesystem'
+  config:
+    customSkillDirs:
+      - !!js "process.getBuiltinModule('node:url').fileURLToPath(new URL('skills/', baseUrl))"
+
+- id: tool-skill
+  name: '@deepseek-ai/dsh-tool-skill'
+
+- id: tool-ask-user
+  name: '@deepseek-ai/dsh-tool-ask-user'
+
+- id: tool-todo
+  name: '@deepseek-ai/dsh-tool-todo'
+  config:
+    allowParallelInProgress: false
+
+- id: planning
+  name: cordis:group
+  group: true
+  isolate:
+    planMode: true
+  config:
+    - id: plan-mode
+      name: '@deepseek-ai/dsh-plan-mode'
+      config:
+        section: |
+          Use plan mode for complex project changes or major creative forks. Keep the plan separate from creative authority: the user decides the story, while the plan records executable work. Explore the current project before acting and leave plan mode only after the user approves the plan.
+
+- id: review-lens
+  name: '@deepseek-ai/dsh-tool-subagent'
+  config:
+    provider: spawn
+    toolName: screenplay_review_lens
+    backgroundMode: one-shot
+    persona: |-
+      You are a read-only screenplay review lens. Read the bound project and return
+      evidence-based channel-B observations and alternatives. Never write files,
+      commit artifacts, ask the user to choose, or decide the story.
+    toolFilter:
+      allow:
+        - read
+        - read_image
+        - glob
+        - grep

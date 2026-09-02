@@ -321,6 +321,28 @@ describe('ui-agent-preset apply', () => {
     conversation()
   })
 
+  it('waits for conversation child slots declared after the required services', async () => {
+    const { ctx, slots } = await bench()
+    declareRoot(slots)
+    ctx.provide('conversation', {} as never)
+    ctx.provide('sessions', sessionsDouble({ byId: {} }) as never)
+    ctx.provide('workspaces', workspacesDouble() as never)
+    const fiber = ctx.plugin({ inject: [...inject, 'conversation', 'sessions', 'workspaces'], apply })
+
+    await fiber.await()
+    expect(slots.entries('conversation.hero.agentPreset')).toHaveLength(0)
+    expect(slots.entries('conversation.session.header.actions')).toHaveLength(0)
+
+    const conversation = declareConversation(slots)
+    expect(slots.entries('conversation.hero.agentPreset')[0]?.component).toBe(AgentPresetSeat)
+    expect(slots.entries('conversation.session.header.actions')[0]?.component).toBe(AgentPresetLabel)
+
+    conversation()
+    expect(slots.entries('conversation.hero.agentPreset')).toHaveLength(0)
+    expect(slots.entries('conversation.session.header.actions')).toHaveLength(0)
+    await fiber.dispose()
+  })
+
   it('moves the chip when the default changes on the settings surface', async () => {
     const { ctx, slots, moveDefault } = await bench()
     declareRoot(slots)

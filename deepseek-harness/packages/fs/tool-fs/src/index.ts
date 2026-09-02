@@ -23,6 +23,8 @@ export const inject = ['tools', 'fs', 'systemPrompt']
 
 /** Plugin config (all optional — `Config` supplies the defaults). */
 export interface Config {
+  /** Whether this composition exposes the mutating `write` and `edit` tools. */
+  allowMutations?: boolean
   /** Default and maximum number of lines returned by one `read` call. */
   readLimit?: number
   /** Maximum characters returned for a single line before truncation. */
@@ -34,6 +36,7 @@ export interface Config {
 }
 
 export const Config: z<Config> = z.object({
+  allowMutations: z.boolean().default(true),
   readLimit: z.number().default(READ_LIMIT),
   readMaxLineLength: z.number().default(READ_MAX_LINE_LENGTH),
   readMaxBytes: z.number().default(READ_MAX_BYTES),
@@ -70,10 +73,12 @@ export function apply(ctx: Context, config: Config): void {
   ctx.inject(['attachments'], (imageCtx) => {
     applyReadImageTool(imageCtx)
   })
-  // One escalation API shared by both mutating tools: advertisement gating,
-  // per-call policy resolution, and denial-marker mapping, all keyed off whether
-  // the mounted ctx.fs confines (ctx.fs.sandboxMode).
-  const sandbox = new FsSandboxController(ctx)
-  applyWriteTool(ctx, sandbox)
-  applyEditTool(ctx, sandbox)
+  if (resolved.allowMutations) {
+    // One escalation API shared by both mutating tools: advertisement gating,
+    // per-call policy resolution, and denial-marker mapping, all keyed off whether
+    // the mounted ctx.fs confines (ctx.fs.sandboxMode).
+    const sandbox = new FsSandboxController(ctx)
+    applyWriteTool(ctx, sandbox)
+    applyEditTool(ctx, sandbox)
+  }
 }

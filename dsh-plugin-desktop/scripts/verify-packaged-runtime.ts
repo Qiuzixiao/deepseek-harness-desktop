@@ -53,6 +53,9 @@ export const REQUIRED_PACKAGED_RUNTIME_ENTRIES = [
   'node_modules/@deepseek-ai/dsh/lib/bin.js',
   'node_modules/@deepseek-ai/dsh-web-frontend/dist/index.html',
   'node_modules/@deepseek-ai/dsh-app-boot/lib/index.js',
+  'node_modules/@deepseek-ai/dsh-client-ui-short-drama/package.json',
+  'node_modules/@deepseek-ai/dsh-client-ui-short-drama/lib/index.js',
+  'node_modules/@deepseek-ai/dsh-client-ui-short-drama/lib/client.js',
   'node_modules/pnpm/bin/pnpm.mjs',
 ] as const
 
@@ -84,9 +87,12 @@ export const REQUIRED_UNPACKED_RUNTIME_ENTRIES = [
   'resources/agent-presets/cordis/agent.cordis.yml',
   'resources/agent-presets/cordis/skills/cordis-plugin-development/SKILL.md',
   'resources/agent-presets/cordis/skills/editing-cordis-compositions/SKILL.md',
-  'resources/agent-presets/screenplay-v1/agent.cordis.yml',
+  'resources/agent-presets/short-drama/agent.cordis.yml',
   'node_modules/@deepseek-ai/dsh/lib/bin.js',
   'node_modules/@deepseek-ai/dsh-app-boot/lib/index.js',
+  'node_modules/@deepseek-ai/dsh-client-ui-short-drama/package.json',
+  'node_modules/@deepseek-ai/dsh-client-ui-short-drama/lib/index.js',
+  'node_modules/@deepseek-ai/dsh-client-ui-short-drama/lib/client.js',
   'node_modules/@deepseek-ai/dsh-web-frontend/dist/index.html',
   'node_modules/pnpm/bin/pnpm.mjs',
 ] as const
@@ -121,6 +127,7 @@ export const REQUIRED_UNPACKED_PACKAGE_SPECIFIERS = [
   '@deepseek-ai/dsh-base/package.json',
   '@deepseek-ai/schemastery/package.json',
   '@deepseek-ai/dsh-web-app/package.json',
+  '@deepseek-ai/dsh-client-ui-short-drama/package.json',
 ] as const
 
 /** Injectable archive listing seam used by focused tests. */

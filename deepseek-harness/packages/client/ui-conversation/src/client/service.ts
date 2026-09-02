@@ -14,10 +14,11 @@ import type { Context } from '@deepseek-ai/cordis'
 // method) instead of the standalone helper.
 import type { ISessions, SessionFace, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ImageAttachmentRef, ImageMediaType } from '@deepseek-ai/dsh-attachment'
-import type { ComposerAttachment } from './contract/slots.ts'
+import type { ComposerAttachment, ComposerDocumentAttachment, ComposerImageAttachment } from './contract/slots.ts'
 import type { QueueAction, QueueItemId } from './contract/queue.ts'
 import type { ComposerBlocks } from './input/blocks.ts'
 import type { DraftAttachmentId, SessionInputResolver } from './input/contract.ts'
+import type { SessionInputShell } from './input/facade.ts'
 import type { InputSubmitMode } from './contract/composer-submission.ts'
 
 /**
@@ -59,13 +60,23 @@ export interface IConversation {
 }
 
 /** Create one browser-only draft descriptor; only its id enters input state. */
-function browserDraftAttachment(file: File): ComposerAttachment {
+function browserDraftAttachment(file: File): ComposerImageAttachment {
   return {
     kind: 'image',
     id: crypto.randomUUID() as DraftAttachmentId,
     previewUrl: URL.createObjectURL(file),
     file,
   }
+}
+
+const IMAGE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif'])
+
+function isImageFile(file: File): boolean {
+  const mime = file.type.trim().toLowerCase()
+  if (IMAGE_MIME_TYPES.has(mime)) return true
+  const dot = file.name.lastIndexOf('.')
+  return dot >= 0 && IMAGE_EXTENSIONS.has(file.name.slice(dot + 1).toLowerCase())
 }
 
 interface ImageUrlEntry {
@@ -145,12 +156,19 @@ export class ConversationController extends Service implements IConversation {
     imageIds: readonly DraftAttachmentId[],
     mode: InputSubmitMode,
   ): Promise<void> {
-    const attachments = this.draftImages(imageIds)
+    const attachments = this.draftAttachmentsFor(imageIds)
     if (attachments.length !== imageIds.length) {
       throw new Error('conversation.sendSession: one or more draft images are no longer available')
     }
-    const uploaded = await this.serializeImages(attachments.map(attachment => attachment.file))
-    const content = [...uploaded, ...(text === '' ? [] : [{ type: 'text' as const, text }])]
+    const content: Parameters<SessionFace['prompt']>[0] = []
+    for (const attachment of attachments) {
+      if (attachment.kind === 'image') content.push(...await this.serializeImages([attachment.file]))
+      else {
+        const path = attachment.relativePath ?? attachment.ref
+        content.push({ type: 'text', text: `<file_reference path="${escapeFileReferencePath(path)}"></file_reference>` })
+      }
+    }
+    if (text !== '') content.push({ type: 'text', text })
     const result = await session.prompt(content, mode)
     if (!result.ok) throw new Error(`conversation.send failed: ${result.error.code}: ${result.error.message}`)
     this.releaseDraftImages(attachments)
@@ -161,14 +179,83 @@ export class ConversationController extends Service implements IConversation {
    * @param files - browser files to register after MIME validation.
    * @returns ordered draft descriptors.
    */
-  createDraftImages(files: readonly File[]): readonly ComposerAttachment[] {
-    for (const file of files) imageMediaType(file.type)
+  createDraftImages(files: readonly File[]): readonly ComposerImageAttachment[] {
+    for (const file of files) imageMediaType(file.type, file.name)
     return files.map((file) => {
       const attachment = browserDraftAttachment(file)
       this.draftAttachments.set(attachment.id, attachment)
       this.createdImageUrls.add(attachment.previewUrl)
       return attachment
     })
+  }
+
+  createDraftDocument(document: Omit<ComposerDocumentAttachment, 'id' | 'kind'>): DraftAttachmentId {
+    const attachment: ComposerDocumentAttachment = {
+      kind: 'document',
+      id: crypto.randomUUID() as DraftAttachmentId,
+      ...document,
+    }
+    this.draftAttachments.set(attachment.id, attachment)
+    return attachment.id
+  }
+
+  createDraftDocumentRecord(document: Omit<ComposerDocumentAttachment, 'id' | 'kind'>): ComposerDocumentAttachment {
+    const id = this.createDraftDocument(document)
+    return this.draftAttachments.get(id) as ComposerDocumentAttachment
+  }
+
+  updateDraftDocument(id: DraftAttachmentId, patch: Partial<Omit<ComposerDocumentAttachment, 'id' | 'kind'>>, shell: SessionInputShell): void {
+    const current = this.draftAttachments.get(id)
+    if (current?.kind !== 'document') return
+    this.draftAttachments.set(id, { ...current, ...patch, kind: 'document', id })
+    shell.refreshAttachments()
+  }
+
+  /** Unified browser intake for local images and server-backed documents. */
+  async intakeFiles(session: SessionFace, files: readonly File[], shell: SessionInputShell): Promise<void> {
+    const imageFiles = files.filter(file => isImageFile(file))
+    if (imageFiles.length > 0) {
+      try {
+        const images = this.createDraftImages(imageFiles)
+        if (!shell.addAttachments(images.map(image => image.id))) this.releaseDraftImages(images)
+      } catch (error) {
+        shell.notify('error', error instanceof Error ? error.message : String(error))
+      }
+    }
+    for (const file of files) {
+      if (isImageFile(file)) continue
+      const extension = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.') + 1).toLowerCase() : 'file'
+      const id = shell.addDocument({
+        ref: '',
+        name: file.name,
+        extension,
+        bytes: file.size,
+        status: 'uploading',
+      })
+      if (id === null) continue
+      try {
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'x-file-name': encodeURIComponent(file.name), 'x-session-id': session.sessionId },
+          body: file,
+        })
+        if (!response.ok) throw new Error(`upload failed (${response.status})`)
+        const payload = await response.json() as { path?: string; name?: string; bytes?: number; relativePath?: string }
+        if (typeof payload.path !== 'string') throw new Error('upload response missing path')
+        const name = payload.name ?? file.name
+        shell.updateDocument(id, {
+          ref: payload.path,
+          ...(typeof payload.relativePath === 'string' ? { relativePath: payload.relativePath } : {}),
+          name,
+          bytes: payload.bytes ?? file.size,
+          status: 'ready',
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        shell.updateDocument(id, { status: 'error', error: message })
+        shell.notify('error', `${file.name}: ${message}`)
+      }
+    }
   }
 
   /**
@@ -185,16 +272,45 @@ export class ConversationController extends Service implements IConversation {
     return attachments
   }
 
+  draftAttachmentsFor(ids: readonly DraftAttachmentId[]): readonly ComposerAttachment[] {
+    return ids.flatMap(id => {
+      const attachment = this.draftAttachments.get(id)
+      return attachment === undefined ? [] : [attachment]
+    })
+  }
+
   /**
    * Release one browser-owned draft image and preview URL.
    * @param id - draft attachment id.
    */
   releaseDraftImage(id: DraftAttachmentId): void {
     const attachment = this.draftAttachments.get(id)
-    if (attachment === undefined) return
+    if (attachment === undefined || attachment.kind !== 'image') return
     this.draftAttachments.delete(id)
     this.createdImageUrls.delete(attachment.previewUrl)
     revokePreview(attachment.previewUrl)
+  }
+
+  releaseDraftAttachment(id: DraftAttachmentId): void {
+    const attachment = this.draftAttachments.get(id)
+    if (attachment === undefined) return
+    this.draftAttachments.delete(id)
+    if (attachment.kind === 'image') {
+      this.createdImageUrls.delete(attachment.previewUrl)
+      revokePreview(attachment.previewUrl)
+    }
+  }
+
+  /** Remove a draft attachment locally and, for documents, from upload storage. */
+  removeDraftAttachment(sessionId: SessionId, id: DraftAttachmentId): void {
+    const attachment = this.draftAttachments.get(id)
+    if (attachment?.kind === 'document' && attachment.ref !== '') {
+      void fetch('/api/upload', {
+        method: 'DELETE',
+        headers: { 'x-file-path': attachment.ref, 'x-session-id': sessionId },
+      }).catch(() => undefined)
+    }
+    this.releaseDraftAttachment(id)
   }
 
   /**
@@ -202,7 +318,7 @@ export class ConversationController extends Service implements IConversation {
    * @param attachments - descriptors to release.
    */
   releaseDraftImages(attachments: readonly ComposerAttachment[]): void {
-    for (const attachment of attachments) this.releaseDraftImage(attachment.id)
+    for (const attachment of attachments) this.releaseDraftAttachment(attachment.id)
   }
 
   /**
@@ -316,23 +432,44 @@ export class ConversationController extends Service implements IConversation {
   private serializeImages(images: readonly File[]): Promise<Parameters<SessionFace['prompt']>[0]> {
     return Promise.all(images.map(async file => ({
       type: 'image' as const,
-      mediaType: imageMediaType(file.type),
+      mediaType: imageMediaType(file.type, file.name),
       data: bytesToBase64(new Uint8Array(await file.arrayBuffer())),
       ...(file.name === '' ? {} : { name: file.name }),
     })))
   }
 }
 
-function imageMediaType(value: string): ImageMediaType {
-  switch (value) {
+const IMAGE_MEDIA_TYPES: Readonly<Record<string, ImageMediaType>> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp',
+  gif: 'image/gif',
+}
+
+function imageMediaType(value: string, name?: string): ImageMediaType {
+  switch (value.trim().toLowerCase()) {
     case 'image/png':
     case 'image/jpeg':
     case 'image/webp':
     case 'image/gif':
-      return value
-    default:
-      throw new UnsupportedImageMediaTypeError(value)
+      return value.trim().toLowerCase() as ImageMediaType
   }
+  if (value.trim() === '' && name !== undefined) {
+    const dot = name.lastIndexOf('.')
+    const inferred = dot === -1 ? undefined : IMAGE_MEDIA_TYPES[name.slice(dot + 1).toLowerCase()]
+    if (inferred !== undefined) return inferred
+  }
+  throw new UnsupportedImageMediaTypeError(value)
+}
+
+function escapeFileReferencePath(value: string): string {
+  return value.replace(/[&<>"]/gu, character => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+  })[character] ?? character)
 }
 
 function bytesToBase64(data: Uint8Array): string {

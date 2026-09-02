@@ -14,6 +14,7 @@ export type {
   AttachmentId as AttachmentIdType,
   ImageAttachmentLimits,
   ImageAttachmentRef,
+  EncodedImageAttachment,
   ImageMediaType,
   SaveImageAttachment,
   StoredImageAttachment,
