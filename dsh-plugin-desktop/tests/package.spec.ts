@@ -82,12 +82,12 @@ describe('published package surface', () => {
 
   it('runs all runtime workspace typechecks from the root command', () => {
     expect(workspaceManifest.scripts?.typecheck)
-      .toBe('yarn workspace dsh-file-upload typecheck && yarn workspace dsh-short-drama typecheck && yarn workspace dsh-plugin-desktop typecheck && yarn workspace dsh-community-market typecheck')
+      .toBe('yarn workspace dsh-file-upload typecheck && yarn workspace dsh-short-drama typecheck && yarn workspace dsh-skill-authoring typecheck && yarn workspace dsh-plugin-desktop typecheck && yarn workspace dsh-community-market typecheck')
   })
 
   it('runs all runtime workspace tests from the root command', () => {
     expect(workspaceManifest.scripts?.test)
-      .toBe('yarn workspace dsh-file-upload test && yarn workspace dsh-short-drama test && yarn workspace dsh-plugin-desktop test && yarn workspace dsh-community-market test')
+      .toBe('yarn workspace dsh-file-upload test && yarn workspace dsh-short-drama test && yarn workspace dsh-skill-authoring test && yarn workspace dsh-plugin-desktop test && yarn workspace dsh-community-market test')
   })
 
   it('registers both npm launcher names', () => {
@@ -694,13 +694,13 @@ describe('published package surface', () => {
     expect(manifest.scripts?.['verify:cli']).toBe('node scripts/verify-cli-runtime.mjs')
     expect(manifest.scripts?.check).toContain('yarn run verify:cli')
     expect(workspaceManifest.scripts?.['dist:mac'])
-      .toBe('yarn source:build && yarn workspace dsh-file-upload build && yarn workspace dsh-short-drama build && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac')
+      .toBe('yarn source:build && yarn workspace dsh-file-upload build && yarn workspace dsh-short-drama build && yarn workspace dsh-skill-authoring build && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac')
     expect(workspaceManifest.scripts?.['dist:mac-smoke'])
-      .toBe('yarn source:build && yarn workspace dsh-file-upload build && yarn workspace dsh-short-drama build && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac-smoke')
+      .toBe('yarn source:build && yarn workspace dsh-file-upload build && yarn workspace dsh-short-drama build && yarn workspace dsh-skill-authoring build && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac-smoke')
     expect(workspaceManifest.scripts?.['dist:win'])
-      .toBe('yarn source:build && yarn workspace dsh-file-upload build && yarn workspace dsh-short-drama build && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win')
+      .toBe('yarn source:build && yarn workspace dsh-file-upload build && yarn workspace dsh-short-drama build && yarn workspace dsh-skill-authoring build && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win')
     expect(workspaceManifest.scripts?.['dist:win-portable'])
-      .toBe('yarn source:build && yarn workspace dsh-file-upload build && yarn workspace dsh-short-drama build && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win-portable')
+      .toBe('yarn source:build && yarn workspace dsh-file-upload build && yarn workspace dsh-short-drama build && yarn workspace dsh-skill-authoring build && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win-portable')
     expect(manifest.build?.afterPack).toBe('./scripts/verify-packaged-runtime.ts')
     expect(manifest.build?.mac).toEqual(expect.objectContaining({
       extendInfo: {

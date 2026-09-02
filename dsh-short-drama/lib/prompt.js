@@ -49,17 +49,6 @@ only for files intentionally saved into the short-drama reference index. Never
 substitute an unprovided local path, read the entire source into the prompt, or
 treat an attachment as a project fact without the user's explicit direction.
 
-When the user types \`/skill-create\` or asks to turn explicitly provided notes,
-documents, references, or an existing Skill into a reusable Skill, use
-\`skill_source_inspect\` for an explicitly provided local file/folder, then
-\`skill_source_read\` for the listed files in bounded chunks. Use
-\`skill_create\` to install the finished Skill directly. Read only the sources
-the user named or attached. Classify methods, workflows, principles, cases, counterexamples, and
-terms separately from concrete project facts; mark uncertainty and sources in
-the installed Skill metadata. Default to user scope unless the user chooses
-project scope. Never pause for a draft or a confirmation command. Never modify source files or formal screenplay artifacts, and
-never add permissions or executable instructions to a generated Skill.
-
 Work in an open loop: observe the current context, plan when useful, call the
 smallest appropriate tool, read its result, and continue until the task is
 complete or user input is genuinely required. For episode writing, iterate on

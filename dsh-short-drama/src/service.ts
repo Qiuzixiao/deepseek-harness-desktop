@@ -1,8 +1,7 @@
 import { readFileSync, statSync } from 'node:fs'
-import { mkdir, readFile, realpath, stat, writeFile } from 'node:fs/promises'
+import { mkdir, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep } from 'node:path'
 import { type Context, Service } from '@deepseek-ai/cordis'
-import type { ScopeKey } from '@deepseek-ai/dsh-scope'
 import type { Session } from '@deepseek-ai/dsh-session'
 import { ScreenplayError } from './errors.js'
 import {
@@ -12,8 +11,6 @@ import {
 } from './layout.js'
 import { ScreenplayProjectStore } from './store.js'
 import { ScreenplayReferenceStore } from './references/store.js'
-import { SkillAuthoringStore, type CreateSkillDraftInput, type InstallSkillInput, type PublishSkillInput, type UpdateSkillDraftInput } from './skill-authoring.js'
-import { inspectSkillSource, readSkillSource } from './skill-source.js'
 import type { ReferenceDocumentPage, ReferencePreview, ReferenceUploadFile } from './references/types.js'
 import type {
   CreateOutlineBundleInput,
@@ -38,11 +35,6 @@ import type {
 declare module '@deepseek-ai/cordis' {
   interface Context {
     screenplayProjects: ScreenplayProjectService
-  }
-
-  interface Events {
-    /** Notify desktop Skill catalogs after a direct installation. */
-    'skills/change'(): void
   }
 }
 
@@ -163,10 +155,9 @@ export class ScreenplayProjectService extends Service {
   private readonly summaries = new Map<string, ScreenplayProjectionValue>()
   private readonly bindings = new Map<string, ScreenplayProjectBinding>()
   private readonly referenceStores = new Map<string, ScreenplayReferenceStore>()
-  private readonly skillAuthors = new Map<string, SkillAuthoringStore>()
   private readonly episodeDrafts = new Map<string, EpisodeDraft>()
 
-  constructor(private readonly context: Context) {
+  constructor(context: Context) {
     super(context, 'screenplayProjects')
   }
 
@@ -309,14 +300,6 @@ export class ScreenplayProjectService extends Service {
     const projectRoot = this.referenceProjectRootForSession(session)
     if (projectRoot === undefined) return ''
     return this.referenceStoreForSession(session).contextSummary()
-  }
-
-  async inspectSkillSourceForSession(_session: Session, path: string): Promise<Record<string, unknown>> {
-    return inspectSkillSource(path)
-  }
-
-  async readSkillSourceForSession(_session: Session, path: string, offset?: number, limit?: number): Promise<Record<string, unknown>> {
-    return readSkillSource(path, offset, limit)
   }
 
   async snapshotForSession(
@@ -545,47 +528,6 @@ export class ScreenplayProjectService extends Service {
     return this.store(workspaceRoot).writingContext()
   }
 
-  async createSkillDraftForSession(session: Session, input: CreateSkillDraftInput) {
-    const projectRoot = this.projectRootForSession(session)
-    if (projectRoot === undefined) throw new ScreenplayError('INVALID_WORKSPACE', 'no screenplay project is bound to this session')
-    return this.skillAuthoringForProject(projectRoot).createDraft(input)
-  }
-
-  async installSkillForSession(session: Session, input: InstallSkillInput) {
-    const projectRoot = this.projectRootForSession(session)
-    if (projectRoot === undefined) throw new ScreenplayError('INVALID_WORKSPACE', 'no screenplay project is bound to this session')
-    const installed = await this.skillAuthoringForProject(projectRoot).install(input)
-    // The authoring store writes directly to disk, so no filesystem mutation
-    // event is guaranteed to reach the Skill watcher before the UI asks again.
-    // Emit the registry's standard invalidation signal immediately.
-    this.context.emit('skills/change')
-    return installed
-  }
-
-  async inspectSkillForSession(session: Session, draftId?: string, name?: string) {
-    const projectRoot = this.projectRootForSession(session)
-    if (projectRoot === undefined) throw new ScreenplayError('INVALID_WORKSPACE', 'no screenplay project is bound to this session')
-    return this.skillAuthoringForProject(projectRoot).inspect(draftId, name)
-  }
-
-  async publishSkillForSession(session: Session, input: PublishSkillInput) {
-    const projectRoot = this.projectRootForSession(session)
-    if (projectRoot === undefined) throw new ScreenplayError('INVALID_WORKSPACE', 'no screenplay project is bound to this session')
-    return this.skillAuthoringForProject(projectRoot).publish(input)
-  }
-
-  async updateSkillDraftForSession(session: Session, input: UpdateSkillDraftInput) {
-    const projectRoot = this.projectRootForSession(session)
-    if (projectRoot === undefined) throw new ScreenplayError('INVALID_WORKSPACE', 'no screenplay project is bound to this session')
-    return this.skillAuthoringForProject(projectRoot).updateDraft(input)
-  }
-
-  async discardSkillDraftForSession(session: Session, draftId: string) {
-    const projectRoot = this.projectRootForSession(session)
-    if (projectRoot === undefined) throw new ScreenplayError('INVALID_WORKSPACE', 'no screenplay project is bound to this session')
-    return this.skillAuthoringForProject(projectRoot).discardDraft(draftId)
-  }
-
   async readProjectContextForSession(session: Session): Promise<ScreenplayProjectSnapshot> {
     return this.snapshotForSession(session, 'summary')
   }
@@ -626,80 +568,6 @@ export class ScreenplayProjectService extends Service {
       })
     }
     return { ok: true, query, revision: snapshot.revision, matches }
-  }
-
-  /**
-   * Read one relative resource from a Skill that is visible to the calling
-   * Agent. Skill resources are deliberately separate from project artifacts:
-   * the caller must name the Skill and cannot turn this into an arbitrary file
-   * reader by supplying an absolute path or parent traversal.
-   */
-  async readSkillReferenceForSession(
-    session: Session,
-    skillName: string,
-    resourcePath: string,
-    scope: ScopeKey,
-  ): Promise<Record<string, unknown>> {
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(skillName)) {
-      throw new ScreenplayError('INVALID_INPUT', 'skill name must use kebab-case', { skillName })
-    }
-    if (resourcePath.trim().length === 0 || isAbsolute(resourcePath)
-      || resourcePath.split(/[\\/]/u).includes('..')) {
-      throw new ScreenplayError(
-        'INVALID_WORKSPACE',
-        'Skill resource path must be a non-empty path relative to that Skill and cannot contain parent traversal',
-        { skillName, resourcePath },
-      )
-    }
-    const getService = (this.context as unknown as { get?: unknown }).get
-    const resolver = (typeof getService === 'function'
-      ? (getService as (name: string) => unknown).call(this.context, 'skills')
-      : undefined) as {
-      get?: (name: string, options: { cwd?: string, signal?: AbortSignal, scope?: ScopeKey }) => Promise<{
-        name: string
-        provider: string
-        resourceBase?: { kind: string, path?: string }
-      } | undefined>
-    } | undefined
-    if (resolver?.get === undefined) {
-      throw new ScreenplayError('INVALID_STATE', 'Skill filesystem provider is not available')
-    }
-    const projectRoot = this.projectRootForSession(session) ?? session.header.cwd
-    const skill = await resolver.get(skillName, {
-      ...(projectRoot === undefined ? {} : { cwd: projectRoot }),
-      scope,
-    })
-    if (skill === undefined) {
-      throw new ScreenplayError('INVALID_INPUT', `Skill "${skillName}" is not available in this Session`, { skillName })
-    }
-    const resourceBase = skill.resourceBase
-    if (resourceBase?.kind !== 'directory' || typeof resourceBase.path !== 'string' || !isAbsolute(resourceBase.path)) {
-      throw new ScreenplayError('INVALID_WORKSPACE', 'this Skill does not expose local directory resources', { skillName })
-    }
-    const base = await realpath(resourceBase.path)
-    const target = resolve(base, resourcePath.replaceAll('\\', '/'))
-    const resolvedTarget = await realpath(target)
-    const baseRelative = relative(base, resolvedTarget)
-    if (baseRelative === '..' || baseRelative.startsWith(`..${sep}`) || isAbsolute(baseRelative)) {
-      throw new ScreenplayError('INVALID_WORKSPACE', 'Skill resource path escapes its resourceBase', {
-        skillName,
-        resourcePath,
-      })
-    }
-    const content = await readFile(resolvedTarget, 'utf8')
-    if (content.length > 1024 * 1024) {
-      throw new ScreenplayError('INVALID_INPUT', 'Skill reference is larger than the 1 MiB read limit', {
-        skillName,
-        resourcePath,
-      })
-    }
-    return {
-      ok: true,
-      skill: skill.name,
-      provider: skill.provider,
-      path: resourcePath.replaceAll('\\', '/'),
-      content,
-    }
   }
 
   async writeSceneForSession(
@@ -916,16 +784,6 @@ export class ScreenplayProjectService extends Service {
     if (store === undefined) {
       store = new ScreenplayProjectStore(workspaceRoot, detectScreenplayLayout(workspaceRoot))
       this.stores.set(workspaceRoot, store)
-    }
-    return store
-  }
-
-  private skillAuthoringForProject(projectRoot: string): SkillAuthoringStore {
-    const root = absoluteRoot(projectRoot, 'projectRoot')
-    let store = this.skillAuthors.get(root)
-    if (store === undefined) {
-      store = new SkillAuthoringStore(root)
-      this.skillAuthors.set(root, store)
     }
     return store
   }

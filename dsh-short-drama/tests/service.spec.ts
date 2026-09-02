@@ -1,10 +1,9 @@
-import { mkdir, readFile, readdir, rm, mkdtemp, stat, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rm, mkdtemp, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { CallId } from '@deepseek-ai/dsh-llm'
-import type { ScopeKey } from '@deepseek-ai/dsh-scope'
 import { Session } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineTool } from '@deepseek-ai/dsh-tools'
@@ -207,46 +206,6 @@ describe('ScreenplayProjectService scene authoring', () => {
       endingState: '照片仍未交出',
       openLoops: ['最后一张照片在哪里'],
     })).resolves.toEqual(committed)
-  })
-
-  it('reads only a relative resource from the loaded Skill resourceBase', async () => {
-    const parent = await mkdtemp(join(tmpdir(), 'screenplay-skill-reference-'))
-    roots.push(parent)
-    const skillRoot = await mkdtemp(join(tmpdir(), 'screenplay-skill-root-'))
-    roots.push(skillRoot)
-    await mkdir(join(skillRoot, 'references'))
-    await writeFile(join(skillRoot, 'references', 'lens.md'), 'optional lens')
-    const outsideRoot = await mkdtemp(join(tmpdir(), 'screenplay-skill-outside-'))
-    roots.push(outsideRoot)
-    await writeFile(join(outsideRoot, 'secret.md'), 'outside secret')
-    await symlink(outsideRoot, join(skillRoot, 'escaped'))
-    const current = session('skill-reference', parent)
-    const skillScope: ScopeKey = {}
-    let observedScope: ScopeKey | undefined
-    const context = {
-      reflect: { provide() {} },
-      get(name: string) {
-        if (name !== 'skills') return undefined
-        return {
-          get: async (_skillName: string, options: { scope?: ScopeKey }) => {
-            observedScope = options.scope
-            return ({
-            name: 'review-lens',
-            provider: 'filesystem',
-            resourceBase: { kind: 'directory', path: skillRoot },
-            })
-          },
-        }
-      },
-    } as unknown as Context
-    const service = new ScreenplayProjectService(context)
-    await expect(service.readSkillReferenceForSession(current, 'review-lens', 'references/lens.md', skillScope))
-      .resolves.toMatchObject({ ok: true, content: 'optional lens' })
-    expect(observedScope).toBe(skillScope)
-    await expect(service.readSkillReferenceForSession(current, 'review-lens', '../secret.md', skillScope))
-      .rejects.toMatchObject({ code: 'INVALID_WORKSPACE' })
-    await expect(service.readSkillReferenceForSession(current, 'review-lens', 'escaped/secret.md', skillScope))
-      .rejects.toMatchObject({ code: 'INVALID_WORKSPACE' })
   })
 
   it('rejects project-relative traversal in domain artifact reads', async () => {

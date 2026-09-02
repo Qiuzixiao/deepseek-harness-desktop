@@ -23,6 +23,7 @@ const integratedSourceOverrides = new Map([
 const desktopWorkspaceDependencies = new Map([
   ['dsh-file-upload', 'workspace:*'],
   ['dsh-short-drama', 'workspace:*'],
+  ['dsh-skill-authoring', 'workspace:*'],
 ])
 
 if (workspace.packageManager !== 'yarn@4.18.0') {
@@ -32,10 +33,11 @@ if (JSON.stringify(workspace.workspaces) !== JSON.stringify([
   'dsh-plugin-desktop',
   'dsh-file-upload',
   'dsh-short-drama',
+  'dsh-skill-authoring',
   'dsh-community-fabric',
   'dsh-community-market',
 ])) {
-  fail('the root Yarn workspace must contain the desktop, file-upload, short-drama, community-fabric, and community-market packages')
+  fail('the root Yarn workspace must contain the desktop, file-upload, short-drama, skill-authoring, community-fabric, and community-market packages')
 }
 for (const [name, manifest] of [
   ['dsh-plugin-desktop', plugin],

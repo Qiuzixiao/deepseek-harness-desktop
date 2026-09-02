@@ -1,6 +1,6 @@
 import { readdir, readFile, realpath, stat } from 'node:fs/promises'
 import { basename, extname, isAbsolute, relative, resolve, sep } from 'node:path'
-import { parseReferenceDocument } from './references/parser.js'
+import { parseSkillSource } from './parser.js'
 
 const MAX_FILES = 500
 const MAX_FILE_BYTES = 20 * 1024 * 1024
@@ -74,7 +74,7 @@ export async function readSkillSource(path: string, offset = 0, limit = 50_000):
   if (target.info.size > MAX_FILE_BYTES) throw new Error(`文件超过 ${String(MAX_FILE_BYTES)} 字节限制`)
   if (!Number.isInteger(offset) || offset < 0) throw new Error('offset 必须是非负整数')
   if (!Number.isInteger(limit) || limit < 1 || limit > MAX_READ_CHARS) throw new Error(`limit 必须在 1-${String(MAX_READ_CHARS)} 之间`)
-  const parsed = await parseReferenceDocument(basename(target.path), await readFile(target.path))
+  const parsed = await parseSkillSource(basename(target.path), await readFile(target.path))
   const content = parsed.content.slice(offset, offset + limit)
   return {
     path: target.path,

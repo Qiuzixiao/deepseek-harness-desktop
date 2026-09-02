@@ -1,26 +1,18 @@
 import { type Context, Service } from '@deepseek-ai/cordis';
-import type { ScopeKey } from '@deepseek-ai/dsh-scope';
 import type { Session } from '@deepseek-ai/dsh-session';
-import { type CreateSkillDraftInput, type InstallSkillInput, type PublishSkillInput, type UpdateSkillDraftInput } from './skill-authoring.js';
 import type { ReferenceDocumentPage, ReferencePreview, ReferenceUploadFile } from './references/types.js';
 import type { CreateOutlineBundleInput, CreateEpisodeScreenplayInput, CreateEpisodeOutlineBatchInput, CreateScreenplayArtifactsInput, EpisodeDiagnosisResult, EpisodeValidationResult, FinalizeOutlineBundleInput, RequirementsChanges, ScreenplayChangeInput, ScreenplayProjectBinding, ScreenplayProjectPreparation, ScreenplayProjectSnapshot, ScreenplayProjectionValue } from './types.js';
 declare module '@deepseek-ai/cordis' {
     interface Context {
         screenplayProjects: ScreenplayProjectService;
     }
-    interface Events {
-        /** Notify desktop Skill catalogs after a direct installation. */
-        'skills/change'(): void;
-    }
 }
 declare function projectionOf(snapshot: ScreenplayProjectSnapshot): ScreenplayProjectionValue;
 export declare class ScreenplayProjectService extends Service {
-    private readonly context;
     private readonly stores;
     private readonly summaries;
     private readonly bindings;
     private readonly referenceStores;
-    private readonly skillAuthors;
     private readonly episodeDrafts;
     constructor(context: Context);
     contextSummary(session: Session | undefined): string;
@@ -45,8 +37,6 @@ export declare class ScreenplayProjectService extends Service {
     readReferencePreviewForSession(session: Session, path: string): Promise<ReferencePreview>;
     readReferencePreviewForProject(projectRoot: string, path: string): Promise<ReferencePreview>;
     referenceContextSummaryForSession(session: Session): string;
-    inspectSkillSourceForSession(_session: Session, path: string): Promise<Record<string, unknown>>;
-    readSkillSourceForSession(_session: Session, path: string, offset?: number, limit?: number): Promise<Record<string, unknown>>;
     snapshotForSession(session: Session, view?: 'summary' | 'artifacts' | 'full' | 'contract'): Promise<ScreenplayProjectSnapshot>;
     /**
      * Persist the desktop launcher hand-off before the Agent's first turn. The
@@ -88,25 +78,9 @@ export declare class ScreenplayProjectService extends Service {
         snapshot: ScreenplayProjectSnapshot;
     }>;
     writingContext(workspaceRoot: string): Promise<Record<string, unknown>>;
-    createSkillDraftForSession(session: Session, input: CreateSkillDraftInput): Promise<import("./skill-authoring.js").SkillDraft>;
-    installSkillForSession(session: Session, input: InstallSkillInput): Promise<import("./skill-authoring.js").PublishedSkill>;
-    inspectSkillForSession(session: Session, draftId?: string, name?: string): Promise<import("./skill-authoring.js").SkillDraft | import("./skill-authoring.js").SkillInspection | undefined>;
-    publishSkillForSession(session: Session, input: PublishSkillInput): Promise<import("./skill-authoring.js").PublishedSkill>;
-    updateSkillDraftForSession(session: Session, input: UpdateSkillDraftInput): Promise<import("./skill-authoring.js").SkillDraft>;
-    discardSkillDraftForSession(session: Session, draftId: string): Promise<{
-        draftId: string;
-        discarded: true;
-    }>;
     readProjectContextForSession(session: Session): Promise<ScreenplayProjectSnapshot>;
     readArtifactForSession(session: Session, logicalPath: string): Promise<Record<string, unknown>>;
     searchProjectForSession(session: Session, query: string): Promise<Record<string, unknown>>;
-    /**
-     * Read one relative resource from a Skill that is visible to the calling
-     * Agent. Skill resources are deliberately separate from project artifacts:
-     * the caller must name the Skill and cannot turn this into an arbitrary file
-     * reader by supplying an absolute path or parent traversal.
-     */
-    readSkillReferenceForSession(session: Session, skillName: string, resourcePath: string, scope: ScopeKey): Promise<Record<string, unknown>>;
     writeSceneForSession(session: Session, episode: number, sceneNo: number, content: string): Promise<Record<string, unknown>>;
     validateEpisodeForSession(session: Session, episode: number): Promise<EpisodeValidationResult>;
     diagnoseEpisodeForSession(session: Session, episode: number): Promise<EpisodeDiagnosisResult>;
@@ -139,7 +113,6 @@ export declare class ScreenplayProjectService extends Service {
         snapshot: ScreenplayProjectSnapshot;
     }>;
     private store;
-    private skillAuthoringForProject;
     /**
      * Recover an initialized project for the exact Session workspace when the
      * session lacks a durable project-binding event. This deliberately does not

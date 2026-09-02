@@ -23,6 +23,10 @@
     # Project state, domain writes, validation, and Session-bound drafts.
     - id: screenplay-host
       name: dsh-short-drama
+    # Agent-independent Skill authoring: /skill-create entrypoint, standardized
+    # skill inspection/install/source-reading tools, and the Skill-only source scope guard.
+    - id: skill-authoring
+      name: dsh-skill-authoring
     - id: desktop-shell
       name: dsh-plugin-desktop
       config:
