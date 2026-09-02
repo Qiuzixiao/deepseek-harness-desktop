@@ -114,7 +114,14 @@ jobs:
         with:
           path: ${{ steps.yarn-cache.outputs.dir }}
           key: yarn-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('yarn.lock', '.yarnrc.yml') }}
-      - run: yarn install --immutable
+      # Yarn's file: archives for the nested Harness packages have
+      # platform-specific locator hashes on Windows. Resolve those local
+      # packages on the runner instead of rejecting the lockfile before the
+      # package-specific verification can run.
+      - name: Install root dependencies
+        env:
+          YARN_ENABLE_IMMUTABLE_INSTALLS: 'false'
+        run: yarn install
       - run: yarn source:install
       - run: yarn source:build
       - run: yarn workspace dsh-plugin-desktop check:win-package
