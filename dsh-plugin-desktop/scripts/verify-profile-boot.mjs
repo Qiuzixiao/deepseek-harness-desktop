@@ -264,8 +264,9 @@ try {
       },
       signal: new AbortController().signal,
     })
-    if (!unscoped.isError || unscoped.error.info?.code !== 'UNKNOWN_TOOL') {
-      throw new Error(`read_skill_reference was callable without the short-drama Agent scope: ${JSON.stringify(unscoped)}`)
+    if (!unscoped.isError
+      || !JSON.stringify(unscoped.error).includes('Session attached to a Workspace')) {
+      throw new Error(`read_skill_reference was callable without an Agent session scope: ${JSON.stringify(unscoped)}`)
     }
   } finally {
     await screenplayHandle.dispose()

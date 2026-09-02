@@ -10,5 +10,3 @@ export { ScreenplayReferenceStore } from './references/store.js';
 export type * from './references/types.js';
 export type * from './types.js';
 export * from './project-scope.js';
-export { SkillAuthoringStore } from './skill-authoring.js';
-export type * from './skill-authoring.js';

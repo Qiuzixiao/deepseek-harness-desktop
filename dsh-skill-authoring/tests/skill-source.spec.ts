@@ -27,4 +27,8 @@ describe('skill external sources', () => {
     await expect(readSkillSource(join(root, 'data.json'))).rejects.toThrow('只支持')
     await expect(readSkillSource(root)).rejects.toThrow('必须是文件')
   })
+
+  it('rejects a relative path passed to the inspector', async () => {
+    await expect(inspectSkillSource('relative/path')).rejects.toThrow('必须是绝对路径')
+  })
 })

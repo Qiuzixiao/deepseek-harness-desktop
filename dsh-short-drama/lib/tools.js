@@ -101,88 +101,6 @@ export function screenplayToolDefinitions(ctx) {
             ...presentation('搜索项目文件', 'read'),
         }),
         defineTool({
-            name: 'skill_inspect',
-            description: '检查已安装 Skill 的结构、来源和作用域。只读，不会修改项目资料或 Skill 文件。',
-            parameters: {
-                name: { type: 'string', required: true, description: '要检查的已有 Skill 名称。' },
-            },
-            output: { schema: { type: 'json' }, render: (_args, value) => text(value) },
-            isConcurrencySafe: () => true,
-            execute: async (args, exec) => toJson(await ctx.screenplayProjects.inspectSkillForSession(session(exec), undefined, args.name)),
-            ...presentation('检查 Skill', 'read'),
-        }),
-        defineTool({
-            name: 'skill_create',
-            description: '根据用户明确提供的资料直接安装 Skill。一次调用完成内容整理、结构校验和原子写入；默认安装到 user 作用域，不生成草稿、不需要确认指令，不声明额外文件、Shell、网络或正式项目写入权限。',
-            parameters: {
-                name: { type: 'string', required: true, description: 'kebab-case Skill 名称。' },
-                description: { type: 'string', required: true, description: 'Skill 简短说明。' },
-                whenToUse: { type: 'string', description: '触发描述。' },
-                scope: { type: 'string', enum: ['user', 'project'], description: '保存作用域；默认 user。' },
-                applicableTo: { type: 'array', items: { type: 'string' }, description: '适用题材或任务范围。' },
-                uncertainty: { type: 'array', items: { type: 'string' }, description: '证据不足或可能遗漏的说明。' },
-                instructions: { type: 'string', description: '根据实际资料编写的 Skill instructions。不要套用固定章节；只写会改变 Agent 决策的内容。' },
-                resources: {
-                    type: 'array',
-                    description: '按需生成的 supporting resources；path 相对于所选 kind 目录，若重复带有同名 kind 前缀会自动归一化。',
-                    items: {
-                        type: 'object',
-                        additionalProperties: false,
-                        properties: {
-                            kind: { type: 'string', enum: ['references', 'scripts', 'assets'], required: true },
-                            path: { type: 'string', required: true },
-                            content: { type: 'string', required: true },
-                        },
-                    },
-                },
-                sources: {
-                    type: 'array',
-                    items: {
-                        type: 'object',
-                        additionalProperties: false,
-                        properties: {
-                            sourceId: { type: 'string', required: true },
-                            label: { type: 'string', required: true },
-                            kind: { type: 'string', enum: ['project-file', 'reference-selection', 'version', 'user-note', 'attachment'], required: true },
-                            excerpt: { type: 'string' },
-                        },
-                    },
-                },
-                entries: {
-                    type: 'array',
-                    description: '从资料中分类后的候选经验。story-fact 或 reusable=false 的条目不会进入发布内容。',
-                    items: {
-                        type: 'object',
-                        additionalProperties: false,
-                        properties: {
-                            category: { type: 'string', enum: ['method', 'workflow', 'principle', 'case', 'counterexample', 'term', 'story-fact'], required: true },
-                            text: { type: 'string', required: true },
-                            reusable: { type: 'boolean', required: true },
-                            sourceIds: { type: 'array', items: { type: 'string' }, required: true },
-                        },
-                    },
-                },
-            },
-            output: { schema: { type: 'json' }, render: (_args, value) => text(value) },
-            execute: async (args, exec) => {
-                if (!Array.isArray(args.entries) && typeof args.instructions !== 'string')
-                    throw new ScreenplayError('INVALID_INPUT', '安装 Skill 需要 instructions 或资料分类 entries');
-                return toJson(await ctx.screenplayProjects.installSkillForSession(session(exec), {
-                    name: args.name,
-                    description: args.description,
-                    scope: args.scope ?? 'user',
-                    ...(args.whenToUse === undefined ? {} : { whenToUse: args.whenToUse }),
-                    ...(args.applicableTo === undefined ? {} : { applicableTo: args.applicableTo }),
-                    ...(args.entries === undefined ? {} : { entries: args.entries }),
-                    ...(args.instructions === undefined ? {} : { instructions: args.instructions }),
-                    ...(args.sources === undefined ? {} : { sources: args.sources }),
-                    ...(args.resources === undefined ? {} : { resources: args.resources }),
-                    ...(args.uncertainty === undefined ? {} : { uncertainty: args.uncertainty }),
-                }));
-            },
-            ...presentation('创建 Skill', 'edit'),
-        }),
-        defineTool({
             name: 'write_scene',
             description: 'Write or replace one scene in the current Session-local episode draft. This does not modify formal files.',
             parameters: {
@@ -202,30 +120,6 @@ export function screenplayToolDefinitions(ctx) {
             isConcurrencySafe: () => true,
             execute: async (args, exec) => toJson(await ctx.screenplayProjects.validateEpisodeForSession(session(exec), args.episode)),
             ...presentation('校验剧集', 'read'),
-        }),
-        defineTool({
-            name: 'skill_source_inspect',
-            description: '扫描用户在 /skill-create 中明确提供的本地文件或文件夹，只返回受控文件清单和大小；不会读取项目外的其他路径，也不会修改资料。',
-            parameters: {
-                path: { type: 'string', required: true, description: '用户明确提供的本地绝对路径。' },
-            },
-            output: { schema: { type: 'json' }, render: (_args, value) => text(value) },
-            isConcurrencySafe: () => true,
-            execute: async (args, exec) => toJson(await ctx.screenplayProjects.inspectSkillSourceForSession(session(exec), args.path)),
-            ...presentation('扫描 Skill 资料', 'read'),
-        }),
-        defineTool({
-            name: 'skill_source_read',
-            description: '读取已由 skill_source_inspect 列出的用户资料文件，按 offset/limit 返回受控文本；支持 TXT、Markdown、DOCX 和带文本层 PDF。',
-            parameters: {
-                path: { type: 'string', required: true, description: 'skill_source_inspect 返回清单中的文件绝对路径。' },
-                offset: { type: 'integer', description: '文本字符起点，默认 0。' },
-                limit: { type: 'integer', description: '最多返回字符数，默认 50000，最大 100000。' },
-            },
-            output: { schema: { type: 'json' }, render: (_args, value) => text(value) },
-            isConcurrencySafe: () => true,
-            execute: async (args, exec) => toJson(await ctx.screenplayProjects.readSkillSourceForSession(session(exec), args.path, args.offset, args.limit)),
-            ...presentation('读取 Skill 资料', 'read'),
         }),
         defineTool({
             name: 'diagnose_episode',
@@ -258,22 +152,6 @@ export function screenplayToolDefinitions(ctx) {
             output: { schema: { type: 'json' }, render: (_args, value) => text(value) },
             execute: async (args, exec) => toJson(await ctx.screenplayProjects.commitEpisodeForSession(session(exec), args.expectedRevision, args.operationId, args.episode, args.continuity)),
             ...presentation('提交正式剧集'),
-        }),
-        defineTool({
-            name: 'read_skill_reference',
-            description: 'Read one relative reference file from a Skill that is visible in this Agent scope. The path is resolved only against that Skill\'s own resourceBase; project paths and absolute paths are rejected.',
-            parameters: {
-                skill: { type: 'string', required: true, description: 'Exact Skill name from the loaded Skill catalog.' },
-                path: { type: 'string', required: true, description: 'Relative path such as references/project-objects.md.' },
-            },
-            output: { schema: { type: 'json' }, render: (_args, value) => text(value) },
-            isConcurrencySafe: () => true,
-            execute: async (args, exec) => {
-                const current = agent(exec);
-                const scope = current;
-                return toJson(await ctx.screenplayProjects.readSkillReferenceForSession(current.session, args.skill, args.path, scope));
-            },
-            ...presentation('读取 Skill 参考', 'read'),
         }),
         defineTool({
             name: 'screenplay_list_references',

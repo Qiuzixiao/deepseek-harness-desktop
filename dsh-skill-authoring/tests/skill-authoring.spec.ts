@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -15,22 +15,34 @@ afterEach(async () => {
 })
 
 describe('SkillAuthoringStore', () => {
-  it('installs directly without creating a draft file', async () => {
+  it('saves a user-scope Skill directly without a draft file', async () => {
     const root = await mkdtemp(join(tmpdir(), 'skill-authoring-'))
     const home = await mkdtemp(join(tmpdir(), 'skill-authoring-home-'))
     roots.push(root); homes.push(home)
     process.env.DSH_HOME = home
     const store = new SkillAuthoringStore(root)
-    const installed = await store.install({
+    const installed = await store.save({
       name: 'direct-guidance',
       description: 'Apply this guidance directly.',
       scope: 'user',
       instructions: 'Use the supplied guidance selectively.',
-      sources: [{ sourceId: 'note-1', label: 'notes.md', kind: 'attachment' }],
     })
     await expect(readFile(installed.skillFile, 'utf8')).resolves.toContain('name: direct-guidance')
     await expect(readFile(join(home, 'skills', 'direct-guidance', 'SKILL.md'), 'utf8')).resolves.toContain('Use the supplied guidance selectively.')
-    await expect(readFile(join(root, '.screenplay', 'skill-drafts'), 'utf8')).rejects.toThrow()
+  })
+
+  it('saves a project-scope Skill under .zenwit/skills', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'skill-authoring-'))
+    roots.push(root)
+    const store = new SkillAuthoringStore(root)
+    const installed = await store.save({
+      name: 'project-guidance',
+      description: 'Project-specific guidance.',
+      scope: 'project',
+      instructions: 'Follow the project conventions.',
+    })
+    expect(installed.directory).toBe(join(root, '.zenwit', 'skills', 'project-guidance'))
+    await expect(readFile(join(root, '.zenwit', 'skills', 'project-guidance', 'SKILL.md'), 'utf8')).resolves.toContain('Follow the project conventions.')
   })
 
   it('does not duplicate a resource kind already present in its path', async () => {
@@ -39,14 +51,13 @@ describe('SkillAuthoringStore', () => {
     roots.push(root); homes.push(home)
     process.env.DSH_HOME = home
     const store = new SkillAuthoringStore(root)
-    const installed = await store.install({
+    const installed = await store.save({
       name: 'prefixed-reference',
       description: 'Use an explicitly prefixed reference path.',
       scope: 'user',
       instructions: 'Read `references/topic.md` before applying this Skill.',
       resources: [{ kind: 'references', path: 'references/topic.md', content: '# Topic\n' }],
     })
-
     await expect(readFile(join(installed.directory, 'references', 'topic.md'), 'utf8')).resolves.toBe('# Topic')
     await expect(readFile(join(installed.directory, 'references', 'references', 'topic.md'), 'utf8')).rejects.toThrow()
   })
@@ -58,7 +69,7 @@ describe('SkillAuthoringStore', () => {
     process.env.DSH_HOME = home
     const store = new SkillAuthoringStore(root)
 
-    await expect(store.install({
+    await expect(store.save({
       name: 'missing-reference',
       description: 'This Skill has an invalid resource route.',
       scope: 'user',
@@ -67,45 +78,43 @@ describe('SkillAuthoringStore', () => {
     await expect(readFile(join(home, 'skills', 'missing-reference', 'SKILL.md'), 'utf8')).rejects.toThrow()
   })
 
-  it('publishes dynamic instructions and only requested supporting resources', async () => {
+  it('rejects a conflicting resource path whose kind is another resource kind', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'skill-authoring-'))
+    roots.push(root)
+    const store = new SkillAuthoringStore(root)
+    await expect(store.save({
+      name: 'conflicting-resource',
+      description: 'This Skill has a path conflict.',
+      scope: 'user',
+      instructions: 'Read `assets/note.md`.',
+      resources: [{ kind: 'references', path: 'assets/note.md', content: '# Note\n' }],
+    })).rejects.toThrow('path conflicts with its kind')
+  })
+
+  it('emits a standard SKILL.md with the Claude Code when_to_use extension', async () => {
     const root = await mkdtemp(join(tmpdir(), 'skill-authoring-'))
     const home = await mkdtemp(join(tmpdir(), 'skill-authoring-home-'))
     roots.push(root); homes.push(home)
     process.env.DSH_HOME = home
     const store = new SkillAuthoringStore(root)
-    const draft = await store.createDraft({
-      instructions: 'Use the supplied notes selectively. Preserve explicit user choices and identify uncertain claims.',
-      sources: [{ sourceId: 'attachment-1', label: 'notes.md', kind: 'attachment' }],
-      resources: [{ kind: 'references', path: 'notes.md', content: '# Notes\n\nKeep the advice conditional.\n' }],
+    const installed = await store.save({
+      name: 'extended-skill',
+      description: 'A Skill with a usage hint.',
+      scope: 'user',
+      instructions: 'Apply the hint.',
+      whenToUse: 'Only when the user asks for it.',
     })
-    const published = await store.publish({ draftId: draft.draftId, name: 'notes-guidance', description: 'Apply supplied notes when drafting or reviewing content.', scope: 'user', confirmation: '确认发布 Skill' })
-    const skill = await readFile(published.skillFile, 'utf8')
-    expect(skill).toContain('name: notes-guidance')
-    expect(skill).toContain('metadata:')
-    expect(skill).toContain(draft.instructions)
+    const skill = await readFile(installed.skillFile, 'utf8')
+    expect(skill).toContain('name: extended-skill')
+    expect(skill).toContain(`when_to_use: "Only when the user asks for it."`)
+    expect(skill).toContain('license: MIT')
+    expect(skill).not.toContain('metadata:')
+    expect(skill).not.toContain('provenance:')
     expect(skill).not.toContain('whenToUse:')
-    await expect(readFile(join(root, '.screenplay', 'skill-drafts', `${draft.draftId}.json`), 'utf8')).rejects.toThrow()
-    await expect(readFile(join(published.directory, 'references', 'notes.md'), 'utf8')).resolves.toContain('Keep the advice conditional.')
-    await expect(readFile(join(published.directory, 'agents', 'openai.yaml'), 'utf8')).resolves.toContain('allow_implicit_invocation: true')
-  })
-
-  it('updates and cancels an unpublished draft without touching source files', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'skill-authoring-'))
-    roots.push(root)
-    const store = new SkillAuthoringStore(root)
-    const draft = await store.createDraft({ instructions: 'First version.' })
-    const updated = await store.updateDraft({ draftId: draft.draftId, instructions: 'Second version.' })
-    expect(updated.draftId).toBe(draft.draftId)
-    expect(updated.version).toBe(2)
-    expect((await store.inspect(draft.draftId) as { instructions: string }).instructions).toBe('Second version.')
-    expect(await readdir(join(root, '.screenplay', 'skill-drafts'))).toEqual([`${draft.draftId}.json`])
-    await expect(store.discardDraft(draft.draftId)).resolves.toEqual({ draftId: draft.draftId, discarded: true })
-    await expect(store.inspect(draft.draftId)).rejects.toThrow('不存在')
   })
 
   it('uses the shared Zenwit home resolution for user Skills', () => {
     expect(resolveUserSkillRoot({ DSH_HOME: '' })).toBe(join(homedir(), '.zenwit', 'skills'))
-    expect(resolveUserSkillRoot({ DSH_HOME: '~/.zenwit' })).toBe(join(homedir(), '.zenwit', 'skills'))
-    expect(resolveUserSkillRoot({ DSH_HOME: './relative-home' })).toBe(join(resolve('./relative-home'), 'skills'))
+    expect(resolveUserSkillRoot({ DSH_HOME: 'does-not-matter' })).toBe(join(resolve('does-not-matter'), 'skills'))
   })
 })

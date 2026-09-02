@@ -248,6 +248,7 @@
     "dsh-community-market": "0.1.0-dev.0",
     "dsh-file-upload": "workspace:*",
     "dsh-short-drama": "workspace:*",
+    "dsh-skill-authoring": "workspace:*",
     "dshmarket": "1.17.1",
     "koffi": "3.1.5",
     "node-addon-require-builtin": "^0.1.4",

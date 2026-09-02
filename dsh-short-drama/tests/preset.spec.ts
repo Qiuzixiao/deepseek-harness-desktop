@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
 import { KNOWN_SESSION_EVENT_TYPES } from '@deepseek-ai/dsh-session'
 import { SCREENPLAY_AGENT_PROMPT } from '../src/prompt.js'
-import { explicitAbsolutePaths, skillCreateInstruction } from '../src/agent.js'
 import { screenplayToolDefinitions } from '../src/tools.js'
 
 describe('screenplay-v1 composition', () => {
@@ -24,12 +23,10 @@ describe('screenplay-v1 composition', () => {
   it('exposes domain tools for open project-scoped authoring', () => {
     const definitions = screenplayToolDefinitions({} as Context)
     const names = definitions.map(tool => tool.name)
-    expect(names.slice(0, 7)).toEqual([
+    expect(names.slice(0, 5)).toEqual([
       'read_project_context',
       'read_artifact',
       'search_project',
-      'skill_inspect',
-      'skill_create',
       'write_scene',
       'validate_episode',
     ])
@@ -79,25 +76,11 @@ describe('screenplay-v1 composition', () => {
     expect(SCREENPLAY_AGENT_PROMPT).toContain('creative direction')
     expect(SCREENPLAY_AGENT_PROMPT).toContain('project files as facts')
     expect(SCREENPLAY_AGENT_PROMPT).toContain('Skill')
-    expect(SCREENPLAY_AGENT_PROMPT).toContain('skill_source_inspect')
-    expect(SCREENPLAY_AGENT_PROMPT).toContain('skill_source_read')
+    expect(SCREENPLAY_AGENT_PROMPT).not.toContain('skill_source_inspect')
+    expect(SCREENPLAY_AGENT_PROMPT).not.toContain('skill_source_read')
     expect(SCREENPLAY_AGENT_PROMPT).not.toContain('M1-M7')
     expect(SCREENPLAY_AGENT_PROMPT).not.toContain('不得主动搜索')
     expect(SCREENPLAY_AGENT_PROMPT).not.toContain('四幕二十拍')
     expect(SCREENPLAY_AGENT_PROMPT).not.toContain('确认生成本批集纲')
-  })
-
-  it('turns the explicit skill-create command into a bounded model instruction', () => {
-    expect(skillCreateInstruction('')).toContain('只读取用户明确提供或选择的资料')
-    expect(skillCreateInstruction('只关注对白风格')).toContain('用户补充要求：只关注对白风格')
-    expect(skillCreateInstruction('')).toContain('直接安装 Skill')
-    expect(skillCreateInstruction('')).not.toContain('草稿')
-    expect(skillCreateInstruction('')).not.toContain('等待用户确认')
-  })
-
-  it('recognizes POSIX, Windows drive and UNC Skill source paths', () => {
-    expect(explicitAbsolutePaths('读取 /tmp/source.md')).toContain('/tmp/source.md')
-    expect(explicitAbsolutePaths('读取 "C:\\Users\\writer\\source notes.docx"')).toContain('C:\\Users\\writer\\source notes.docx')
-    expect(explicitAbsolutePaths('读取 \\\\server\\share\\source.pdf')).toContain('\\\\server\\share\\source.pdf')
   })
 })
