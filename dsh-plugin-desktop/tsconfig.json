@@ -10,6 +10,7 @@
     "outDir": "lib/types",
     "declaration": true,
     "emitDeclarationOnly": true,
+    "skipLibCheck": true,
     "strict": true,
     "exactOptionalPropertyTypes": true,
     "noFallthroughCasesInSwitch": true,
