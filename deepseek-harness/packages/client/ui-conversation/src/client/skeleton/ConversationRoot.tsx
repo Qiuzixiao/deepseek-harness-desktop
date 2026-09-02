@@ -16,7 +16,7 @@ export type ConversationRootProps = ConversationSlotProps
 export function ConversationRoot({
   sessionId, useSession, useSessions, useWorkspaces, useInput, useComposerBlock,
   renderSlot, renderSlotChain, selectWorkspace, showWorkspacePicker = true,
-  showHeroHeadline = true, t,
+  showHeroHeadline = true, openFileInWorkspace, t,
 }: ConversationRootProps) {
   const openState = useSession(s => s.openState)
   const composerPhase = useSession(s => s.composerPhase)
@@ -204,7 +204,7 @@ export function ConversationRoot({
     <div className={css.root} data-phase={phase}>
       {renderSlot('conversation.session.header', {})}
       <div className={css.scrollBody} data-conversation-scroll="">
-        {renderSlot('conversation.session', {})}
+        {renderSlot('conversation.session', openFileInWorkspace === undefined ? {} : { openFileInWorkspace })}
         {composerSeat}
       </div>
     </div>

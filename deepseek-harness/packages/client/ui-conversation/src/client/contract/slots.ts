@@ -57,7 +57,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * flow instead: `conversation.view` for a whole tab, the input regions for
      * composer chrome.
      */
-    'conversation.session': { kind: 'single'; scope: 'session' }
+    'conversation.session': { kind: 'single'; scope: 'session'; owner: ConversationSessionOwnerProps }
     /**
      * The strip above the session's scrollport: title, view tabs, and the
      * action row. Taking this seat means rendering all three yourself, and it
@@ -303,6 +303,8 @@ export interface ConvViewOwnerProps {
   inspect?: { callId: CallId } | null
   /** Acknowledge the inspect request once applied (clears the store field). */
   onInspectDone?: () => void
+  /** Open a project file inside the owning product shell when handled. */
+  openFileInWorkspace?: (path: string) => Promise<boolean>
 }
 
 /**
@@ -438,6 +440,12 @@ export interface ConversationInjected {
    * the root renders as the inert composer's placeholder.
    */
   hooks: { composerBlock: ObservableSnapshot<ComposerBlock | undefined> }
+}
+
+/** Owner callback forwarded from the product shell to the session's view ring. */
+export interface ConversationSessionOwnerProps {
+  /** Open a project file inside the owning product shell when handled. */
+  openFileInWorkspace?: (path: string) => Promise<boolean>
 }
 
 /** Business callbacks injected into the strict Session body seat. */

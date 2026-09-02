@@ -138,7 +138,7 @@ export function ConversationSessionHeader({
  */
 export function ConversationSession({
   sessionId, useSession, useInput, inputActions, useStore, actions,
-  renderSlot, views, bindDraftMirror, releaseSessionImages,
+  renderSlot, views, bindDraftMirror, releaseSessionImages, openFileInWorkspace,
 }: ConversationSessionProps) {
   useSyncExternalStore(views.subscribe, views.version)
   const tabs = views.list()
@@ -169,6 +169,7 @@ export function ConversationSession({
       {active !== undefined && renderSlot('conversation.view', {
         inspect,
         onInspectDone: () => { actions.setInspect(null) },
+        ...(openFileInWorkspace === undefined ? {} : { openFileInWorkspace }),
       }, { only: active.id })}
     </div>
   )

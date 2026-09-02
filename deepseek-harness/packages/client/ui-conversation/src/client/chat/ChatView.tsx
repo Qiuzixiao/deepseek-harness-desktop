@@ -14,6 +14,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ChatNodeStore, ConversationTimelineSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import { resolveWorkspacePath } from '@deepseek-ai/dsh-client-runtime/client'
 import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { isRunningTool, type ChatNode } from '../contract/chat-nodes.ts'
@@ -196,7 +197,7 @@ function TurnStatus({ startTime, t }: {
  */
 export function ChatView({
   useSession, useSessions, useStore, renderSlot, sessionId, openFile, loadOlder, loadImage, inspectCall, chatScroll, forkAt,
-  fileMentions, t,
+  fileMentions, openFileInWorkspace, t,
 }: ChatViewSlotProps) {
   const order = useSession(s => s.chat.order)
   const nodeStore = useSession(s => s.chat.nodes)
@@ -210,6 +211,23 @@ export function ChatView({
   const hasMore = useSession(s => s.hasMore)
   const loadingOlder = useSession(s => s.loadingOlder)
   const selectedCallId = useStore(s => s.selection?.callId)
+
+  const openFileFromChat = useMemo<ChatViewSlotProps['openFile']>(() => {
+    if (openFileInWorkspace === undefined) return openFile
+    return (path: string): void => {
+      const resolved = resolveWorkspacePath(cwd, path)
+      void openFileInWorkspace(resolved).then((handled) => {
+        if (!handled) openFile(resolved)
+      }).catch(() => {
+        openFile(resolved)
+      })
+    }
+  }, [cwd, openFile, openFileInWorkspace])
+
+  const fileMentionsFromChat = useMemo(() => {
+    if (openFileInWorkspace === undefined) return fileMentions
+    return (owner: Parameters<typeof fileMentions>[0]) => fileMentions({ ...owner, openFile: openFileFromChat })
+  }, [fileMentions, openFileFromChat, openFileInWorkspace])
 
   const pendingSteering = useMemo(
     () => inbox.filter(item => item.placement === 'steering'),
@@ -441,11 +459,11 @@ export function ChatView({
                 useSession={useSession}
                 selectedCallId={selectedCallId}
                 cwd={cwd}
-                openFile={openFile}
+                openFile={openFileFromChat}
                 inspectCall={inspectCall}
                 forkAt={forkAt}
                 loadImage={loadImage}
-                fileMentions={fileMentions}
+                fileMentions={fileMentionsFromChat}
                 renderSlot={renderSlot}
                 t={t}
               />

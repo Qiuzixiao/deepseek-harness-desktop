@@ -145,10 +145,11 @@ describe('Zenwit workspace layout', () => {
     expect(within(files).queryByText(/历史会话/)).toBeNull()
     expect(screen.getByRole('button', { name: '原生设置' })).toBeTruthy()
     expect(within(chat).getByRole('button', { name: '新建对话' })).toBeTruthy()
-    expect(view.renderSlot).toHaveBeenCalledWith('conversation', {
+    expect(view.renderSlot).toHaveBeenCalledWith('conversation', expect.objectContaining({
       showWorkspacePicker: false,
       showHeroHeadline: false,
-    })
+      openFileInWorkspace: expect.any(Function),
+    }))
 
     const historyButton = within(chat).getByRole('button', { name: '历史对话（2）' })
     expect(historyButton.getAttribute('title')).toBe('历史对话（2）')
@@ -177,6 +178,18 @@ describe('Zenwit workspace layout', () => {
     expect(screen.getByTestId('editor')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '可视化' }))
     expect(screen.getByTestId('visual-editor')).toBeTruthy()
+  })
+
+  it('exposes an in-workspace opener for project files and declines outside paths', async () => {
+    const view = mountWorkspace()
+    const renderSlotMock = view.renderSlot as unknown as { mock: { calls: Array<[string, object]> } }
+    const conversationCall = renderSlotMock.mock.calls.find(([slot]) => slot === 'conversation')
+    const owner = conversationCall?.[1] as { openFileInWorkspace?: (path: string) => Promise<boolean> } | undefined
+    expect(owner?.openFileInWorkspace).toBeTypeOf('function')
+    expect(await owner!.openFileInWorkspace!('/project/剧本/episode-1.md')).toBe(true)
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'episode-1.md' })).toBeTruthy())
+    expect(await owner!.openFileInWorkspace!('/other/notes.md')).toBe(false)
+    expect(await owner!.openFileInWorkspace!('/project/../other/notes.md')).toBe(false)
   })
 
   it('adds a selected passage to the current conversation draft without sending', async () => {

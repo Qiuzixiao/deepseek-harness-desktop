@@ -120,6 +120,8 @@ export interface ConvOwnerProps {
   showWorkspacePicker?: boolean
   /** Hide the generic hero headline when a product shell supplies its own identity. */
   showHeroHeadline?: boolean
+  /** Open a project file inside the product shell's file workspace when handled. */
+  openFileInWorkspace?: (path: string) => Promise<boolean>
 }
 
 /** Details owner share: empty — sessionId arrives as a framework-standard prop. */

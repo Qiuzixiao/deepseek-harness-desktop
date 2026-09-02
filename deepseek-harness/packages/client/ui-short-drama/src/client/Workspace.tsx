@@ -102,6 +102,14 @@ function descendantSuffix(path: string, parent: string): string | null {
     : null
 }
 
+/** Accept only a file lexically below the active project root. */
+function isProjectFilePath(path: string, projectPath: string): boolean {
+  const normalizedPath = path.replaceAll('\\', '/')
+  const normalizedProject = projectPath.replace(/[\\/]+$/u, '').replaceAll('\\', '/')
+  if (normalizedPath === normalizedProject || !normalizedPath.startsWith(normalizedProject + '/')) return false
+  return normalizedPath.slice(normalizedProject.length + 1).split('/').every(segment => segment !== '..')
+}
+
 function readPersistedTabs(projectPath: string): PersistedDocumentTabs | null {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(DOCUMENT_TABS_STORAGE_PREFIX + projectPath) ?? 'null') as Partial<PersistedDocumentTabs> | null
@@ -337,27 +345,34 @@ export function Workspace({
     return () => clearInterval(timer)
   }, [projectPath])
 
-  const openFilePath = async (path: string, name: string) => {
+  const openFilePath = useCallback(async (path: string, name: string): Promise<boolean> => {
     const existing = documentsRef.current.find(document => document.path === path)
     if (existing !== undefined) {
       setActivePath(path)
-      return
+      return true
     }
     try {
       const res = await fetch('/api/desktop/projects/file?path=' + encodeURIComponent(path))
       if (res.status === 404) {
         setDocuments(previous => [...previous, { path, name, content: '', draft: '', dirty: false, saving: false, saveStatus: null, visualMode: true }])
         setActivePath(path)
-        return
+        return true
       }
       if (!res.ok) throw new Error('read ' + res.status)
       const body = await res.json() as { content: string }
       setDocuments(previous => [...previous, { path, name, content: body.content, draft: body.content, dirty: false, saving: false, saveStatus: null, visualMode: true }])
       setActivePath(path)
+      return true
     } catch (e) {
       setDocuments(previous => previous.map(document => document.path === path ? { ...document, saveStatus: '打开失败：' + String(e instanceof Error ? e.message : e) } : document))
+      return false
     }
-  }
+  }, [])
+
+  const openFileInWorkspace = useCallback(async (path: string): Promise<boolean> => {
+    if (!isProjectFilePath(path, projectPath)) return false
+    return openFilePath(path, nodeBasename(path))
+  }, [openFilePath, projectPath])
 
   const onOpenNode = async (node: TreeNode) => {
     if (node.kind === 'dir') {
@@ -813,7 +828,11 @@ export function Workspace({
         )}
         {/* The project shell already binds this session to projectPath; keep
             both generic hero controls available for non-Zenwit shells. */}
-        {renderSlot('conversation', { showWorkspacePicker: false, showHeroHeadline: false })}
+        {renderSlot('conversation', {
+          showWorkspacePicker: false,
+          showHeroHeadline: false,
+          openFileInWorkspace,
+        })}
       </aside>
     </div>
   )

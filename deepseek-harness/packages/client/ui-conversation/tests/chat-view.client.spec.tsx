@@ -4,7 +4,7 @@
 // ObservableSnapshot fake, no wire or Tool presentation plugin.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, waitFor, within } from '@testing-library/react'
 import { useEffect } from 'react'
 import type {
   AssistantMessageNode, CommandNode, CompactionSummaryNode, ConversationNode, ConversationSnapshot,
@@ -380,6 +380,28 @@ describe('Chat node rendering', () => {
     fireEvent.click(mention)
     // The vocabulary was built from the closing message's own owner currency.
     expect(h.openFile).toHaveBeenCalledWith('for-seq-4/site/report.html')
+  })
+
+  it('prefers the product workspace opener and falls back to the host opener', async () => {
+    const h = makeHarness({
+      nodes: [user(1, 'build it'), assistant(2, 'Wrote `report.md`.', 1)],
+      turnEnds: new Map([[1, 2]]),
+    })
+    h.props.fileMentions = owner => ({
+      resolve: (value) => value === 'report.md'
+        ? { open: () => { owner.openFile('report.md') }, label: '打开 report.md', title: 'report.md' }
+        : undefined,
+    })
+    const openFileInWorkspace = vi.fn<NonNullable<ChatViewSlotProps['openFileInWorkspace']>>(async () => true)
+    h.props.openFileInWorkspace = openFileInWorkspace
+    const view = render(<h.ChatView {...h.props} />)
+    fireEvent.click(view.getByRole('button', { name: '打开 report.md' }))
+    await waitFor(() => expect(openFileInWorkspace).toHaveBeenCalledWith('report.md'))
+    expect(h.openFile).not.toHaveBeenCalled()
+
+    openFileInWorkspace.mockResolvedValueOnce(false)
+    fireEvent.click(view.getByRole('button', { name: '打开 report.md' }))
+    await waitFor(() => expect(h.openFile).toHaveBeenCalledWith('report.md'))
   })
 
   it('formatRunDuration localizes units and floors partial seconds', () => {
