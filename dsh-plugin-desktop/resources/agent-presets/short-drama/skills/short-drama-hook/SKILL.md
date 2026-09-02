@@ -5,7 +5,6 @@ metadata:
   scope: user
   version: 1
   applicableTo: ["设计首屏钩子与开场方案", "建立可验证悬念与信息差表", "设计误导/隐藏反转及因果链", "安排分集卡点与付费点"]
-  sourceIds: ["/Users/qiuzixiao/Desktop/剧本创作/xie-hao-duan-ju-skills-1.0.0/skills/short-drama-hook-suspense-reversal-beat/SKILL.md"]
   whenToUse: "触发词：'开头不抓人'、'每集结尾没动力'、'设计付费卡点'、'观众知道凶手仍想要反转'。语言信号：用户提供故事梗概、目标观众和集数限制，要求输出开场方案、悬念、反转或卡点设计。"
 ---
 

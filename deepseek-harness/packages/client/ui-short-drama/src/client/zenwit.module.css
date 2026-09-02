@@ -330,6 +330,36 @@
 }
 .workspaceSettings {
   min-width: 0;
+  min-height: 44px;
+  overflow: hidden;
+  border: 1px solid var(--zw-hairline);
+  border-radius: var(--zw-r-card);
+  background: var(--zw-surface);
+  box-shadow: var(--zw-shadow);
+}
+.workspaceSettings > :global([data-slot="sidebar"]) > div {
+  width: 100%;
+  height: 44px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.workspaceSettings :global(button[aria-haspopup="dialog"]) {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 42px;
+  margin: 0;
+  padding: 6px 14px;
+  justify-content: center;
+  border-radius: calc(var(--zw-r-card) - 1px);
+  background: transparent;
+  color: var(--zw-text);
+}
+.workspaceSettings :global(button[aria-haspopup="dialog"]):hover {
+  background: var(--zw-surface-2);
 }
 .resizeHandle {
   position: relative;
@@ -1105,6 +1135,15 @@
 .visualEditor :global(.ProseMirror-selectednode) {
   background: color-mix(in srgb, var(--zw-brand) 8%, transparent);
 }
+.visualEditor :global(.ProseMirror) {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+/* Keep Milkdown's inline soft-break node for Markdown round-tripping, but show it as a new line here. */
+.visualEditor :global(.ProseMirror span[data-type="hardbreak"][data-is-inline="true"]) {
+  display: block;
+  height: 0;
+}
 .visualEditor :global(.milkdown h1),
 .visualEditor :global(.milkdown h2),
 .visualEditor :global(.milkdown h3) {
@@ -1124,6 +1163,76 @@
   background: var(--zw-surface-2);
   font-family: var(--zw-mono);
   line-height: 1.6;
+}
+.visualEditor :global(.milkdown table) {
+  width: 100%;
+  margin: 18px 0;
+  border-collapse: collapse;
+  overflow-x: auto;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.visualEditor :global(.milkdown th),
+.visualEditor :global(.milkdown td) {
+  padding: 8px 10px;
+  border: 1px solid var(--zw-hairline-strong);
+  text-align: left;
+  vertical-align: top;
+}
+.visualEditor :global(.milkdown th) {
+  background: var(--zw-surface-2);
+  color: var(--zw-ink);
+  font-weight: 650;
+}
+.visualEditor :global(.milkdown td) {
+  color: var(--zw-text);
+}
+.visualEditor :global(.milkdown th p),
+.visualEditor :global(.milkdown td p),
+.visualEditor :global(.milkdown li[data-item-type="task"] p) {
+  margin: 0;
+}
+.visualEditor :global(.milkdown del) {
+  color: var(--zw-muted);
+  text-decoration-color: var(--zw-muted);
+}
+.visualEditor :global(.milkdown li[data-item-type="task"]) {
+  position: relative;
+  list-style: none;
+  margin-left: 0;
+  padding-left: 24px;
+}
+.visualEditor :global(.milkdown li[data-item-type="task"]::before) {
+  content: '';
+  position: absolute;
+  top: 0.6em;
+  left: 0;
+  width: 13px;
+  height: 13px;
+  box-sizing: border-box;
+  border: 1px solid var(--zw-hairline-strong);
+  border-radius: 3px;
+  background: var(--zw-surface);
+}
+.visualEditor :global(.milkdown li[data-item-type="task"][data-checked="true"]::before) {
+  content: '✓';
+  border-color: var(--zw-brand);
+  background: var(--zw-brand);
+  color: #fff;
+  font-size: 10px;
+  line-height: 12px;
+  text-align: center;
+}
+.visualEditor :global(.milkdown li[data-item-type="task"][data-checked="true"] p) {
+  color: var(--zw-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--zw-muted);
+}
+.visualEditor :global(.milkdown img) {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
 }
 .editorPlaceholder {
   flex: 1;

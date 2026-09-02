@@ -5,7 +5,6 @@ metadata:
   scope: user
   version: 1
   applicableTo: ["将故事梗概拆分为四幕二十拍节拍表", "排布分集节奏、场次骨架与卡点", "重排松散中段、提前高潮、提速转折", "设计悬念、反转、付费卡点与高潮兑现路径"]
-  sourceIds: ["/Users/qiuzixiao/Desktop/剧本创作/xie-hao-duan-ju-skills-1.0.0/skills/four-act-twenty-beat-short-drama/SKILL.md"]
   whenToUse: "触发词：'四幕二十拍'、'每幕五拍'、'帮我排节拍/卡点/高潮'、'每集结尾怎么卡点'、'把高潮提前/把中段提速'。语言信号：用户已有故事前提、人物和梗概，要求输出四幕/20 拍/分集/场次骨架。"
 ---
 

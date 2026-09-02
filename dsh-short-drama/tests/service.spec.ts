@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rm, mkdtemp, stat } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rm, mkdtemp, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -7,7 +7,7 @@ import { CallId } from '@deepseek-ai/dsh-llm'
 import { Session } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineTool } from '@deepseek-ai/dsh-tools'
-import { installScreenplayFailureGuard, installScreenplayProjectScopeGuard } from '../src/agent.js'
+import { installScreenplayProjectScopeGuard } from '../src/agent.js'
 import { ScreenplayProjectService } from '../src/service.js'
 import { screenplayToolDefinitions } from '../src/tools.js'
 import type { CreateScreenplayArtifactsInput } from '../src/types.js'
@@ -146,26 +146,12 @@ function episodeOutlinesFor(title: string, count: number): string {
   return lines.join('\n').concat('\n')
 }
 
-function validEpisodeFor(episode: number, repeats = 20): string {
-  const lines = [`第${String(episode)}集`, '', `${String(episode)}-1 客厅 清晨 内`, '人物：顾北辰、林母', '']
-  for (let index = 1; index <= repeats; index += 1) {
-    lines.push(
-      `△顾北辰把第${String(index)}份证据放到桌面中央，抬眼等林母回应。`,
-      '顾北辰：这件事必须在今天说清楚。',
-      '△林母按住证据，没有把手收回去。',
-      '林母：你先告诉我，你准备承担什么结果。',
-    )
-  }
-  lines.push('', '【卡点特写：林母仍没有交出最后一张照片。】', '【本集完】')
-  return lines.join('\n').concat('\n')
-}
-
 afterEach(async () => {
   await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })))
 })
 
-describe('ScreenplayProjectService scene authoring', () => {
-  it('keeps scene drafts in the Session, validates them, and commits only after A passes', async () => {
+describe('ScreenplayProjectService episode authoring', () => {
+  it('writes the formal episode immediately and leaves validation optional', async () => {
     const parent = await mkdtemp(join(tmpdir(), 'screenplay-scene-authoring-'))
     roots.push(parent)
     const service = new ScreenplayProjectService(fakeContext())
@@ -179,33 +165,18 @@ describe('ScreenplayProjectService scene authoring', () => {
       episodeOutlinesContent: episodeOutlinesFor('场景短剧', 12),
     })
 
-    const invalid = await service.writeSceneForSession(current, 1, 1, '第1集\n\n1-1 客厅 清晨 内\n人物：顾北辰\n△动作')
-    expect(invalid).toMatchObject({ ok: true, episode: 1, sceneNo: 1 })
-    await expect(service.readArtifactForSession(current, '剧本/episode-001.md')).resolves.toMatchObject({ source: 'session-draft' })
+    const invalid = await service.writeEpisodeForSession(
+      current,
+      2,
+      'episode-direct-invalid',
+      1,
+      '第1集\n\n1-1 客厅 清晨 内\n人物：顾北辰\n△动作',
+      { endingState: '草稿内容已写入', openLoops: [] },
+    )
+    expect(invalid).toMatchObject({ ok: true, episode: 1, stage: 'EpisodeReady' })
+    await expect(service.readArtifactForSession(current, '剧本/第001集.md')).resolves.toMatchObject({ source: 'formal' })
     await expect(service.validateEpisodeForSession(current, 1)).resolves.toMatchObject({ ok: false, issues: [{ channel: 'A' }] })
-
-    await service.writeSceneForSession(current, 1, 1, validEpisodeFor(1))
-    await expect(service.validateEpisodeForSession(current, 1)).resolves.toMatchObject({ ok: true, issues: [] })
-    const diagnosis = await service.diagnoseEpisodeForSession(current, 1)
-    expect(diagnosis.advisory).toBe(true)
-    expect(diagnosis.reviewAreas.map(item => item.id)).toEqual([
-      'hook', 'pressure', 'reversal', 'dialogue', 'cliffhanger', 'production',
-    ])
-    expect(diagnosis).not.toHaveProperty('reviewQuestions')
-
-    const committed = await service.commitEpisodeForSession(current, 2, 'scene-commit', 1, {
-      endingState: '照片仍未交出',
-      openLoops: ['最后一张照片在哪里'],
-    })
-    expect(committed.result).toMatchObject({ episode: 1, stage: 'EpisodeReady' })
-    await expect(readFile(join(projectRoot, '剧本', 'episode-001.md'), 'utf8')).resolves.toBe(validEpisodeFor(1))
-
-    // A lost response may be retried with the same idempotency key after the
-    // Session draft has already been consumed by the successful commit.
-    await expect(service.commitEpisodeForSession(current, 2, 'scene-commit', 1, {
-      endingState: '照片仍未交出',
-      openLoops: ['最后一张照片在哪里'],
-    })).resolves.toEqual(committed)
+    await expect(readFile(join(projectRoot, '剧本', '第001集.md'), 'utf8')).resolves.toContain('△动作')
   })
 
   it('rejects project-relative traversal in domain artifact reads', async () => {
@@ -215,9 +186,56 @@ describe('ScreenplayProjectService scene authoring', () => {
     const current = session('artifact-scope', parent)
     await expect(service.readArtifactForSession(current, '../outside.md')).rejects.toMatchObject({ code: 'INVALID_WORKSPACE' })
   })
+
+  it('edits an existing file in one operation without a validation gate', async () => {
+    const parent = await mkdtemp(join(tmpdir(), 'screenplay-direct-edit-'))
+    roots.push(parent)
+    const service = new ScreenplayProjectService(fakeContext())
+    const current = session('direct-edit', parent)
+    const created = await service.createContractForSession(
+      current, parent, 0, 'direct-edit-contract', '直接修改短剧', requirements, artifacts('直接修改短剧'),
+    )
+    const projectRoot = created.binding.projectRoot
+    await service.createOutlineBundle(projectRoot, 1, 'direct-edit-outline', {
+      outlineContent: fullOutlineFor('直接修改短剧'),
+      episodeOutlinesContent: episodeOutlinesFor('直接修改短剧', 12),
+    })
+    await service.writeEpisodeForSession(
+      current, 2, 'direct-edit-episode', 1,
+      '第1集\n\n1-1 客厅 清晨 内\n人物：顾北辰\n△动作\n顾北辰：开始\n【卡点：秘密】\n【本集完】',
+      { endingState: '结尾', openLoops: [] },
+    )
+
+    const edited = await service.editFile(projectRoot, 3, 'direct-edit-file', {
+      path: '剧本/第001集.md',
+      content: '这段内容故意不符合正文格式，但用户要求应立即保存。',
+    })
+    expect(edited.result).toMatchObject({ ok: true, transitionedThrough: 'ChangeSaved' })
+    await expect(readFile(join(projectRoot, '剧本', '第001集.md'), 'utf8'))
+      .resolves.toContain('这段内容故意不符合正文格式')
+  })
 })
 
 describe('ScreenplayProjectService project bindings', () => {
+  it('recognizes a Zenwit-created project metadata marker as prepared intake', async () => {
+    const parent = await mkdtemp(join(tmpdir(), 'screenplay-zenwit-prepared-'))
+    roots.push(parent)
+    const projectRoot = join(parent, 'Zenwit短剧')
+    await mkdir(join(projectRoot, '.zenwit-project'), { recursive: true })
+    await writeFile(join(projectRoot, '.zenwit-project', 'project.json'), JSON.stringify({ version: 2, agentId: 'short-drama' }))
+    const service = new ScreenplayProjectService(fakeContext())
+    const current = session('zenwit-prepared-session', projectRoot)
+
+    expect(service.contextSummary(current)).toContain('project folder is prepared and bound')
+    const created = await service.createContractForSession(
+      current, parent, 0, 'zenwit-prepared-contract', undefined, requirements, artifacts('Zenwit短剧'),
+    )
+
+    expect(created.binding.projectRoot).toBe(projectRoot)
+    expect(await readFile(join(projectRoot, '创作合同', '创作合同.md'), 'utf8'))
+      .toBe(`${contract('Zenwit短剧')}\n`)
+  })
+
   it('previews only uploaded files from the selected project reference folder', async () => {
     const parent = await mkdtemp(join(tmpdir(), 'screenplay-reference-preview-'))
     roots.push(parent)
@@ -325,7 +343,6 @@ describe('ScreenplayProjectService project bindings', () => {
     await createContract.execute({
       expectedRevision: 0,
       operationId: 'create-contract-tool',
-      confirmation: '确认并创建全部文件',
       requirements,
       contractContent: contract('工具绑定短剧'),
       settingContent: setting('工具绑定短剧'),
@@ -352,7 +369,7 @@ describe('ScreenplayProjectService project bindings', () => {
 
     const projectRoot = outcome.binding.projectRoot
     expect(projectRoot).toBe(join(parent, '我的短剧'))
-    expect(await readFile(join(projectRoot, '创作合同', 'creative-contract.md'), 'utf8'))
+    expect(await readFile(join(projectRoot, '创作合同', '创作合同.md'), 'utf8'))
       .toBe(`${contract('我的短剧')}\n`)
     expect(await readdir(parent)).toEqual(['我的短剧'])
 
@@ -394,7 +411,7 @@ describe('ScreenplayProjectService project bindings', () => {
       revision: 1,
     })
     if (!snapshot.initialized) throw new Error('expected recovered initialized snapshot')
-    expect(snapshot.artifactContents?.['创作合同/creative-contract.md']).toBe(`${contract('可恢复项目')}\n`)
+    expect(snapshot.artifactContents?.['创作合同/创作合同.md']).toBe(`${contract('可恢复项目')}\n`)
   })
 
   it('suffixes a colliding project name inside the same Workspace', async () => {
@@ -423,7 +440,7 @@ describe('ScreenplayProjectService project bindings', () => {
 
     expect(outcome.binding.projectRoot).toBe(projectRoot)
     expect(outcome.binding.parentRoot).toBe(parent)
-    expect(await readFile(join(projectRoot, '创作合同', 'creative-contract.md'), 'utf8'))
+    expect(await readFile(join(projectRoot, '创作合同', '创作合同.md'), 'utf8'))
       .toBe(`${contract('预创建短剧')}\n`)
     expect(await readdir(parent)).toEqual(['预创建短剧'])
   })
@@ -449,7 +466,7 @@ describe('ScreenplayProjectService project bindings', () => {
     expect(outcome.binding.projectRoot).toBe(projectRoot)
     await expect(readFile(join(projectRoot, 'contract', 'creative-contract.md'), 'utf8'))
       .resolves.toBe(`${contract('旧项目')}\n`)
-    await expect(readFile(join(projectRoot, '创作合同', 'creative-contract.md'), 'utf8'))
+    await expect(readFile(join(projectRoot, '创作合同', '创作合同.md'), 'utf8'))
       .rejects.toMatchObject({ code: 'ENOENT' })
   })
 
@@ -470,7 +487,7 @@ describe('ScreenplayProjectService project bindings', () => {
     )
 
     expect(outcome.binding.projectRoot).toBe(projectRoot)
-    expect(await readFile(join(projectRoot, '创作合同', 'creative-contract.md'), 'utf8'))
+    expect(await readFile(join(projectRoot, '创作合同', '创作合同.md'), 'utf8'))
       .toBe(`${contract('大大')}\n`)
     expect(await readdir(parent)).toEqual(['大大'])
   })
@@ -521,125 +538,40 @@ describe('screenplay tool failure feedback', () => {
 
     expect(result.isError).toBe(true)
     expect(result.content).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'text', text: expect.stringContaining('bind a screenplay project') }),
+      expect.objectContaining({ type: 'text', text: expect.stringContaining('open a project') }),
     ]))
   })
 
-  async function harness(title: string) {
-    const parent = await mkdtemp(join(tmpdir(), 'screenplay-tool-feedback-'))
+  it('allows ordinary writes to files previously recorded as formal artifacts', async () => {
+    const parent = await mkdtemp(join(tmpdir(), 'screenplay-generic-formal-write-'))
     roots.push(parent)
     const context = new Context()
     await context.plugin(SystemPrompt)
     await context.plugin(ToolRuntime)
     const projects = new ScreenplayProjectService(context)
     Object.assign(context, { screenplayProjects: projects })
-    for (const definition of screenplayToolDefinitions(context)) context.tools.register(definition)
-    installScreenplayFailureGuard(context)
-    const current = session(`tool-feedback-${title}`, parent)
-    await projects.createContractForSession(
-      current, parent, 0, `create-${title}`, title, requirements, artifacts(title),
+    const current = session('generic-formal-write', parent)
+    const created = await projects.createContractForSession(
+      current, parent, 0, 'generic-formal-write-contract', '自由写作', requirements, artifacts('自由写作'),
     )
-    const agent = { session: current } as never
-    return { context, projects, current, agent }
-  }
+    context.tools.register(defineTool({
+      name: 'write',
+      description: 'test write',
+      parameters: { file_path: { type: 'string', required: true }, content: { type: 'string', required: true } },
+      output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+      async execute() { return 'written' },
+    }))
+    installScreenplayProjectScopeGuard(context)
 
-  function invalidOutline(title: string, variation: number): string {
-    return [
-      `# 《${title}》全剧大纲`,
-      '',
-      `全剧主线概述版本${String(variation)}。`,
-      '',
-      '## 第 1 集《错误的逐集结构》',
-      '',
-      '1. 这里不应出现逐集明细。',
-    ].join('\n')
-  }
-
-  it('exposes structured validation details through the real tool runtime', async () => {
-    const title = '工具反馈短剧'
-    const { context, agent } = await harness(title)
     const result = await context.tools.execute({
-      callId: CallId('outline-feedback'),
-      name: 'screenplay_create_outline',
-      arguments: {
-        expectedRevision: 1,
-        operationId: 'outline-feedback',
-        outlineContent: invalidOutline(title, 1),
-      },
+      callId: CallId('generic-formal-write-call'),
+      name: 'write',
+      arguments: { file_path: '创作合同/创作合同.md', content: '# 用户自己的标题' },
       signal: new AbortController().signal,
-      agent,
+      agent: { session: session('generic-formal-write-agent', created.binding.projectRoot) } as never,
     })
 
-    expect(result.isError).toBe(true)
-    expect(result.error?.info?.code).toBe('VALIDATION_FAILED')
-    const feedback = result.content.map(block => block.type === 'text' ? block.text : '').join('\n')
-    expect(feedback).toContain('artifact: full-outline')
-    expect(feedback).toContain('location: structure')
-    expect(feedback).toContain('expected:')
-    expect(feedback).toContain('actual:')
-    expect(feedback).toContain('repairHint:')
+    expect(result.isError).toBe(false)
   })
 
-  it('requires a diagnostic action after two consecutive matching structural failures', async () => {
-    const title = '循环保护短剧'
-    const { context, agent } = await harness(title)
-    for (let variation = 1; variation <= 2; variation += 1) {
-      const result = await context.tools.execute({
-        callId: CallId(`outline-loop-${String(variation)}`),
-        name: 'screenplay_create_outline',
-        arguments: {
-          expectedRevision: 1,
-          operationId: `outline-loop-${String(variation)}`,
-          outlineContent: invalidOutline(title, variation),
-        },
-        signal: new AbortController().signal,
-        agent,
-      })
-      expect(result.isError).toBe(true)
-      if (variation === 2) {
-        expect(result.additionalContexts).toEqual(expect.arrayContaining([
-          expect.objectContaining({ source: expect.objectContaining({ plugin: 'screenplay-agent' }) }),
-        ]))
-      }
-    }
-
-    const correctedArguments = {
-      expectedRevision: 1,
-      operationId: 'outline-loop-corrected',
-      outlineContent: `# ${title}\n\n主角确认目标并开始行动。\n\n阻力升级后，主角承担选择的结果并处理核心矛盾。`,
-    }
-    await expect(context.tools.execute({
-      callId: CallId('outline-loop-unrelated-read'),
-      name: 'screenplay_list_references',
-      arguments: {},
-      signal: new AbortController().signal,
-      agent,
-    })).resolves.toMatchObject({ isError: false })
-    const blocked = await context.tools.execute({
-      callId: CallId('outline-loop-blocked'),
-      name: 'screenplay_create_outline',
-      arguments: correctedArguments,
-      signal: new AbortController().signal,
-      agent,
-    })
-    expect(blocked.isError).toBe(true)
-    expect(blocked.content).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'text', text: expect.stringContaining('read_project_context') }),
-    ]))
-
-    await expect(context.tools.execute({
-      callId: CallId('outline-loop-diagnostic'),
-      name: 'read_project_context',
-      arguments: {},
-      signal: new AbortController().signal,
-      agent,
-    })).resolves.toMatchObject({ isError: false })
-    await expect(context.tools.execute({
-      callId: CallId('outline-loop-recovered'),
-      name: 'screenplay_create_outline',
-      arguments: correctedArguments,
-      signal: new AbortController().signal,
-      agent,
-    })).resolves.toMatchObject({ isError: false })
-  })
 })

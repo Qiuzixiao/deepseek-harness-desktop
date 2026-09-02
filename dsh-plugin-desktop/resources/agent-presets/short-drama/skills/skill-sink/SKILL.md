@@ -5,7 +5,6 @@ metadata:
   scope: user
   version: 1
   applicableTo: ["个人文风 skill 沉淀", "经验方法论 skill 沉淀", "反复规则的固化", "创作资产积累"]
-  sourceIds: ["/Users/qiuzixiao/Desktop/剧本创作/作者搭建自己的知识库建议.md"]
   whenToUse: "当创作中发现可复用的方法论经验、个人文风偏好、或用户反复强调的规则，要把它沉淀成新 skill 时使用。用户说「记住这个 / 以后都这样 / 沉淀成技能 / 存成我的风格」时激活。"
 ---
 

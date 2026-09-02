@@ -5,7 +5,6 @@ metadata:
   scope: user
   version: 1
   applicableTo: ["解释性段落改成可拍动作", "对白口语化与潜台词增强", "单场冲突与状态变化检查", "信息差与动作进出设计"]
-  sourceIds: ["/Users/qiuzixiao/Desktop/剧本创作/xie-hao-duan-ju-skills-1.0.0/skills/scene-dialogue-visualization/SKILL.md"]
   whenToUse: "用户说「把这段对白改得更口语、更有潜台词」「这场戏不够有戏/不够可视化」「少说多做，帮我改成能拍的版本」时调用"
 ---
 

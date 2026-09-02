@@ -13,6 +13,7 @@ import {
   MAIN_CHARACTER_SECTIONS,
   OTHER_CHARACTER_FIELDS,
   fieldValues,
+  hasMainCharacterFieldSyntax,
   hasMainCharacterFieldTemplate,
   isPresentFieldValue,
   sectionBody,
@@ -25,8 +26,6 @@ import {
   type CreateOutlineBundleInput,
   type CreateScreenplayArtifactsInput,
   type EpisodeOutlineBatch,
-  type EpisodeOutlineDraft,
-  type FinalizeOutlineBundleInput,
   type PendingArtifactChange,
   type RequirementsChanges,
   type ScreenplayArtifactKind,
@@ -41,7 +40,6 @@ import {
   type ScreenplayVersionArtifact,
 } from './types.js'
 
-const PROJECT_FILE = 'screenplay.project.json'
 const PRIVATE_DIR = '.screenplay'
 const EVENTS_FILE = 'events.jsonl'
 const STATE_FILE = 'state.json'
@@ -310,7 +308,9 @@ function episodeOutlineHeadings(content: string): EpisodeOutlineHeading[] {
       headings.push({ number: Number(match[1]), index: match.index, style: 'legacy' })
     }
   }
-  for (const match of content.matchAll(/^###\s+第\s*(\d+)\s*集\s*$/gmu)) {
+  // Compact outlines are creative Markdown, so keep the stable episode number
+  // but allow a human-friendly suffix such as "· 归" or "：回家".
+  for (const match of content.matchAll(/^###[ \t]+第[ \t]*(\d+)[ \t]*集(?:[ \t]+.*|[·•—–\-:：|｜《（(【\[].*)?$/gmu)) {
     if (match.index !== undefined && match[1] !== undefined) {
       headings.push({ number: Number(match[1]), index: match.index, style: 'compact' })
     }
@@ -318,9 +318,18 @@ function episodeOutlineHeadings(content: string): EpisodeOutlineHeading[] {
   return headings.sort((left, right) => left.index - right.index)
 }
 
+function normalizeEpisodeOutlineLabel(line: string): string {
+  return line.trim()
+    .replace(/^>\s*/u, '')
+    .replace(/^(?:[-*+]\s+|\d+[.)]\s+)/u, '')
+    .replace(/^[*_]{1,2}/u, '')
+    .replace(/[*_]{1,2}(?=\s*[：:])/u, '')
+    .trim()
+}
+
 function validateCompactEpisodeOutlineBlock(content: string, episode: number): void {
   const lines = content.split('\n').map(line => line.trim()).filter(Boolean)
-  const intro = lines.findIndex(line => /^导语：\S.*$/u.test(line))
+  const intro = lines.findIndex(line => /^导语\s*[：:]\s*\S.*$/u.test(normalizeEpisodeOutlineLabel(line)))
   if (intro < 0) {
     validationFailure(`episode ${String(episode)} compact outline is missing 导语`, 'episode-outlines', [{
       field: `episode-${String(episode)}`,
@@ -335,7 +344,7 @@ function validateCompactEpisodeOutlineBlock(content: string, episode: number): v
     }])
   }
   const analysisLabels = /^(?:核心冲突|情绪定位|钩子开场|冲突升级|情绪爆发|微反转\/钩子)\s*[：:]/u
-  if (storyLines.some(line => analysisLabels.test(line))) {
+  if (storyLines.some(line => analysisLabels.test(normalizeEpisodeOutlineLabel(line)))) {
     validationFailure(`episode ${String(episode)} compact outline must be narrative rather than analysis fields`, 'episode-outlines', [{
       field: `episode-${String(episode)}`,
       expected: 'third-person narrative without analysis labels',
@@ -730,12 +739,12 @@ function batchEpisodes(content: string): string[] {
 
 function buildEpisodeOutlines(
   totalEpisodes: number,
-  draft: EpisodeOutlineDraft,
+  batches: readonly EpisodeOutlineBatch[],
   forecastContent: string,
 ): string {
-  const firstBatch = draft.batches[0]
+  const firstBatch = batches[0]
   if (firstBatch === undefined) {
-    throw new ScreenplayError('INVALID_STATE', 'episode outline draft has no batches')
+    throw new ScreenplayError('INVALID_STATE', 'episode outline batches are empty')
   }
   const forecast = forecastContent.trim()
   if (forecast.length === 0) {
@@ -747,21 +756,10 @@ function buildEpisodeOutlines(
   }
   return [
     batchHeader(firstBatch.content),
-    ...draft.batches.flatMap(batch => batchEpisodes(batch.content)),
+    ...batches.flatMap(batch => batchEpisodes(batch.content)),
     '---',
     `## 后续主线预告（${String(totalEpisodes)} 集内定向）`,
     forecast,
-  ].join('\n\n').concat('\n')
-}
-
-function buildEpisodeOutlineDraftContent(draft: EpisodeOutlineDraft): string {
-  const firstBatch = draft.batches[0]
-  if (firstBatch === undefined) {
-    throw new ScreenplayError('INVALID_STATE', 'episode outline draft has no batches')
-  }
-  return [
-    batchHeader(firstBatch.content),
-    ...draft.batches.flatMap(batch => batchEpisodes(batch.content)),
   ].join('\n\n').concat('\n')
 }
 
@@ -773,7 +771,7 @@ function validateContent(
   episodeCount?: number,
   episodeNumber?: number,
   durationSeconds?: number,
-  allowLegacyMainCharacterTemplate = false,
+  _allowLegacyMainCharacterTemplate = false,
 ): void {
   switch (kind) {
     case 'creative-contract':
@@ -787,17 +785,29 @@ function validateContent(
         throw new ScreenplayError('INVALID_STATE', 'main-character artifact is missing its character name')
       }
       const firstLine = content.split('\n', 1)[0]?.trim()
-      if (firstLine !== `# ${characterName}` && !firstLine?.startsWith(`# ${characterName}（`)) {
-        throw new ScreenplayError('VALIDATION_FAILED', 'major character heading must start with the exact character name', {
+      const heading = firstLine?.match(/^#[ \t]+(.+)$/u)?.[1]?.trim() ?? ''
+      const formalName = characterName.split(/[（(]/u, 1)[0]?.trim() || characterName
+      const headingMatchesName = heading === characterName
+        || heading === formalName
+        || (heading.startsWith(formalName)
+          && /^[ \t（(【\[《<:：·—–\-|｜]/u.test(heading.slice(formalName.length)))
+      if (!headingMatchesName) {
+        throw new ScreenplayError('VALIDATION_FAILED', 'major character heading must start with the formal character name', {
           characterName,
+          formalName,
         })
       }
       const legacySections = MAIN_CHARACTER_SECTIONS.filter(section => content.includes(section)).length
       if (legacySections === MAIN_CHARACTER_SECTIONS.length) {
-        if (allowLegacyMainCharacterTemplate && !hasMainCharacterFieldTemplate(content)) {
+        // A prose profile is valid at intake. Enforce the detailed template
+        // only when the author has started using its field syntax, so the
+        // validator cannot contradict the tool's lightweight contract.
+        if (_allowLegacyMainCharacterTemplate && !hasMainCharacterFieldSyntax(content)) {
           validateFlexibleArtifact(content, 'main-character')
-        } else {
+        } else if (hasMainCharacterFieldTemplate(content) || hasMainCharacterFieldSyntax(content)) {
           validateMainCharacterTemplate(content, characterName)
+        } else {
+          validateFlexibleArtifact(content, 'main-character')
         }
       } else {
         validateFlexibleArtifact(content, 'main-character')
@@ -832,12 +842,20 @@ function validateContent(
 }
 
 function cloneState(state: ScreenplayProjectState): ScreenplayProjectState {
-  return structuredClone(state)
+  // Drop the retired field when replaying an older event log. It is a
+  // one-way read migration; no current state or operation can create it.
+  const legacy = state as ScreenplayProjectState & { episodeOutlineDraft?: unknown }
+  const { episodeOutlineDraft: _retired, ...current } = legacy
+  return structuredClone(current)
 }
 
 function episodeNumberFromPath(layout: ScreenplayPathLayout, logicalPath: string): number {
   if (posix.dirname(logicalPath) !== layout.screenplayDir) return NaN
-  return Number(posix.basename(logicalPath).match(/^episode-(\d+)\.md$/u)?.[1] ?? NaN)
+  const basename = posix.basename(logicalPath)
+  const match = layout.id === 'zh-CN-v1'
+    ? basename.match(/^第(\d+)集\.md$/u)
+    : basename.match(/^episode-(\d+)\.md$/u)
+  return Number(match?.[1] ?? NaN)
 }
 
 function writingProgressAfterEpisodeEdit(
@@ -918,12 +936,7 @@ export class ScreenplayProjectStore {
     return snapshot
   }
 
-  /**
-   * Return the persisted result for an idempotency key without requiring the
-   * caller to replay the operation's inputs. This is used when a Session-local
-   * draft was consumed by a successful commit but the client needs to retry a
-   * lost response.
-   */
+  /** Return the persisted result for an idempotency key. */
   async findOperationResult(
     operationId: string,
     expectedType: ScreenplayEvent['type'],
@@ -1088,14 +1101,6 @@ export class ScreenplayProjectStore {
         throw new ScreenplayError('VALIDATION_FAILED', 'outlineContent is required')
       }
       const content = normalizeContent(outlineContent, 'full outline content')
-      if (previous.episodeOutlineDraft?.outlineContent !== undefined
-        && previous.episodeOutlineDraft.outlineContent !== content) {
-        validationFailure('the full outline does not match the outline already discussed for the episode batches', 'full-outline', [{
-          field: 'outlineContent',
-          expected: previous.episodeOutlineDraft.outlineContent,
-          actual: content,
-        }])
-      }
       validateContent('full-outline', content, undefined, previous.projectName, previous.requirements.episodeCount)
 
       const sources: Array<{
@@ -1184,16 +1189,20 @@ export class ScreenplayProjectStore {
       if (totalEpisodes === undefined) {
         throw new ScreenplayError('INVALID_STATE', 'the project has no confirmed episode count')
       }
-      const draft = previous.episodeOutlineDraft
-      if (draft !== undefined && draft.totalEpisodes !== totalEpisodes) {
-        throw new ScreenplayError('INVALID_STATE', 'episode outline draft does not match the confirmed episode count', {
-          expected: totalEpisodes,
-          actual: draft.totalEpisodes,
-        })
-      }
       const startEpisode = input.startEpisode
       const endEpisode = input.endEpisode
-      const expectedStart = draft?.nextEpisode ?? 1
+      const existingEpisodeArtifact = currentVersion.artifacts.find(
+        artifact => artifact.logicalPath === this.layout.episodeOutlinesFile,
+      )
+      const existingEpisodeOutlines = existingEpisodeArtifact === undefined
+        ? undefined
+        : await this.readRelative(existingEpisodeArtifact.versionRelativePath)
+      const existingHeadings = existingEpisodeOutlines === undefined
+        ? []
+        : episodeOutlineHeadings(existingEpisodeOutlines)
+      const expectedStart = existingHeadings.at(-1)?.number === undefined
+        ? 1
+        : existingHeadings.at(-1)!.number + 1
       if (startEpisode !== expectedStart) {
         validationFailure(
           'episode outline batch must continue from the next ungenerated episode',
@@ -1204,12 +1213,6 @@ export class ScreenplayProjectStore {
             actual: startEpisode,
           }],
         )
-      }
-      const existingEpisodeArtifact = currentVersion.artifacts.find(
-        artifact => artifact.logicalPath === this.layout.episodeOutlinesFile,
-      )
-      if (existingEpisodeArtifact !== undefined && draft === undefined) {
-        throw new ScreenplayError('INVALID_STATE', 'episode outlines already exist; use the explicit modification flow')
       }
       if (endEpisode < startEpisode || endEpisode > totalEpisodes
         || endEpisode - startEpisode + 1 > MAX_EPISODE_OUTLINE_BATCH_SIZE) {
@@ -1234,18 +1237,10 @@ export class ScreenplayProjectStore {
         ? undefined
         : await this.readRelative(existingOutlineArtifact.versionRelativePath)
       const outlineContent = input.outlineContent === undefined
-        ? draft?.outlineContent ?? existingOutlineContent
+        ? existingOutlineContent
         : normalizeContent(input.outlineContent, 'full outline content')
       if (outlineContent === undefined) {
         throw new ScreenplayError('VALIDATION_FAILED', 'the first episode outline batch must include the whole-series outline')
-      }
-      if (draft?.outlineContent !== undefined && input.outlineContent !== undefined
-        && normalizeContent(input.outlineContent, 'full outline content') !== draft.outlineContent) {
-        validationFailure('the whole-series outline cannot change while episode batches are in progress', 'full-outline', [{
-          field: 'outlineContent',
-          expected: draft.outlineContent,
-          actual: input.outlineContent,
-        }])
       }
       validateFullOutline(outlineContent, previous.projectName)
       const batchContent = normalizeContent(input.episodeOutlinesContent, 'episode outline batch content')
@@ -1263,12 +1258,13 @@ export class ScreenplayProjectStore {
         sha256: sha256(batchContent),
         createdAt: time,
       }
-      const nextDraft: EpisodeOutlineDraft = {
-        totalEpisodes,
-        nextEpisode: endEpisode + 1,
-        outlineContent,
-        batches: [...(draft?.batches ?? []), batch],
-      }
+      const previousBatches: EpisodeOutlineBatch[] = existingEpisodeOutlines === undefined ? [] : [{
+        startEpisode: 1,
+        endEpisode: expectedStart - 1,
+        content: existingEpisodeOutlines,
+        sha256: sha256(existingEpisodeOutlines),
+        createdAt: time,
+      }]
       const complete = endEpisode === totalEpisodes
       let episodeOutlinesContent: string
       if (complete) {
@@ -1280,13 +1276,13 @@ export class ScreenplayProjectStore {
           }])
         }
         episodeOutlinesContent = normalizeContent(
-          buildEpisodeOutlines(totalEpisodes, nextDraft, input.forecastContent),
+          buildEpisodeOutlines(totalEpisodes, [...previousBatches, batch], input.forecastContent),
           'episode outlines content',
         )
         validateContent('episode-outlines', episodeOutlinesContent, undefined, previous.projectName, totalEpisodes)
       } else {
         episodeOutlinesContent = normalizeContent(
-          buildEpisodeOutlineDraftContent(nextDraft),
+          [batchHeader(batchContent), ...previousBatches.flatMap(item => batchEpisodes(item.content)), ...batchEpisodes(batchContent)].join('\n\n').concat('\n'),
           'episode outline progress content',
         )
         validateEpisodeOutlineBatch(
@@ -1337,8 +1333,6 @@ export class ScreenplayProjectStore {
         versions: [...previous.versions, version],
         updatedAt: time,
       }
-      if (complete) delete state.episodeOutlineDraft
-      else state.episodeOutlineDraft = nextDraft
       const createdFiles = [
         ...(existingOutlineArtifact === undefined ? [this.layout.outlineFile] : []),
         ...(existingEpisodeArtifact === undefined ? [this.layout.episodeOutlinesFile] : []),
@@ -1374,9 +1368,6 @@ export class ScreenplayProjectStore {
         throw new ScreenplayError('INVALID_STATE', 'save or discard the pending change first', {
           pendingChangeId: previous.pendingChange.id,
         })
-      }
-      if (previous.episodeOutlineDraft !== undefined) {
-        throw new ScreenplayError('INVALID_STATE', 'episode outline batches are in progress; finalize the batch draft before creating formal files')
       }
       const currentVersion = previous.currentVersion
       if (currentVersion === undefined) {
@@ -1457,105 +1448,6 @@ export class ScreenplayProjectStore {
           stage: 'OutlineReady',
           createdFiles: [this.layout.outlineFile, this.layout.episodeOutlinesFile],
           transitionedThrough: 'OutlineCreated',
-        }),
-      }
-    })
-  }
-
-  async finalizeOutlineBundle(
-    expectedRevision: number,
-    operationId: string,
-    input: FinalizeOutlineBundleInput,
-  ): Promise<Record<string, unknown>> {
-    return this.mutate(expectedRevision, operationId, 'outline-created', async (current, revision, time) => {
-      const previous = this.requireState(current)
-      if (previous.pendingChange !== undefined) {
-        throw new ScreenplayError('INVALID_STATE', 'save or discard the pending change first', {
-          pendingChangeId: previous.pendingChange.id,
-        })
-      }
-      const currentVersion = previous.currentVersion
-      if (currentVersion === undefined) {
-        throw new ScreenplayError('INVALID_STATE', 'the project has no formal artifact set')
-      }
-      if (currentVersion.artifacts.some(artifact => artifact.logicalPath === this.layout.outlineFile
-        || artifact.logicalPath === this.layout.episodeOutlinesFile)) {
-        throw new ScreenplayError('INVALID_STATE', 'outline and episode outlines already exist; use the explicit modification flow')
-      }
-      const draft = previous.episodeOutlineDraft
-      const totalEpisodes = previous.requirements.episodeCount
-      if (draft === undefined || totalEpisodes === undefined) {
-        throw new ScreenplayError('INVALID_STATE', 'episode outline batches must be completed before finalization')
-      }
-      if (draft.totalEpisodes !== totalEpisodes || draft.nextEpisode !== totalEpisodes + 1) {
-        throw new ScreenplayError('INVALID_STATE', 'episode outline batches are incomplete', {
-          expected: { totalEpisodes, nextEpisode: totalEpisodes + 1 },
-          actual: { totalEpisodes: draft.totalEpisodes, nextEpisode: draft.nextEpisode },
-        })
-      }
-      if (input === null || typeof input !== 'object' || typeof input.forecastContent !== 'string') {
-        throw new ScreenplayError('VALIDATION_FAILED', 'forecastContent is required to finalize episode outlines')
-      }
-      const outlineContent = normalizeContent(draft.outlineContent, 'full outline content')
-      const episodeOutlinesContent = normalizeContent(
-        buildEpisodeOutlines(totalEpisodes, draft, input.forecastContent),
-        'episode outlines content',
-      )
-      validateContent('full-outline', outlineContent, undefined, previous.projectName, totalEpisodes)
-      validateContent('episode-outlines', episodeOutlinesContent, undefined, previous.projectName, totalEpisodes)
-
-      const sources: Array<{
-        kind: ScreenplayArtifactKind
-        logicalPath: string
-        content: string
-        characterName?: string
-      }> = []
-      for (const artifact of currentVersion.artifacts) {
-        sources.push({
-          kind: artifact.kind,
-          logicalPath: artifact.logicalPath,
-          content: await this.readRelative(artifact.versionRelativePath),
-          ...(artifact.characterName === undefined ? {} : { characterName: artifact.characterName }),
-        })
-      }
-      sources.push({ kind: 'full-outline', logicalPath: this.layout.outlineFile, content: outlineContent })
-      sources.push({
-        kind: 'episode-outlines',
-        logicalPath: this.layout.episodeOutlinesFile,
-        content: episodeOutlinesContent,
-      })
-      const sourceDigests = sources.map(source => ({ logicalPath: source.logicalPath, sha256: sha256(source.content) }))
-      const versionId = stableId(`v${String(revision)}`, operationId, artifactDigest(sourceDigests))
-      const artifacts: ScreenplayVersionArtifact[] = []
-      for (const source of sources) {
-        const versionRelativePath = join(PRIVATE_DIR, 'versions', versionId, source.logicalPath)
-        await this.writeRelative(versionRelativePath, source.content)
-        artifacts.push({
-          kind: source.kind,
-          logicalPath: source.logicalPath,
-          versionRelativePath,
-          sha256: sha256(source.content),
-          ...(source.characterName === undefined ? {} : { characterName: source.characterName }),
-        })
-      }
-      const version: ScreenplayVersion = { id: versionId, revision, artifacts, createdAt: time }
-      const { episodeOutlineDraft: _episodeOutlineDraft, ...base } = cloneState(previous)
-      const state: ScreenplayProjectState = {
-        ...base,
-        phase: 'Ready',
-        revision,
-        currentVersion: version,
-        versions: [...previous.versions, version],
-        updatedAt: time,
-      }
-      return {
-        state,
-        result: stateResult(state, {
-          version,
-          stage: 'OutlineReady',
-          createdFiles: [this.layout.outlineFile, this.layout.episodeOutlinesFile],
-          completedEpisodes: totalEpisodes,
-          transitionedThrough: 'OutlineFinalized',
         }),
       }
     })
@@ -1698,7 +1590,9 @@ export class ScreenplayProjectStore {
         })
       }
       const content = normalizeContent(input.episodeContent, `episode ${String(episode)} screenplay content`)
-      const count = validateEpisodeScreenplay(content, episode, previous.requirements.episodeDurationSeconds)
+      const count = input.validate === false
+        ? effectiveCharacterCount(content)
+        : validateEpisodeScreenplay(content, episode, previous.requirements.episodeDurationSeconds)
       const continuity = normalizeContinuity(input.continuity)
       const sources: Array<{
         kind: ScreenplayArtifactKind
@@ -1864,6 +1758,7 @@ export class ScreenplayProjectStore {
     expectedRevision: number,
     operationId: string,
     requestedChanges: ScreenplayChangeInput[],
+    validate = true,
   ): Promise<Record<string, unknown>> {
     if (requestedChanges.length === 0) {
       throw new ScreenplayError('INVALID_STATE', 'at least one explicit file change is required')
@@ -1949,16 +1844,18 @@ export class ScreenplayProjectStore {
         const episodeNumber = artifact.kind === 'episode-screenplay'
           ? episodeNumberFromPath(this.layout, requested.path)
           : undefined
-        validateContent(
-          artifact.kind,
-          content,
-          nextCharacterName,
-          previous.projectName,
-          previous.requirements.episodeCount,
-          Number.isSafeInteger(episodeNumber) ? episodeNumber : undefined,
-          previous.requirements.episodeDurationSeconds,
-          artifact.kind === 'main-character' && !hasMainCharacterFieldTemplate(oldText),
-        )
+        if (validate) {
+          validateContent(
+            artifact.kind,
+            content,
+            nextCharacterName,
+            previous.projectName,
+            previous.requirements.episodeCount,
+            Number.isSafeInteger(episodeNumber) ? episodeNumber : undefined,
+            previous.requirements.episodeDurationSeconds,
+            artifact.kind === 'main-character' && !hasMainCharacterFieldTemplate(oldText),
+          )
+        }
         if (artifact.kind === 'creative-contract' && !hasProjectHeading(content, previous.projectName)) {
           throw new ScreenplayError('VALIDATION_FAILED', 'creative contract title must keep the exact project name')
         }
@@ -2325,15 +2222,6 @@ export class ScreenplayProjectStore {
         if (!isMissing(error)) throw error
       }
     }
-    await writeFileAtomic(join(this.workspaceRoot, PROJECT_FILE), `${JSON.stringify({
-      schemaVersion: state.schemaVersion,
-      projectId: state.projectId,
-      projectName: state.projectName,
-      phase: state.phase,
-      revision: state.revision,
-      currentVersionId: state.currentVersion?.id ?? null,
-      files: state.currentVersion?.artifacts.map(artifact => artifact.logicalPath) ?? [],
-    }, null, 2)}\n`, { mode: 0o600, dirMode: 0o700 })
   }
 
   private async readRelative(relativePath: string): Promise<string> {

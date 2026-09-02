@@ -162,3 +162,12 @@ export function hasMainCharacterFieldTemplate(content) {
     }
     return true;
 }
+/**
+ * Distinguish a prose character profile from an author attempting the
+ * field-level template.  The latter should still receive actionable missing
+ * field errors; prose profiles only need the lightweight Markdown baseline.
+ */
+export function hasMainCharacterFieldSyntax(content) {
+    const fieldNames = Object.values(MAIN_CHARACTER_FIELDS).flat();
+    return fieldNames.some(field => new RegExp(`^\\s*-\\s*\\*\\*${field}\\*\\*\\s*(?:：|:)`, 'mu').test(content));
+}

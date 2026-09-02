@@ -5,7 +5,6 @@ metadata:
   scope: user
   version: 1
   applicableTo: ["从灵感/新闻/生活片段生成短剧故事核", "补齐人物、时空、情境、行动、主题五元组的缺失项", "判断创意是否可拍、是否适合短剧类型", "产出前提、梗概与可执行大纲等中间产物"]
-  sourceIds: ["/Users/qiuzixiao/Desktop/剧本创作/xie-hao-duan-ju-skills-1.0.0/skills/story-ideation-to-shootable/SKILL.md"]
   whenToUse: "触发词：'把这个素材扩成短剧'、'帮我整理故事创意/一句话梗概'、'这个点子缺什么冲突'。语言信号：用户只有灵感、新闻、生活片段或模糊题材，题材缺少目标、行动、冲突或结尾主题，或想判断创意是否可拍。"
 ---
 

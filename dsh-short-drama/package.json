@@ -2,7 +2,7 @@
   "name": "dsh-short-drama",
   "version": "0.1.0-dev.0",
   "private": true,
-  "description": "短剧创作 Agent 插件（内核）：短剧项目状态机、领域工具、参考文件解析、格式校验与 screenplay-v1 预设。对齐 DeepSeek Harness 0.1.1-rc.2。",
+  "description": "Zenwit 短剧写作预设：通用项目文件能力、联网、附件读取和可选 Skill。对齐 DeepSeek Harness 0.1.1-rc.2。",
   "license": "MIT",
   "type": "module",
   "main": "lib/index.js",

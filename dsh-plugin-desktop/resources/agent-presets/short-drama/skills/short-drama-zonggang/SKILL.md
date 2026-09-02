@@ -5,7 +5,6 @@ metadata:
   scope: user
   version: 1
   applicableTo: ["短剧剧本创作/立项选题", "人物与故事骨架", "分集大纲与爽点卡点", "短剧正文台词写作", "付费卡点设计", "剧本评审/修改/验收"]
-  sourceIds: ["/Users/qiuzixiao/Desktop/剧本创作/short-drama-zenwit/SKILL.md", "/Users/qiuzixiao/Desktop/剧本创作/short-drama-zenwit/references/00_情绪账务引擎.md", "/Users/qiuzixiao/Desktop/剧本创作/short-drama-zenwit/references/01_创作六律.md", "/Users/qiuzixiao/Desktop/剧本创作/short-drama-zenwit/references/02_压爽循环卡点与正文格式.md", "/Users/qiuzixiao/Desktop/剧本创作/short-drama-zenwit/references/03_创作流程与自检清单.md", "/Users/qiuzixiao/Desktop/剧本创作/short-drama-zenwit/references/04_选题闸门与首集战役.md", "/Users/qiuzixiao/Desktop/剧本创作/short-drama-zenwit/references/05_付费卡点体系.md", "/Users/qiuzixiao/Desktop/剧本创作/short-drama-zenwit/references/06_生产纪律与失效模式库.md", "/Users/qiuzixiao/Desktop/剧本创作/short-drama-zenwit/references/07_生效说明.md"]
   whenToUse: "当用户要创作或设计短剧剧本、做立项/选题、定主角反派与故事骨架、写分集大纲与爽点卡点、写正文台词、埋付费钩子，或评审/修改/验收一部短剧时使用。凡涉短剧「怎么能让观众爽、怎么压怎么爽、怎么埋付费钩子、格式怎么写、怎么自检改稿」，都先读本 Skill。"
 ---
 

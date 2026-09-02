@@ -1,10 +1,10 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { CHINESE_SCREENPLAY_LAYOUT, LEGACY_SCREENPLAY_LAYOUT } from '../src/layout.js'
 import { ScreenplayProjectStore } from '../src/store.js'
-import type { CreateScreenplayArtifactsInput } from '../src/types.js'
+import type { CreateScreenplayArtifactsInput, ScreenplayProjectState } from '../src/types.js'
 
 const roots: string[] = []
 
@@ -234,6 +234,16 @@ afterEach(async () => {
 })
 
 describe('ScreenplayProjectStore', () => {
+  it('does not materialize the legacy root screenplay.project.json projection', async () => {
+    const root = await workspace()
+    const { store } = await readyProject(root)
+
+    await expect(access(join(root, 'screenplay.project.json'))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(access(join(root, '.screenplay', 'state.json'))).resolves.toBeUndefined()
+    await store.snapshot('summary')
+    await expect(access(join(root, 'screenplay.project.json'))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
   it('keeps creation, rename, writing, delivery, and episode repair inside the Chinese layout', async () => {
     const root = await workspace()
     const store = new ScreenplayProjectStore(root, CHINESE_SCREENPLAY_LAYOUT)
@@ -244,14 +254,14 @@ describe('ScreenplayProjectStore', () => {
 
     expect(created).toMatchObject({
       createdFiles: [
-        '创作合同/creative-contract.md',
-        '设定/core-setting.md',
+        '创作合同/创作合同.md',
+        '设定/核心设定.md',
         '人物/主要人物/顾北辰.md',
         '人物/主要人物/苏晚.md',
-        '人物/其他人物/other-characters.md',
+        '人物/其他人物/其他人物.md',
       ],
     })
-    await expect(readFile(join(root, '创作合同', 'creative-contract.md'), 'utf8')).resolves.toBe(contract())
+    await expect(readFile(join(root, '创作合同', '创作合同.md'), 'utf8')).resolves.toBe(contract())
     await expect(readFile(join(root, '人物', '主要人物', '顾北辰.md'), 'utf8')).resolves.toBe(mainCharacter('顾北辰'))
     await expect(readFile(join(root, 'contract', 'creative-contract.md'), 'utf8'))
       .rejects.toMatchObject({ code: 'ENOENT' })
@@ -278,18 +288,18 @@ describe('ScreenplayProjectStore', () => {
     })
     const delivery = await store.mergeDelivery(6, 'op-chinese-delivery')
     expect(delivery).toMatchObject({ mergedFile: '交付/测试短剧.md' })
-    await expect(readFile(join(root, '大纲', 'full-outline.md'), 'utf8')).resolves.toBe(fullOutline())
-    await expect(readFile(join(root, '剧本', 'episode-002.md'), 'utf8')).resolves.toBe(episodeScript(2))
+    await expect(readFile(join(root, '大纲', '总纲.md'), 'utf8')).resolves.toBe(fullOutline())
+    await expect(readFile(join(root, '剧本', '第002集.md'), 'utf8')).resolves.toBe(episodeScript(2))
     await expect(readFile(join(root, '交付', '测试短剧.md'), 'utf8')).resolves.toContain('第2集')
 
     const editedEpisode = episodeScript(1).replace('今天说清楚', '今天说得更清楚')
     const episodeChange = await store.prepareChange(7, 'op-edit-chinese-episode', [{
-      path: '剧本/episode-001.md',
+      path: '剧本/第001集.md',
       content: editedEpisode,
     }])
     await store.saveChange(8, 'op-save-chinese-episode', (episodeChange.pendingChange as { id: string }).id)
-    await expect(readFile(join(root, '剧本', 'episode-001.md'), 'utf8')).resolves.toBe(editedEpisode)
-    await expect(readFile(join(root, '剧本', 'episode-002.md'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(readFile(join(root, '剧本', '第001集.md'), 'utf8')).resolves.toBe(editedEpisode)
+    await expect(readFile(join(root, '剧本', '第002集.md'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
     await expect(readFile(join(root, '交付', '测试短剧.md'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
@@ -381,6 +391,7 @@ describe('ScreenplayProjectStore', () => {
     expect(await readFile(join(root, 'episodes', 'episode-outlines.md'), 'utf8')).toBe(episodeOutlines())
     const snapshot = await store.snapshot('summary')
     if (!snapshot.initialized) throw new Error('expected initialized snapshot')
+    expect((snapshot as ScreenplayProjectState & { episodeOutlineDraft?: unknown }).episodeOutlineDraft).toBeUndefined()
     expect(snapshot.currentVersion?.artifacts).toHaveLength(7)
     expect(snapshot.currentVersion?.artifacts.map(artifact => artifact.logicalPath)).toEqual(expect.arrayContaining([
       'outline/full-outline.md',
@@ -534,7 +545,6 @@ describe('ScreenplayProjectStore', () => {
     expect(finalEpisodes).toContain('## 后续主线预告（12 集内定向）')
     const snapshot = await store.snapshot('summary')
     if (!snapshot.initialized) throw new Error('expected initialized snapshot')
-    expect(snapshot.episodeOutlineDraft).toBeUndefined()
     expect(snapshot.currentVersion?.artifacts).toHaveLength(7)
     expect((await readFile(join(root, '.screenplay', 'events.jsonl'), 'utf8')).trim().split('\n')).toHaveLength(3)
   })
@@ -792,7 +802,7 @@ describe('ScreenplayProjectStore', () => {
     })
   })
 
-  it('rejects compressed character content and reports missing field names', async () => {
+  it('accepts prose character sections when no field-level template was requested', async () => {
     const root = await workspace()
     const invalid = artifacts()
     invalid.mainCharacters = [{
@@ -800,18 +810,50 @@ describe('ScreenplayProjectStore', () => {
       content: legacyMainCharacter('顾北辰'),
     }]
     await expect(new ScreenplayProjectStore(root).createProject(
-      0, 'op-invalid-character-template', '测试短剧', requirements, invalid,
+      0, 'op-prose-character-template', '测试短剧', requirements, invalid,
+    )).resolves.toMatchObject({ phase: 'Ready' })
+  })
+
+  it('accepts a formal character heading when the input name also contains a nickname', async () => {
+    const root = await workspace()
+    const input = artifacts()
+    input.mainCharacters = [{
+      name: '周念（囡囡）',
+      content: legacyMainCharacter('周念').replace('# 周念（主要角色）', '# 周念（主要角色）'),
+    }]
+    await expect(new ScreenplayProjectStore(root).createProject(
+      0, 'op-character-nickname-heading', '测试短剧', requirements, input,
+    )).resolves.toMatchObject({ phase: 'Ready' })
+  })
+
+  it('still rejects a partially filled field-level character template', async () => {
+    const root = await workspace()
+    const invalid = artifacts()
+    invalid.mainCharacters = [{
+      name: '顾北辰',
+      content: [
+        '# 顾北辰',
+        '## 一句话记忆点',
+        '冷静创业者',
+        '## 基本信息',
+        '- **年龄**：29 岁',
+        '- **身份**：创业者',
+        '## 性格特质',
+        '待确认',
+        '## 关键经历',
+        '- 待确认',
+        '## 人物关系',
+        '- 待确认',
+        '## 记忆点标签',
+        '待确认',
+      ].join('\n'),
+    }]
+    await expect(new ScreenplayProjectStore(root).createProject(
+      0, 'op-partial-character-template', '测试短剧', requirements, invalid,
     )).rejects.toMatchObject({
       code: 'VALIDATION_FAILED',
       message: 'major character 顾北辰 does not match the field-level Markdown template',
-      details: {
-        issues: expect.arrayContaining([
-          expect.objectContaining({
-            section: '基本信息',
-            missingFields: expect.arrayContaining(['年龄', '身份', '外貌', '口头禅']),
-          }),
-        ]),
-      },
+      details: { issues: expect.arrayContaining([expect.objectContaining({ section: '基本信息' })]) },
     })
   })
 

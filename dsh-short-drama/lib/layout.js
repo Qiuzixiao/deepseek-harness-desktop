@@ -1,6 +1,13 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
-function defineLayout(id, values) {
+function defineLayout(id, values, fileNames = {
+    contract: 'creative-contract.md',
+    setting: 'core-setting.md',
+    otherCharacters: 'other-characters.md',
+    outline: 'full-outline.md',
+    episodeOutlines: 'episode-outlines.md',
+    episode: episode => `episode-${String(episode).padStart(3, '0')}.md`,
+}) {
     const directories = [
         values.referenceDir,
         values.contractDir,
@@ -16,13 +23,13 @@ function defineLayout(id, values) {
         id,
         ...values,
         directories,
-        contractFile: posix.join(values.contractDir, 'creative-contract.md'),
-        settingFile: posix.join(values.settingDir, 'core-setting.md'),
-        otherCharactersFile: posix.join(values.otherCharactersDir, 'other-characters.md'),
-        outlineFile: posix.join(values.outlineDir, 'full-outline.md'),
-        episodeOutlinesFile: posix.join(values.episodesDir, 'episode-outlines.md'),
+        contractFile: posix.join(values.contractDir, fileNames.contract),
+        settingFile: posix.join(values.settingDir, fileNames.setting),
+        otherCharactersFile: posix.join(values.otherCharactersDir, fileNames.otherCharacters),
+        outlineFile: posix.join(values.outlineDir, fileNames.outline),
+        episodeOutlinesFile: posix.join(values.episodesDir, fileNames.episodeOutlines),
         mainCharacterPath: name => posix.join(values.mainCharactersDir, `${name}.md`),
-        episodeScreenplayPath: episode => posix.join(values.screenplayDir, `episode-${String(episode).padStart(3, '0')}.md`),
+        episodeScreenplayPath: episode => posix.join(values.screenplayDir, fileNames.episode(episode)),
         deliverablePath: projectName => posix.join(values.deliverablesDir, `${projectName}.md`),
     };
 }
@@ -49,6 +56,13 @@ export const CHINESE_SCREENPLAY_LAYOUT = defineLayout('zh-CN-v1', {
     episodesDir: '分集大纲',
     screenplayDir: '剧本',
     deliverablesDir: '交付',
+}, {
+    contract: '创作合同.md',
+    setting: '核心设定.md',
+    otherCharacters: '其他人物.md',
+    outline: '总纲.md',
+    episodeOutlines: '分集大纲.md',
+    episode: episode => `第${String(episode).padStart(3, '0')}集.md`,
 });
 export const DEFAULT_SCREENPLAY_LAYOUT = CHINESE_SCREENPLAY_LAYOUT;
 export const SCREENPLAY_LAYOUT_MARKER = posix.join('.screenplay', 'layout.json');

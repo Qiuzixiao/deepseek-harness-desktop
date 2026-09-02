@@ -193,20 +193,17 @@ try {
     for (const name of [
       'read',
       'read_image',
+      'write',
+      'edit',
+      'move',
+      'delete',
       'glob',
       'grep',
+      'web_search',
       'skill',
-      'ask_user_question',
-      'todo_write',
-      'exit_plan_mode',
-      'screenplay_review_lens',
       'read_document',
-      'read_project_context',
-      'write_scene',
-      'validate_episode',
-      'diagnose_episode',
-      'commit_episode',
       'skill_create',
+      'ask_user_question',
     ]) {
       if (!screenplayTools.has(name)) {
         throw new Error(`short-drama Agent is missing composed tool ${name}`)
@@ -216,9 +213,25 @@ try {
     if (!uploadTools) {
       throw new Error('short-drama Agent is missing the dsh-file-upload read_document tool')
     }
-    for (const name of ['write', 'edit', 'bash', 'pwsh', 'run_code']) {
+    for (const name of [
+      'todo_write',
+      'exit_plan_mode',
+      'screenplay_review_lens',
+      'read_project_context',
+      'write_episode',
+      'screenplay_create_contract',
+      'screenplay_create_outline',
+      'screenplay_create_episode_outline_batch',
+      'screenplay_edit_file',
+      'screenplay_merge_delivery',
+      'validate_episode',
+      'diagnose_episode',
+      'bash',
+      'pwsh',
+      'run_code',
+    ]) {
       if (screenplayTools.has(name)) {
-        throw new Error(`short-drama Agent unexpectedly exposes generic mutation ${name}`)
+        throw new Error(`short-drama Agent unexpectedly exposes removed tool ${name}`)
       }
     }
     const skill = await ctx.skills.get('short-drama-zonggang', { scope: screenplayHandle.agent })

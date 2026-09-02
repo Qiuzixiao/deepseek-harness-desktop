@@ -2,6 +2,8 @@
 
 状态：提案
 
+> **实现状态说明（2026-09）**：本文整体是历史能力提案，不是当前运行契约。当前没有 `write_episode`、`validate_episode`、`diagnose_episode`、草稿/提交、领域状态或固定布局；普通文件通过通用文件工具直接处理。当前实现见 `dsh-short-drama/README.md`。
+
 本文统筹以下四份 PRD：
 
 - [从已完成项目沉淀可复用 Skill](prd/short-drama-skill-extraction.md)
@@ -335,4 +337,3 @@ Agent
 ```
 
 用户始终负责作品方向和最终拍板；Agent 负责理解和执行；项目负责保存故事事实；Skill 负责提供可替换的参考；灵感库负责暂存尚未决定的素材；Harness 负责安全和完整性。
-

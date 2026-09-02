@@ -1,6 +1,17 @@
-# 短剧 Agent 内核重构设计
+# 短剧 Agent 内核重构设计（历史方案）
 
-> 本文是 `screenplay-v1` 的架构依据。它描述职责、接口和不变量，不把任何一套编剧方法认证为正确答案。
+> 本文保留早期方案用于追溯，不是当前运行契约。旧 Host、`.screenplay` 状态机、领域写作工具、A/B 信道、草稿、发布确认、Todo、计划审批和审稿子 Agent 均未加载。当前契约以 `dsh-short-drama/README.md`、`src/agent.ts`、`src/prompt.ts` 和桌面 `short-drama` 预设为准。
+
+## 当前实现（2026-09）
+
+- 短剧 Agent 只提供提示词、项目范围保护，以及通用 `move/delete` 文件工具。
+- 其他能力由 Harness 组合提供：`read/write/edit/glob/grep`、`web_search`、`read_document`、Skill、Skill 创建和 `ask_user_question`。
+- 普通写入、修改、改名和移动直接执行；删除前询问用户。创作格式、标题、署名、目录和字数不做硬校验。
+- 项目结构由用户、当前 Skill 和已有文件共同决定，不创建固定短剧目录。
+- 桌面通用工作区保存 `.zenwit-project/project.json`；短剧 Agent 不读写 `.screenplay` 状态。
+- `src/store.ts`、`src/service.ts`、`src/tools.ts` 等旧源码仅保留待清理，不从桌面配置、包根或预设加载。
+
+## 以下为已废弃的历史设计
 
 ## 1. 产品概念
 
@@ -25,7 +36,7 @@
 - Artifact 路径、格式、集数顺序、必要字段和时长/字数范围；
 - 结构化连续性状态、已声明角色/道具/时间线的客观矛盾；
 - revision、operationId、幂等、版本恢复、原子写入和失败不覆盖；
-- 草稿与正式文件分离，只有明确提交才物化正式文件。
+- 正文写入直接物化正式文件；编辑器未保存内容与项目正式文件分离。
 
 代码不判断“好不好看”，也不把无法机械证明的语义判断伪装成硬错误。
 
@@ -34,7 +45,7 @@
 - 理解用户任务并读取最小必要上下文；
 - 使用 `plan-mode` 和 `todo` 管理复杂工作；
 - 选择 Skill 和参考资料；
-- 按场写作、读回、校验、修正，再次校验；
+- 生成完整正文并直接写入；用户需要时再校验和修正；
 - 发现冲突，给出多种创作方案；
 - 在重大创作分叉或不可逆操作时询问用户；
 - 汇总信道 A 的错误和信道 B 的建议。
@@ -96,13 +107,12 @@ Prompt 不包含 M1-M7 正文、固定阶段状态机、固定确认话术、统
 read_project_context()
 read_artifact(path)
 search_project(query)
-write_scene(episode, sceneNo, content)
+write_episode(episode, content, continuity)
 validate_episode(episode)
 diagnose_episode(episode)
-commit_episode(episode)
 ```
 
-`write_scene` 写入当前 Session 的内存草稿；`read_artifact` 对当前集返回草稿叠加视图；`validate_episode` 和 `diagnose_episode` 读取同一份视图；只有 `commit_episode` 才能产生正式文件和新 revision。
+`write_episode` 接收完整正文，直接原子写入正式剧本并生成新 revision。`read_artifact`、`validate_episode` 和 `diagnose_episode` 都读取正式文件；校验和诊断是按需调用，不是写入前置条件。
 
 项目初始化、创作合同、核心设定、人物、全剧大纲、分集大纲仍由短剧领域工具负责，但它们使用同一套项目状态、版本和路径接口，不保留旧客户端 Adapter 或两套模型契约。
 
@@ -113,12 +123,10 @@ commit_episode(episode)
 ```text
 screenplay_merge_delivery
 screenplay_restore_version
-screenplay_prepare_change
-screenplay_save_change
-screenplay_discard_change
+screenplay_edit_file
 ```
 
-这些动作仍由领域代码负责，Skill 和信道 B 不能绕过保存、恢复和交付边界。
+这些动作仍由领域代码负责，Skill 和信道 B 不能绕过编辑、恢复和交付边界。
 
 ## 6. 信道 A 与信道 B
 
@@ -138,7 +146,7 @@ ValidationIssue {
 
 ### 信道 A：代码硬校验
 
-检查 Artifact 格式、路径、字段、集数顺序、时长/字数、闪回标记、卡点/集尾、结构化连续性、revision 和提交状态。A 有错误时，`commit_episode` 拒绝提交。
+检查 Artifact 格式、路径、字段、集数顺序、时长/字数、闪回标记、卡点/集尾、结构化连续性和 revision。A 返回错误供用户修正，不阻止正文先写入。
 
 ### 信道 B：创作建议
 
@@ -152,14 +160,9 @@ ValidationIssue {
 → 自动加载匹配 Skill
 → 必要时使用 plan/todo
 → 读取相关 Artifact
-→ 写入或修改一场
-→ A 校验
-→ 修正机械问题并再次校验
-→ B 诊断与透镜审查
-→ 呈现方案和取舍
-→ 用户选择创作方向
-→ 用户明确提交
-→ 正式文件原子写入并产生 revision
+→ 生成完整正文并写入正式文件
+→ 用户需要时 A 校验或 B 诊断
+→ 按用户选择修正并再次写入
 ```
 
 只在剧情大转折、人设或结局方向改变、跨阶段方向变化、明确保存/放弃、恢复/交付和无法推断的重大决策时暂停。

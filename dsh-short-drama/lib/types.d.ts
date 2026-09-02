@@ -39,15 +39,12 @@ export interface CreateOutlineBundleInput {
 export interface CreateEpisodeOutlineBatchInput {
     startEpisode: number;
     endEpisode: number;
-    /** Required for the first batch; omitted once the internal draft exists. */
+    /** Optional when the formal full outline already exists. */
     outlineContent?: string;
     /** Image-format Markdown containing only the requested episode range. */
     episodeOutlinesContent: string;
     /** Required only for the final batch; becomes the complete-file forecast section. */
     forecastContent?: string;
-}
-export interface FinalizeOutlineBundleInput {
-    forecastContent: string;
 }
 export interface EpisodeOutlineBatch {
     startEpisode: number;
@@ -55,12 +52,6 @@ export interface EpisodeOutlineBatch {
     content: string;
     sha256: string;
     createdAt: number;
-}
-export interface EpisodeOutlineDraft {
-    totalEpisodes: number;
-    nextEpisode: number;
-    outlineContent: string;
-    batches: EpisodeOutlineBatch[];
 }
 /**
  * Private continuity data carried from one completed screenplay episode to
@@ -92,6 +83,8 @@ export interface ScreenplayWritingProgress {
 export interface CreateEpisodeScreenplayInput {
     episodeContent: string;
     continuity: ScreenplayContinuityState;
+    /** Direct authoring skips the optional mechanical review gate. */
+    validate?: boolean;
 }
 export type ValidationChannel = 'A' | 'B';
 export interface ValidationIssue {
@@ -102,16 +95,6 @@ export interface ValidationIssue {
     location?: string;
     message: string;
     repairHint?: string;
-}
-export interface EpisodeDraft {
-    episode: number;
-    baseRevision: number;
-    scenes: Record<number, string>;
-    continuity?: ScreenplayContinuityState;
-    updatedAt: number;
-}
-export interface EpisodeDraftSnapshot extends EpisodeDraft {
-    content: string;
 }
 export interface EpisodeValidationResult {
     ok: boolean;
@@ -195,7 +178,6 @@ export interface ScreenplayProjectState {
     requirements: ScreenplayRequirements;
     writingProgress?: ScreenplayWritingProgress;
     pendingChange?: PendingChange;
-    episodeOutlineDraft?: EpisodeOutlineDraft;
     currentVersion?: ScreenplayVersion;
     versions: ScreenplayVersion[];
     updatedAt: number;

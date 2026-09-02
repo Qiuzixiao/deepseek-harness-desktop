@@ -5,7 +5,6 @@ metadata:
   scope: user
   version: 1
   applicableTo: ["平台投稿包/项目提案", "标题、卖点与受众定位", "行业进入与编剧工作对接", "变现准备与商业合作"]
-  sourceIds: ["/Users/qiuzixiao/Desktop/剧本创作/xie-hao-duan-ju-skills-1.0.0/skills/platform-commercial-delivery/SKILL.md"]
   whenToUse: "触发词：投稿包、项目提案、卖点、标题怎么取、对接平台/制片方、避免踩坑、入行变现、商业合作、交付清单"
 ---
 

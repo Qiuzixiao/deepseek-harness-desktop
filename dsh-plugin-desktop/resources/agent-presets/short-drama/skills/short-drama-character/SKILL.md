@@ -5,7 +5,6 @@ metadata:
   scope: user
   version: 1
   applicableTo: ["主角主动性诊断", "反派压力线与势均力敌校验", "配角功能清理与合并", "人物成长与两难选择设计"]
-  sourceIds: ["/Users/qiuzixiao/Desktop/剧本创作/xie-hao-duan-ju-skills-1.0.0/skills/character-pressure-growth/SKILL.md"]
   whenToUse: "用户说「主角太被动」「反派像工具人」「配角太多」「人物没有成长」「两人目标相同怎么成为对手」时调用"
 ---
 

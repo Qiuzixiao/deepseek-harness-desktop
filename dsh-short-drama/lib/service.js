@@ -1,5 +1,5 @@
 import { readFileSync, statSync } from 'node:fs';
-import { mkdir, stat, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep } from 'node:path';
 import { Service } from '@deepseek-ai/cordis';
 import { ScreenplayError } from './errors.js';
@@ -9,6 +9,10 @@ import { ScreenplayReferenceStore } from './references/store.js';
 const PROJECT_LAYOUT = DEFAULT_SCREENPLAY_LAYOUT.directories;
 const LAUNCHER_MARKER = join('.screenplay', 'launcher');
 const MATERIALIZED_STATE = join('.screenplay', 'state.json');
+// Zenwit creates the project-library marker before the Session is opened.
+// Accept it as the prepared-project hand-off alongside the legacy launcher
+// marker so the first contract write uses the existing project directory.
+const ZENWIT_PROJECT_METADATA = join('.zenwit-project', 'project.json');
 function sessionKey(session) {
     return String(session.header.id);
 }
@@ -56,30 +60,6 @@ function projectionOf(snapshot) {
         }),
     };
 }
-function draftKey(session, projectRoot, episode) {
-    return `${sessionKey(session)}:${projectRoot}:${String(episode)}`;
-}
-function draftContent(draft) {
-    const entries = Object.entries(draft.scenes)
-        .sort(([left], [right]) => Number(left) - Number(right))
-        .map(([, content]) => content.trim())
-        .filter(Boolean);
-    if (entries.length === 0)
-        return '';
-    const title = `第${String(draft.episode)}集`;
-    const assembled = entries.map((content, index) => {
-        const withoutDuplicateTitle = index === 0
-            ? content
-            : content.replace(new RegExp(`^${title}\\s*`, 'u'), '');
-        // A scene can be replaced independently. Keep the formal episode marker
-        // only at the end of the assembled draft so an intermediate scene cannot
-        // masquerade as a completed episode.
-        return index === entries.length - 1
-            ? withoutDuplicateTitle
-            : withoutDuplicateTitle.replace(/^【本集完】\s*$/gmu, '').trim();
-    }).filter(Boolean).join('\n\n');
-    return assembled.startsWith(title) ? assembled : `${title}\n\n${assembled}`;
-}
 function issueFromError(error, artifact) {
     if (error instanceof ScreenplayError) {
         const details = error.details;
@@ -99,7 +79,7 @@ function issueFromError(error, artifact) {
             message: error.message,
             repairHint: missingSections.length > 0
                 ? `补齐这些结构：${missingSections.join('、')}`
-                : '根据校验结果修正草稿后重新校验。',
+                : '根据校验结果修正正式剧本文件后按需重新校验。',
         };
     }
     return {
@@ -108,7 +88,7 @@ function issueFromError(error, artifact) {
         severity: 'error',
         artifact,
         message: error instanceof Error ? error.message : String(error),
-        repairHint: '检查当前场景草稿和项目上下文后重试。',
+        repairHint: '检查当前正式剧本文件和项目上下文后重试。',
     };
 }
 export class ScreenplayProjectService extends Service {
@@ -116,7 +96,6 @@ export class ScreenplayProjectService extends Service {
     summaries = new Map();
     bindings = new Map();
     referenceStores = new Map();
-    episodeDrafts = new Map();
     constructor(context) {
         super(context, 'screenplayProjects');
     }
@@ -179,23 +158,19 @@ export class ScreenplayProjectService extends Service {
     /**
      * Return the desktop-created project preparation before the first formal
      * artifact set. New sessions carry a durable preparation event; the exact
-     * Session cwd plus launcher marker is also accepted as a one-path migration
-     * fallback for folders created before this binding event was introduced.
+     * Session cwd plus either the legacy launcher marker or Zenwit project
+     * metadata is accepted as a one-path migration fallback for folders created
+     * before this binding event was introduced.
      */
     preparedProjectForSession(session) {
         // rc.2 不持久化自定义 session 事件：桌面端准备的项目目录以
-        // .screenplay/launcher 标记 + 会话 cwd 识别。
+        // .screenplay/launcher 或 .zenwit-project/project.json + 会话 cwd 识别。
         const sessionCwd = session.header.cwd;
         if (sessionCwd === undefined || !isAbsolute(sessionCwd))
             return undefined;
         const projectRoot = resolve(sessionCwd);
-        try {
-            if (!statSync(join(projectRoot, LAUNCHER_MARKER)).isDirectory())
-                return undefined;
-        }
-        catch {
+        if (!this.hasPreparedProjectMarker(projectRoot))
             return undefined;
-        }
         return {
             projectName: basename(projectRoot),
             parentRoot: dirname(projectRoot),
@@ -394,9 +369,6 @@ export class ScreenplayProjectService extends Service {
     async createEpisodeOutlineBatch(workspaceRoot, expectedRevision, operationId, input) {
         return this.mutate(workspaceRoot, store => store.createEpisodeOutlineBatch(expectedRevision, operationId, input));
     }
-    async finalizeOutlineBundle(workspaceRoot, expectedRevision, operationId, input) {
-        return this.mutate(workspaceRoot, store => store.finalizeOutlineBundle(expectedRevision, operationId, input));
-    }
     async writingContext(workspaceRoot) {
         return this.store(workspaceRoot).writingContext();
     }
@@ -414,15 +386,6 @@ export class ScreenplayProjectService extends Service {
         const snapshot = await this.snapshotForSession(session, 'artifacts');
         if (!snapshot.initialized)
             throw new ScreenplayError('NOT_INITIALIZED', 'screenplay project is not initialized');
-        const sessionPrefix = `${sessionKey(session)}:${projectRoot}:`;
-        const draft = [...this.episodeDrafts.entries()].find(([key, candidate]) => {
-            const episodePath = this.store(projectRoot).layout.episodeScreenplayPath(candidate.episode);
-            return key.startsWith(sessionPrefix) && episodePath === normalizedPath;
-        })?.[1];
-        if (draft !== undefined) {
-            const value = { ...draft, content: draftContent(draft) };
-            return { ok: true, path: normalizedPath, source: 'session-draft', ...value };
-        }
         const content = snapshot.artifactContents?.[normalizedPath];
         if (content === undefined) {
             throw new ScreenplayError('INVALID_INPUT', 'artifact does not exist in the bound project', { logicalPath: normalizedPath });
@@ -444,54 +407,26 @@ export class ScreenplayProjectService extends Service {
         }
         return { ok: true, query, revision: snapshot.revision, matches };
     }
-    async writeSceneForSession(session, episode, sceneNo, content) {
+    async writeEpisodeForSession(session, expectedRevision, operationId, episode, episodeContent, continuity) {
         const projectRoot = this.projectRootForSession(session);
         if (projectRoot === undefined)
             throw new ScreenplayError('INVALID_WORKSPACE', 'no screenplay project is bound to this session');
-        if (!Number.isSafeInteger(episode) || episode <= 0 || !Number.isSafeInteger(sceneNo) || sceneNo <= 0) {
-            throw new ScreenplayError('VALIDATION_FAILED', 'episode and sceneNo must be positive integers');
-        }
-        if (content.trim().length === 0)
-            throw new ScreenplayError('VALIDATION_FAILED', 'scene content must not be empty');
         const snapshot = await this.snapshotForSession(session, 'summary');
         if (!snapshot.initialized)
             throw new ScreenplayError('NOT_INITIALIZED', 'screenplay project is not initialized');
-        if (snapshot.pendingChange !== undefined) {
-            throw new ScreenplayError('INVALID_STATE', 'save or discard the pending change first', { pendingChangeId: snapshot.pendingChange.id });
-        }
-        const progress = snapshot.writingProgress ?? {
-            status: 'NotStarted',
-            totalEpisodes: snapshot.requirements.episodeCount ?? 0,
-            nextEpisode: 1,
-            completedEpisodes: [],
-            episodes: [],
-        };
-        if (episode !== progress.nextEpisode) {
-            throw new ScreenplayError('INVALID_STATE', 'new screenplay scenes must target the current next episode', {
-                expected: progress.nextEpisode,
+        const nextEpisode = snapshot.writingProgress?.nextEpisode ?? 1;
+        if (episode !== nextEpisode) {
+            throw new ScreenplayError('INVALID_STATE', 'episode must match the next unwritten episode', {
+                expected: nextEpisode,
                 actual: episode,
             });
         }
-        const key = draftKey(session, projectRoot, episode);
-        const current = this.episodeDrafts.get(key);
-        if (current !== undefined && current.baseRevision !== snapshot.revision) {
-            throw new ScreenplayError('REVISION_CONFLICT', 'the episode draft is based on an older project revision', {
-                expected: current.baseRevision,
-                actual: snapshot.revision,
-            });
-        }
-        const draft = current === undefined
-            ? { episode, baseRevision: snapshot.revision, scenes: {}, updatedAt: Date.now() }
-            : { ...current, scenes: { ...current.scenes }, updatedAt: Date.now() };
-        draft.scenes[sceneNo] = content.trim();
-        this.episodeDrafts.set(key, draft);
-        return {
-            ok: true,
-            episode,
-            sceneNo,
-            revision: snapshot.revision,
-            draft: { ...draft, content: draftContent(draft) },
-        };
+        const outcome = await this.createEpisodeScreenplay(projectRoot, expectedRevision, operationId, {
+            episodeContent,
+            continuity,
+            validate: false,
+        });
+        return outcome.result;
     }
     async validateEpisodeForSession(session, episode) {
         const projectRoot = this.projectRootForSession(session);
@@ -502,8 +437,7 @@ export class ScreenplayProjectService extends Service {
             throw new ScreenplayError('NOT_INITIALIZED', 'screenplay project is not initialized');
         const store = this.store(projectRoot);
         const logicalPath = store.layout.episodeScreenplayPath(episode);
-        const draft = this.episodeDrafts.get(draftKey(session, projectRoot, episode));
-        const content = draft === undefined ? snapshot.artifactContents?.[logicalPath] : draftContent(draft);
+        const content = snapshot.artifactContents?.[logicalPath];
         if (content === undefined) {
             return {
                 ok: false,
@@ -514,8 +448,8 @@ export class ScreenplayProjectService extends Service {
                         code: 'ARTIFACT_MISSING',
                         severity: 'error',
                         artifact: logicalPath,
-                        message: '当前集还没有正式文件或 Session 草稿。',
-                        repairHint: '先写入至少一场，再运行 validate_episode。',
+                        message: '当前集还没有正式文件。',
+                        repairHint: '先直接写入正式剧集文件，再按需运行 validate_episode。',
                     }],
             };
         }
@@ -542,47 +476,37 @@ export class ScreenplayProjectService extends Service {
             ],
         };
     }
-    async commitEpisodeForSession(session, expectedRevision, operationId, episode, continuity) {
-        const projectRoot = this.projectRootForSession(session);
-        if (projectRoot === undefined)
-            throw new ScreenplayError('INVALID_WORKSPACE', 'no screenplay project is bound to this session');
-        const store = this.store(projectRoot);
-        const committed = await store.findOperationResult(operationId, 'episode-created');
-        if (committed !== undefined) {
-            return { result: committed, snapshot: await store.snapshot('summary') };
-        }
-        const draft = this.episodeDrafts.get(draftKey(session, projectRoot, episode));
-        if (draft === undefined)
-            throw new ScreenplayError('INVALID_STATE', 'there is no session draft for this episode', { episode });
-        if (draft.baseRevision !== expectedRevision) {
-            throw new ScreenplayError('REVISION_CONFLICT', 'the episode draft is based on an older project revision', {
-                expected: draft.baseRevision,
-                actual: expectedRevision,
-            });
-        }
-        const validation = await this.validateEpisodeForSession(session, episode);
-        if (!validation.ok) {
-            throw new ScreenplayError('VALIDATION_FAILED', 'episode A validation failed; formal file was not modified', {
-                episode,
-                issues: validation.issues,
-                written: false,
-            });
-        }
-        const outcome = await this.createEpisodeScreenplay(projectRoot, expectedRevision, operationId, {
-            episodeContent: draftContent(draft),
-            continuity,
-        });
-        this.episodeDrafts.delete(draftKey(session, projectRoot, episode));
-        return outcome;
-    }
     async createEpisodeScreenplay(workspaceRoot, expectedRevision, operationId, input) {
         return this.mutate(workspaceRoot, store => store.createEpisodeScreenplay(expectedRevision, operationId, input));
     }
     async mergeDelivery(workspaceRoot, expectedRevision, operationId) {
         return this.mutate(workspaceRoot, store => store.mergeDelivery(expectedRevision, operationId));
     }
-    async prepareChange(workspaceRoot, expectedRevision, operationId, changes) {
-        return this.mutate(workspaceRoot, store => store.prepareChange(expectedRevision, operationId, changes));
+    async prepareChange(workspaceRoot, expectedRevision, operationId, changes, validate = true) {
+        return this.mutate(workspaceRoot, store => store.prepareChange(expectedRevision, operationId, changes, validate));
+    }
+    /** Apply an explicit file edit in one user-facing action. */
+    async editFile(workspaceRoot, expectedRevision, operationId, change) {
+        const prepared = await this.prepareChange(workspaceRoot, expectedRevision, operationId, [change], false);
+        const pending = prepared.result.pendingChange;
+        const changeId = pending?.id;
+        const revision = prepared.result.revision;
+        if (typeof changeId !== 'string' || typeof revision !== 'number') {
+            throw new ScreenplayError('INVALID_STATE', 'file edit did not produce a pending change');
+        }
+        try {
+            return await this.saveChange(workspaceRoot, revision, `${operationId}-save`, changeId);
+        }
+        catch (error) {
+            // Do not leave a hidden pending state behind if the second half fails.
+            try {
+                await this.discardChange(workspaceRoot, revision, `${operationId}-discard`, changeId);
+            }
+            catch {
+                // Preserve the original failure; the next read exposes any remaining state.
+            }
+            throw error;
+        }
     }
     async saveChange(workspaceRoot, expectedRevision, operationId, changeId) {
         return this.mutate(workspaceRoot, store => store.saveChange(expectedRevision, operationId, changeId));
@@ -699,9 +623,19 @@ export class ScreenplayProjectService extends Service {
         });
     }
     async isPreparedProjectRoot(projectRoot) {
+        return this.hasPreparedProjectMarker(projectRoot);
+    }
+    hasPreparedProjectMarker(projectRoot) {
         try {
-            const marker = await stat(join(projectRoot, LAUNCHER_MARKER));
-            return marker.isDirectory();
+            if (statSync(join(projectRoot, LAUNCHER_MARKER)).isDirectory())
+                return true;
+        }
+        catch {
+            // Fall through to the Desktop project-library marker.
+        }
+        try {
+            const metadata = JSON.parse(readFileSync(join(projectRoot, ZENWIT_PROJECT_METADATA), 'utf8'));
+            return metadata !== null && typeof metadata === 'object' && !Array.isArray(metadata);
         }
         catch {
             return false;

@@ -6,6 +6,7 @@ import { defaultValueCtx, editorViewCtx, Editor as MilkdownEditor, rootCtx } fro
 import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react'
 import { listener, listenerCtx } from '@milkdown/plugin-listener'
 import { commonmark } from '@milkdown/preset-commonmark'
+import { gfm } from '@milkdown/preset-gfm'
 import { dlkjb } from './dlkjb-language.ts'
 import css from './zenwit.module.css'
 
@@ -160,6 +161,7 @@ function VisualEditorInner({ initialDoc, onChange, onSelectionChange }: VisualEd
       })
     })
     .use(commonmark)
+    .use(gfm)
     .use(listener), [])
 
   return <div className={css.visualEditor}><Milkdown /></div>

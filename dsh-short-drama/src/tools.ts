@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import type { JsonValue, Session } from '@deepseek-ai/dsh-session'
 import { defineTool, type ToolDefinition, type ToolRunContext } from '@deepseek-ai/dsh-tools'
@@ -7,19 +8,16 @@ import type {
   CreateEpisodeScreenplayInput,
   CreateScreenplayArtifactsInput,
   RequirementsChanges,
-  ScreenplayChangeInput,
 } from './types.js'
 
 const mutationParameters = {
   expectedRevision: {
     type: 'integer',
-    required: true,
-    description: 'Latest project revision returned by read_project_context or the prior mutation.',
+    description: 'Optional. The system uses the current project revision when omitted.',
   },
   operationId: {
     type: 'string',
-    required: true,
-    description: 'Unique idempotency key. Reuse it only when retrying the same uncertain operation.',
+    description: 'Optional. The system generates an idempotency key when omitted.',
   },
 } as const
 
@@ -41,6 +39,15 @@ function agent(exec: ToolRunContext): NonNullable<ToolRunContext['agent']> {
     throw new ScreenplayError('INVALID_WORKSPACE', 'screenplay tools require a Session attached to a Workspace')
   }
   return current
+}
+
+async function mutationArgs(ctx: Context, exec: ToolRunContext, args: Record<string, unknown>): Promise<{ expectedRevision: number, operationId: string }> {
+  const snapshot = await ctx.screenplayProjects.readProjectContextForSession(session(exec))
+  const expectedRevision = typeof args.expectedRevision === 'number' ? args.expectedRevision : snapshot.revision
+  const operationId = typeof args.operationId === 'string' && args.operationId.trim().length >= 8
+    ? args.operationId
+    : randomUUID()
+  return { expectedRevision, operationId }
 }
 
 function projectWorkspace(ctx: Context, exec: ToolRunContext): string {
@@ -102,7 +109,7 @@ export function screenplayToolDefinitions(ctx: Context): ToolDefinition[] {
     }),
     defineTool({
       name: 'read_artifact',
-      description: 'Read one project-relative formal artifact, or the current Session-local episode draft when it exists.',
+      description: 'Read one project-relative formal artifact from the current project.',
       parameters: {
         path: { type: 'string', required: true, description: 'Project-relative artifact path.' },
       },
@@ -123,43 +130,12 @@ export function screenplayToolDefinitions(ctx: Context): ToolDefinition[] {
       ...presentation('搜索项目文件', 'read'),
     }),
     defineTool({
-      name: 'write_scene',
-      description: 'Write or replace one scene in the current Session-local episode draft. This does not modify formal files.',
-      parameters: {
-        episode: { type: 'integer', required: true },
-        sceneNo: { type: 'integer', required: true },
-        content: { type: 'string', required: true, description: 'The complete Markdown content of this scene.' },
-      },
-      output: { schema: { type: 'json' }, render: (_args, value) => text(value) },
-      execute: async (args, exec) => toJson(await ctx.screenplayProjects.writeSceneForSession(
-        session(exec), args.episode as number, args.sceneNo as number, args.content as string,
-      )),
-      ...presentation('写入场景'),
-    }),
-    defineTool({
-      name: 'validate_episode',
-      description: 'Run signal-channel-A mechanical validation against an episode draft or formal episode.',
-      parameters: { episode: { type: 'integer', required: true } },
-      output: { schema: { type: 'json' }, render: (_args, value) => text(value) },
-      isConcurrencySafe: () => true,
-      execute: async (args, exec) => toJson(await ctx.screenplayProjects.validateEpisodeForSession(session(exec), args.episode as number)),
-      ...presentation('校验剧集', 'read'),
-    }),
-    defineTool({
-      name: 'diagnose_episode',
-      description: 'Return signal-channel-A results and mark the episode for optional Agent, Skill, or read-only lens review. Channel B advice never blocks a user decision.',
-      parameters: { episode: { type: 'integer', required: true } },
-      output: { schema: { type: 'json' }, render: (_args, value) => text(value) },
-      isConcurrencySafe: () => true,
-      execute: async (args, exec) => toJson(await ctx.screenplayProjects.diagnoseEpisodeForSession(session(exec), args.episode as number)),
-      ...presentation('诊断剧集', 'read'),
-    }),
-    defineTool({
-      name: 'commit_episode',
-      description: 'After the user chooses the direction, validate and atomically commit the current Session-local episode draft as a formal version.',
+      name: 'write_episode',
+      description: 'Write one complete episode directly to the formal project screenplay file. The file is immediately visible to the user; no Session draft, confirmation, or automatic validation is used.',
       parameters: {
         ...mutationParameters,
         episode: { type: 'integer', required: true },
+        episodeContent: { type: 'string', required: true, description: 'Complete Markdown content of the episode.' },
         continuity: {
           type: 'object',
           required: true,
@@ -174,11 +150,32 @@ export function screenplayToolDefinitions(ctx: Context): ToolDefinition[] {
         },
       },
       output: { schema: { type: 'json' }, render: (_args, value) => text(value) },
-      execute: async (args, exec) => toJson(await ctx.screenplayProjects.commitEpisodeForSession(
-        session(exec), args.expectedRevision as number, args.operationId as string, args.episode as number,
-        args.continuity as CreateEpisodeScreenplayInput['continuity'],
-      )),
-      ...presentation('提交正式剧集'),
+      execute: async (args, exec) => {
+        const mutation = await mutationArgs(ctx, exec, args)
+        return toJson(await ctx.screenplayProjects.writeEpisodeForSession(
+          session(exec), mutation.expectedRevision, mutation.operationId, args.episode as number,
+          args.episodeContent as string, args.continuity as CreateEpisodeScreenplayInput['continuity'],
+        ))
+      },
+      ...presentation('写入正式剧集'),
+    }),
+    defineTool({
+      name: 'validate_episode',
+      description: 'Optionally run signal-channel-A mechanical validation against a formal episode.',
+      parameters: { episode: { type: 'integer', required: true } },
+      output: { schema: { type: 'json' }, render: (_args, value) => text(value) },
+      isConcurrencySafe: () => true,
+      execute: async (args, exec) => toJson(await ctx.screenplayProjects.validateEpisodeForSession(session(exec), args.episode as number)),
+      ...presentation('校验剧集', 'read'),
+    }),
+    defineTool({
+      name: 'diagnose_episode',
+      description: 'Return signal-channel-A results and mark the episode for optional Agent, Skill, or read-only lens review. Channel B advice never blocks a user decision.',
+      parameters: { episode: { type: 'integer', required: true } },
+      output: { schema: { type: 'json' }, render: (_args, value) => text(value) },
+      isConcurrencySafe: () => true,
+      execute: async (args, exec) => toJson(await ctx.screenplayProjects.diagnoseEpisodeForSession(session(exec), args.episode as number)),
+      ...presentation('诊断剧集', 'read'),
     }),
     defineTool({
       name: 'screenplay_list_references',
@@ -253,15 +250,9 @@ export function screenplayToolDefinitions(ctx: Context): ToolDefinition[] {
     }),
     defineTool({
       name: 'screenplay_create_contract',
-      description: 'After discussion and explicit direction confirmation, atomically create the initial screenplay artifact set: creative contract, core setting, one exact-name file per major character, and one combined other-characters file. Each Markdown artifact needs an H1 and at least one H2 facts section; contract and setting H1s contain the project folder name, and each major-character H1 starts with its exact name. No fixed creative methodology or legacy section list is required.',
+      description: 'When the user directs the project setup, atomically create the initial screenplay artifact set: creative contract, core setting, one exact-name file per major character, and one combined other-characters file. Each Markdown artifact needs an H1 and at least one H2 facts section; contract and setting H1s contain the project folder name, and each major-character H1 starts with the formal character name (a nickname or role label may follow). No separate confirmation token or fixed creative methodology is required.',
       parameters: {
         ...mutationParameters,
-        confirmation: {
-          type: 'string',
-          required: true,
-          enum: ['确认并创建全部文件'],
-          description: 'Must be the exact option selected by the user in ask_user_question. Never infer or fabricate this value.',
-        },
         requirements: requirementsSchema,
         contractContent: { type: 'string', required: true, description: 'Creative-contract Markdown: H1 containing the exact project folder name, followed by at least one H2 section of confirmed project facts.' },
         settingContent: { type: 'string', required: true, description: 'Core-setting Markdown: H1 containing the exact project folder name, followed by at least one H2 section of confirmed setting facts.' },
@@ -273,7 +264,7 @@ export function screenplayToolDefinitions(ctx: Context): ToolDefinition[] {
             additionalProperties: false,
             properties: {
               name: { type: 'string', required: true, description: 'Exact character name, also used as the filename.' },
-              content: { type: 'string', required: true, description: 'Major-character Markdown: H1 starting with the exact character name, followed by at least one H2 facts section.' },
+              content: { type: 'string', required: true, description: 'Major-character Markdown: H1 starting with the formal character name; a nickname or role label may follow, followed by at least one H2 facts section.' },
             },
           },
         },
@@ -281,17 +272,12 @@ export function screenplayToolDefinitions(ctx: Context): ToolDefinition[] {
       },
       output: { schema: { type: 'json' }, render: (_args, value) => text(value) },
       execute: async (args, exec) => {
-        if (args.confirmation !== '确认并创建全部文件') {
-          throw new ScreenplayError(
-            'USER_CONFIRMATION_REQUIRED',
-            '必须先通过 ask_user_question 获得用户“确认并创建全部文件”的明确选择',
-          )
-        }
+        const mutation = await mutationArgs(ctx, exec, args)
         const outcome = await ctx.screenplayProjects.createContractForSession(
           session(exec),
           parentWorkspace(exec),
-          args.expectedRevision,
-          args.operationId,
+          mutation.expectedRevision,
+          mutation.operationId,
           undefined,
           args.requirements as RequirementsChanges,
           {
@@ -307,7 +293,7 @@ export function screenplayToolDefinitions(ctx: Context): ToolDefinition[] {
     }),
     defineTool({
       name: 'screenplay_create_outline',
-      description: 'After the user discusses and confirms the whole-series direction, write the formal 大纲/full-outline.md file for new projects; legacy projects keep their existing path. Do not ask for a generation confirmation; after the write result, stop and wait for the user’s next instruction.',
+      description: 'After the user discusses and confirms the whole-series direction, write the formal 大纲/总纲.md file for new projects; legacy projects keep their existing path. Do not ask for a generation confirmation; after the write result, stop and wait for the user’s next instruction.',
       parameters: {
         ...mutationParameters,
         outlineContent: {
@@ -318,10 +304,11 @@ export function screenplayToolDefinitions(ctx: Context): ToolDefinition[] {
       },
       output: { schema: { type: 'json' }, render: (_args, value) => text(value) },
       execute: async (args, exec) => {
+        const mutation = await mutationArgs(ctx, exec, args)
         const outcome = await ctx.screenplayProjects.createOutline(
           projectWorkspace(ctx, exec),
-          args.expectedRevision,
-          args.operationId,
+          mutation.expectedRevision,
+          mutation.operationId,
           args.outlineContent,
         )
         return toJson(outcome.result)
@@ -330,7 +317,7 @@ export function screenplayToolDefinitions(ctx: Context): ToolDefinition[] {
     }),
     defineTool({
       name: 'screenplay_create_episode_outline_batch',
-      description: 'After the formal full outline exists, write exactly the continuous episode range requested by the user, or exactly the count selected through ask_user_question when the user did not specify a range. Never infer, expand, or replace the user’s range with the default batch. The batch is written into the formal 分集大纲/episode-outlines.md file for new projects; legacy projects keep their existing path. Later batches update the same formal file. Do not ask for a generation confirmation; after the write result, stop and wait for the user’s next instruction.',
+      description: 'After the formal full outline exists, write exactly the continuous episode range requested by the user, or exactly the count selected through ask_user_question when the user did not specify a range. Never infer, expand, or replace the user’s range with the default batch. The batch is written into the formal 分集大纲/分集大纲.md file for new projects; legacy projects keep their existing path. Later batches update the same formal file. Do not ask for a generation confirmation; after the write result, stop and wait for the user’s next instruction.',
       parameters: {
         ...mutationParameters,
         startEpisode: { type: 'integer', required: true, description: 'The next ungenerated episode number, determined by the runtime and the user’s explicit range.' },
@@ -342,7 +329,7 @@ export function screenplayToolDefinitions(ctx: Context): ToolDefinition[] {
         episodeOutlinesContent: {
           type: 'string',
           required: true,
-          description: 'Image-format Markdown for exactly the requested continuous range. The canonical title uses the exact project folder name and confirmed total episode count (《project folder name》前 totalEpisodes 集大纲); that number is not the batch size. Include the image header and all six fields for every episode in this batch.',
+          description: 'Markdown for exactly the requested continuous range. Use either the legacy image-format fields or the compact form `### 第N集` (an optional subtitle is fine), `导语：...`, and one complete third-person story paragraph per episode. Common list/bold decoration around 导语 is accepted. The title should contain the exact project folder name; do not treat a batch-size number as the total episode count.',
         },
         forecastContent: {
           type: 'string',
@@ -351,10 +338,11 @@ export function screenplayToolDefinitions(ctx: Context): ToolDefinition[] {
       },
       output: { schema: { type: 'json' }, render: (_args, value) => text(value) },
       execute: async (args, exec) => {
+        const mutation = await mutationArgs(ctx, exec, args)
         const outcome = await ctx.screenplayProjects.createEpisodeOutlineBatch(
           projectWorkspace(ctx, exec),
-          args.expectedRevision,
-          args.operationId,
+          mutation.expectedRevision,
+          mutation.operationId,
           {
             startEpisode: args.startEpisode,
             endEpisode: args.endEpisode,
@@ -373,78 +361,36 @@ export function screenplayToolDefinitions(ctx: Context): ToolDefinition[] {
       parameters: { ...mutationParameters },
       output: { schema: { type: 'json' }, render: (_args, value) => text(value) },
       execute: async (args, exec) => {
+        const mutation = await mutationArgs(ctx, exec, args)
         const outcome = await ctx.screenplayProjects.mergeDelivery(
-          projectWorkspace(ctx, exec), args.expectedRevision, args.operationId,
+          projectWorkspace(ctx, exec), mutation.expectedRevision, mutation.operationId,
         )
         return toJson(outcome.result)
       },
       ...presentation('合并正式剧本交付文件'),
     }),
     defineTool({
-      name: 'screenplay_prepare_change',
-      description: 'Apply only the files and sections the user explicitly asked to modify, including an explicit major-character rename through renameTo, then hold the result for the immediate 保存修改/不保存 choice. This is one user-facing action, not a staging, validation, Diff, or approval pipeline.',
+      name: 'screenplay_edit_file',
+      description: 'Modify one existing project file and save it immediately as a new formal version. The system keeps the previous version for recovery; there is no draft or save/discard step.',
       parameters: {
         ...mutationParameters,
-        changes: {
-          type: 'array',
-          required: true,
-          items: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-              path: { type: 'string', description: 'Exact existing project-relative Markdown path.' },
-              renameTo: {
-                type: 'string',
-                description: 'New exact name for an explicitly renamed major character. Omit for an in-place content edit.',
-              },
-              content: { type: 'string', description: 'Complete updated content for this file.' },
-            },
-          },
+        path: { type: 'string', required: true, description: 'Exact existing project-relative Markdown path.' },
+        renameTo: {
+          type: 'string',
+          description: 'New exact name for an explicitly renamed major character. Omit for an in-place content edit.',
         },
+        content: { type: 'string', required: true, description: 'Complete updated content for this file.' },
       },
       output: { schema: { type: 'json' }, render: (_args, value) => text(value) },
       execute: async (args, exec) => {
-        const outcome = await ctx.screenplayProjects.prepareChange(
-          projectWorkspace(ctx, exec),
-          args.expectedRevision,
-          args.operationId,
-          args.changes as ScreenplayChangeInput[],
+        const mutation = await mutationArgs(ctx, exec, args)
+        const outcome = await ctx.screenplayProjects.editFile(
+          projectWorkspace(ctx, exec), mutation.expectedRevision, mutation.operationId,
+          { path: args.path as string, content: args.content as string, ...(args.renameTo === undefined ? {} : { renameTo: args.renameTo as string }) },
         )
         return toJson(outcome.result)
       },
-      ...presentation('准备指定修改'),
-    }),
-    defineTool({
-      name: 'screenplay_save_change',
-      description: 'Save the pending explicit modification as a complete new artifact-set version only after the user chooses 保存修改.',
-      parameters: {
-        ...mutationParameters,
-        changeId: { type: 'string', required: true },
-      },
-      output: { schema: { type: 'json' }, render: (_args, value) => text(value) },
-      execute: async (args, exec) => {
-        const outcome = await ctx.screenplayProjects.saveChange(
-          projectWorkspace(ctx, exec), args.expectedRevision, args.operationId, args.changeId,
-        )
-        return toJson(outcome.result)
-      },
-      ...presentation('保存修改'),
-    }),
-    defineTool({
-      name: 'screenplay_discard_change',
-      description: 'Discard the pending explicit modification after the user chooses 不保存. Formal files and version history remain unchanged.',
-      parameters: {
-        ...mutationParameters,
-        changeId: { type: 'string', required: true },
-      },
-      output: { schema: { type: 'json' }, render: (_args, value) => text(value) },
-      execute: async (args, exec) => {
-        const outcome = await ctx.screenplayProjects.discardChange(
-          projectWorkspace(ctx, exec), args.expectedRevision, args.operationId, args.changeId,
-        )
-        return toJson(outcome.result)
-      },
-      ...presentation('不保存修改'),
+      ...presentation('直接修改文件'),
     }),
     defineTool({
       name: 'screenplay_restore_version',
@@ -455,8 +401,9 @@ export function screenplayToolDefinitions(ctx: Context): ToolDefinition[] {
       },
       output: { schema: { type: 'json' }, render: (_args, value) => text(value) },
       execute: async (args, exec) => {
+        const mutation = await mutationArgs(ctx, exec, args)
         const outcome = await ctx.screenplayProjects.restoreVersion(
-          projectWorkspace(ctx, exec), args.expectedRevision, args.operationId, args.sourceVersionId,
+          projectWorkspace(ctx, exec), mutation.expectedRevision, mutation.operationId, args.sourceVersionId,
         )
         return toJson(outcome.result)
       },

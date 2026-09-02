@@ -5,7 +5,6 @@ metadata:
   scope: user
   version: 1
   applicableTo: ["短剧正文写作格式", "大纲与集纲写法", "格式自检与校验", "可表演化改写"]
-  sourceIds: ["/Users/qiuzixiao/Desktop/剧本创作/短剧正文写法规范.md", "/Users/qiuzixiao/Desktop/剧本创作/大纲与集纲写法.md", "/Users/qiuzixiao/Desktop/剧本创作/short-drama-zenwit/references/02_压爽循环卡点与正文格式.md"]
   whenToUse: "当用户要写短剧正文、写大纲或逐集集纲、把剧情改写成可拍摄的可表演化正文、或做格式自检时使用。正文的场次头/动作行/台词/OS/VO/闪回格式、集纲的第三人称写法与禁令，都以此 Skill 为准。"
 ---
 

@@ -5,7 +5,7 @@
   episode screenplay, or delivery file.
 - **Reference**: user-provided material that is read only within its granted
   selection and never treated as project fact automatically.
-- **Draft**: the current Session-local episode view before commit.
+- **Formal episode**: the episode screenplay file written by the Agent and immediately visible in the project.
 - **Revision**: an immutable formal save produced by a domain operation.
 - **Continuity state**: structured character, relationship, object, timeline,
   and open-loop facts that can be checked mechanically.

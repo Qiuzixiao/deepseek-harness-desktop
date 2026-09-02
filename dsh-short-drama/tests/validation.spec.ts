@@ -68,4 +68,12 @@ describe('signal-channel-A episode validation', () => {
       episodeOutlinesContent: '# 《校验短剧》分集大纲\n\n### 第1集\n\n导语：顾北辰必须在公开证据和保护家人之间做出选择。\n\n顾北辰带着证据找到林母，林母拒绝交出最后一张照片，他决定公开已经确认的部分真相。\n',
     })).resolves.toMatchObject({ ok: true, stage: 'OutlineReady' })
   })
+
+  it('accepts natural Markdown decoration in compact episode headings and 导语', async () => {
+    const store = await project()
+    await expect(store.createOutlineBundle(1, 'compact-outlines-decorated', {
+      outlineContent: '# 《校验短剧》全剧大纲\n\n主角在家庭秘密和现实压力之间确认目标。\n\n他通过行动面对阻力并完成选择。\n',
+      episodeOutlinesContent: '# 《校验短剧》分集大纲\n\n### 第1集 · 归\n\n- **导语**：顾北辰必须在公开证据和保护家人之间做出选择。\n\n顾北辰带着证据找到林母，林母拒绝交出最后一张照片，他决定公开已经确认的部分真相。\n',
+    })).resolves.toMatchObject({ ok: true, stage: 'OutlineReady' })
+  })
 })

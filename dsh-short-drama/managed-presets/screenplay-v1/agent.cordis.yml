@@ -1,17 +1,25 @@
 # Managed copy of the screenplay-v1 composition. Keep it aligned with the
-# desktop preset; project scope and formal-write policy live in the agent.
+# desktop preset; project scope lives in the agent.
 # Web disables the base filesystem rows while moving model-facing tools behind
-# agent presets. The short-drama row is explicitly read-only; formal mutations
-# remain available only through the domain tools below.
+# agent presets. Every project file uses the ordinary filesystem tools.
+- id: tool-web
+  name: '@deepseek-ai/dsh-tool-web'
+  config:
+    fetch: false
+    searchTimeoutMs: 60000
+
 - id: tool-fs
   name: '@deepseek-ai/dsh-tool-fs'
   config:
-    allowMutations: false
+    allowMutations: true
 
 - id: tool-fs-search
   name: '@deepseek-ai/dsh-tool-fs-search'
   config:
     sampleOverCapGlobResults: false
+
+- id: tool-ask-user
+  name: '@deepseek-ai/dsh-tool-ask-user'
 
 - id: screenplay-agent
   name: dsh-short-drama/agent
@@ -24,44 +32,3 @@
 
 - id: tool-skill
   name: '@deepseek-ai/dsh-tool-skill'
-
-- id: tool-ask-user
-  name: '@deepseek-ai/dsh-tool-ask-user'
-
-- id: tool-todo
-  name: '@deepseek-ai/dsh-tool-todo'
-  config:
-    allowParallelInProgress: false
-
-- id: planning
-  name: cordis:group
-  group: true
-  isolate:
-    planMode: true
-  config:
-    - id: plan-mode
-      name: '@deepseek-ai/dsh-plan-mode'
-      config:
-        section: |
-          Use plan mode for complex project changes or major creative forks. Keep the plan separate from creative authority: the user decides the story, while the plan records executable work. Explore the current project before acting and leave plan mode only after the user approves the plan.
-
-- id: review-lens
-  name: '@deepseek-ai/dsh-tool-subagent'
-  config:
-    provider: spawn
-    toolName: screenplay_review_lens
-    backgroundMode: one-shot
-    persona: |-
-      You are a read-only screenplay review lens. Read the bound project and return
-      evidence-based channel-B observations and alternatives. Never write files,
-      commit artifacts, ask the user to choose, or decide the story.
-    # A child lens receives only the global read/search tools. Domain tools
-    # inherited from the parent preset remain available because they are
-    # scope-local; the allow-list avoids naming tools absent from the child
-    # composition and therefore survives the child creation window.
-    toolFilter:
-      allow:
-        - read
-        - read_image
-        - glob
-        - grep

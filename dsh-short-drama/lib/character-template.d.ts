@@ -20,3 +20,9 @@ export declare function sectionBody(content: string, heading: string): string;
 export declare function fieldValues(body: string): Map<string, string[]>;
 export declare function isPresentFieldValue(value: string): boolean;
 export declare function hasMainCharacterFieldTemplate(content: string): boolean;
+/**
+ * Distinguish a prose character profile from an author attempting the
+ * field-level template.  The latter should still receive actionable missing
+ * field errors; prose profiles only need the lightweight Markdown baseline.
+ */
+export declare function hasMainCharacterFieldSyntax(content: string): boolean;

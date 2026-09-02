@@ -5,7 +5,6 @@ metadata:
   scope: user
   version: 1
   applicableTo: ["剧本诊断与优先级修改", "全稿瘦身与回归测试", "人物/悬念/对白兑现核对", "删并改写的终稿检查"]
-  sourceIds: ["/Users/qiuzixiao/Desktop/剧本创作/xie-hao-duan-ju-skills-1.0.0/skills/script-revision-70/SKILL.md"]
   whenToUse: "触发词：剧本诊断、瘦身、找问题、修改、终稿检查、头重脚轻、后半段乏力、按优先级怎么改、人物/悬念/对白是否兑现、哪些戏该删"
 ---
 

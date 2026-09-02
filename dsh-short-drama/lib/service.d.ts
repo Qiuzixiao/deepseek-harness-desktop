@@ -1,7 +1,7 @@
 import { type Context, Service } from '@deepseek-ai/cordis';
 import type { Session } from '@deepseek-ai/dsh-session';
 import type { ReferenceDocumentPage, ReferencePreview, ReferenceUploadFile } from './references/types.js';
-import type { CreateOutlineBundleInput, CreateEpisodeScreenplayInput, CreateEpisodeOutlineBatchInput, CreateScreenplayArtifactsInput, EpisodeDiagnosisResult, EpisodeValidationResult, FinalizeOutlineBundleInput, RequirementsChanges, ScreenplayChangeInput, ScreenplayProjectBinding, ScreenplayProjectPreparation, ScreenplayProjectSnapshot, ScreenplayProjectionValue } from './types.js';
+import type { CreateOutlineBundleInput, CreateEpisodeScreenplayInput, CreateEpisodeOutlineBatchInput, CreateScreenplayArtifactsInput, EpisodeDiagnosisResult, EpisodeValidationResult, RequirementsChanges, ScreenplayChangeInput, ScreenplayProjectBinding, ScreenplayProjectPreparation, ScreenplayProjectSnapshot, ScreenplayProjectionValue } from './types.js';
 declare module '@deepseek-ai/cordis' {
     interface Context {
         screenplayProjects: ScreenplayProjectService;
@@ -13,7 +13,6 @@ export declare class ScreenplayProjectService extends Service {
     private readonly summaries;
     private readonly bindings;
     private readonly referenceStores;
-    private readonly episodeDrafts;
     constructor(context: Context);
     contextSummary(session: Session | undefined): string;
     snapshot(workspaceRoot: string, view?: 'summary' | 'artifacts' | 'full' | 'contract'): Promise<ScreenplayProjectSnapshot>;
@@ -21,8 +20,9 @@ export declare class ScreenplayProjectService extends Service {
     /**
      * Return the desktop-created project preparation before the first formal
      * artifact set. New sessions carry a durable preparation event; the exact
-     * Session cwd plus launcher marker is also accepted as a one-path migration
-     * fallback for folders created before this binding event was introduced.
+     * Session cwd plus either the legacy launcher marker or Zenwit project
+     * metadata is accepted as a one-path migration fallback for folders created
+     * before this binding event was introduced.
      */
     preparedProjectForSession(session: Session): ScreenplayProjectPreparation | undefined;
     projectRootForSession(session: Session): string | undefined;
@@ -73,21 +73,13 @@ export declare class ScreenplayProjectService extends Service {
         result: Record<string, unknown>;
         snapshot: ScreenplayProjectSnapshot;
     }>;
-    finalizeOutlineBundle(workspaceRoot: string, expectedRevision: number, operationId: string, input: FinalizeOutlineBundleInput): Promise<{
-        result: Record<string, unknown>;
-        snapshot: ScreenplayProjectSnapshot;
-    }>;
     writingContext(workspaceRoot: string): Promise<Record<string, unknown>>;
     readProjectContextForSession(session: Session): Promise<ScreenplayProjectSnapshot>;
     readArtifactForSession(session: Session, logicalPath: string): Promise<Record<string, unknown>>;
     searchProjectForSession(session: Session, query: string): Promise<Record<string, unknown>>;
-    writeSceneForSession(session: Session, episode: number, sceneNo: number, content: string): Promise<Record<string, unknown>>;
+    writeEpisodeForSession(session: Session, expectedRevision: number, operationId: string, episode: number, episodeContent: string, continuity: CreateEpisodeScreenplayInput['continuity']): Promise<Record<string, unknown>>;
     validateEpisodeForSession(session: Session, episode: number): Promise<EpisodeValidationResult>;
     diagnoseEpisodeForSession(session: Session, episode: number): Promise<EpisodeDiagnosisResult>;
-    commitEpisodeForSession(session: Session, expectedRevision: number, operationId: string, episode: number, continuity: CreateEpisodeScreenplayInput['continuity']): Promise<{
-        result: Record<string, unknown>;
-        snapshot: ScreenplayProjectSnapshot;
-    }>;
     createEpisodeScreenplay(workspaceRoot: string, expectedRevision: number, operationId: string, input: CreateEpisodeScreenplayInput): Promise<{
         result: Record<string, unknown>;
         snapshot: ScreenplayProjectSnapshot;
@@ -96,10 +88,12 @@ export declare class ScreenplayProjectService extends Service {
         result: Record<string, unknown>;
         snapshot: ScreenplayProjectSnapshot;
     }>;
-    prepareChange(workspaceRoot: string, expectedRevision: number, operationId: string, changes: ScreenplayChangeInput[]): Promise<{
+    prepareChange(workspaceRoot: string, expectedRevision: number, operationId: string, changes: ScreenplayChangeInput[], validate?: boolean): Promise<{
         result: Record<string, unknown>;
         snapshot: ScreenplayProjectSnapshot;
     }>;
+    /** Apply an explicit file edit in one user-facing action. */
+    editFile(workspaceRoot: string, expectedRevision: number, operationId: string, change: ScreenplayChangeInput): Promise<Record<string, unknown>>;
     saveChange(workspaceRoot: string, expectedRevision: number, operationId: string, changeId: string): Promise<{
         result: Record<string, unknown>;
         snapshot: ScreenplayProjectSnapshot;
@@ -125,6 +119,7 @@ export declare class ScreenplayProjectService extends Service {
     private referenceStoreForProject;
     private createProjectDirectory;
     private isPreparedProjectRoot;
+    private hasPreparedProjectMarker;
     private mutate;
 }
 export { projectionOf };
