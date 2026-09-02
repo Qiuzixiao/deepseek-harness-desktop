@@ -116,10 +116,24 @@ jobs:
         env:
           DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
         run: yarn workspace dsh-plugin-desktop dist:win
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v6
+        with:
+          name: zenwit-windows-installer
+          path: dsh-plugin-desktop/dist/Zenwit-*-x64-Setup.exe
+          if-no-files-found: error
+          retention-days: 14
       - name: Build Windows portable archive
         env:
           DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
         run: yarn workspace dsh-plugin-desktop dist:win-portable
+      - name: Upload Windows portable archive
+        uses: actions/upload-artifact@v6
+        with:
+          name: zenwit-windows-portable
+          path: dsh-plugin-desktop/dist/Zenwit-*-x64-Portable.zip
+          if-no-files-found: error
+          retention-days: 14
 
   # macOS-only universal packaging smoke on a real macOS runner: the signed
   # release is built manually on a credentialed machine, so an unsigned DMG
