@@ -1,6 +1,6 @@
 /** Fail-loud verification of the runtime entries sealed into Electron's app.asar. */
 
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { isAbsolute, join, relative, sep } from 'node:path'
@@ -53,6 +53,7 @@ export const REQUIRED_PACKAGED_RUNTIME_ENTRIES = [
   'node_modules/@deepseek-ai/dsh/lib/bin.js',
   'node_modules/@deepseek-ai/dsh-web-frontend/dist/index.html',
   'node_modules/@deepseek-ai/dsh-app-boot/lib/index.js',
+  'node_modules/@deepseek-ai/dsh-home-paths/lib/index.js',
   'node_modules/@deepseek-ai/dsh-client-ui-short-drama/package.json',
   'node_modules/@deepseek-ai/dsh-client-ui-short-drama/lib/index.js',
   'node_modules/@deepseek-ai/dsh-client-ui-short-drama/lib/client.js',
@@ -360,6 +361,28 @@ export function verifyUnpackedPackageResolution(
   }
 }
 
+/** Ensure the packaged product uses the productized Zenwit home default. */
+export function verifyPackagedHomePathDefault(
+  unpackedRoot: string,
+  read = (filename: string): string => readFileSync(filename, 'utf8'),
+): void {
+  const filename = join(unpackedRoot, 'node_modules/@deepseek-ai/dsh-home-paths/lib/index.js')
+  let source: string
+  try {
+    source = read(filename)
+  } catch (cause) {
+    throw new Error(`dsh-plugin-desktop: packaged runtime cannot read ${filename}`, { cause })
+  }
+  if (source.includes('DSH_HOME_DIR_NAME = ".dsh"')) {
+    throw new Error(`dsh-plugin-desktop: packaged runtime at ${filename} still uses the legacy .dsh home default`)
+  }
+  if (!source.includes('DSH_HOME_DIR_NAME = ".zenwit"')) {
+    throw new Error(
+      `dsh-plugin-desktop: packaged runtime at ${filename} does not use the Zenwit home default (~/.zenwit)`,
+    )
+  }
+}
+
 /**
  * Verify Electron Builder's completed application before signing begins.
  * @param context - Electron Builder's afterPack context.
@@ -409,9 +432,12 @@ export async function afterPack(
   context: PackagedRuntimeContext,
   verify: typeof verifyPackagedRuntime = verifyPackagedRuntime,
   smoke: PackagedDiagnosticWorkerSmoke = smokePackagedDiagnosticWorker,
+  verifyHome: typeof verifyPackagedHomePathDefault = verifyPackagedHomePathDefault,
 ): Promise<void> {
   verify(context)
-  await smoke(resolvePackagedUnpackedRoot(context))
+  const unpackedRoot = resolvePackagedUnpackedRoot(context)
+  verifyHome(unpackedRoot)
+  await smoke(unpackedRoot)
 }
 
 export default afterPack

@@ -118,7 +118,9 @@ try {
     BIN_NAME,
     prepared.rootConfig,
     [{ insert: [
-      { id: 'desktop-shell', name: 'dsh-plugin-desktop' },
+      // Pin the mode in the smoke fixture instead of relying on the platform
+      // default (macOS/Windows default to the advanced shell).
+      { id: 'desktop-shell', name: 'dsh-plugin-desktop', config: { mode: 'compatibility' } },
       { id: 'community-market', name: 'dsh-community-market' },
       { id: 'third-party-smoke', name: THIRD_PARTY_NAME },
     ] }],

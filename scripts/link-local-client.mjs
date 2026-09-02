@@ -18,6 +18,10 @@ const expectedVersion = '0.1.1-rc.2'
 // RC artifact. Overlaying their unpatched local builds would silently erase
 // the markers verified by dsh-plugin-desktop/tests/package.spec.ts.
 const LOCAL_PACKAGES = [
+  // The productized default home lives in the integrated Harness source. Keep
+  // the Desktop runtime on that implementation while retaining the installed
+  // RC2 manifest for the current package graph.
+  ['@deepseek-ai/dsh-home-paths', 'packages/util/home-paths', ['lib/index.js', 'lib/invariant.js', 'lib/types']],
   // Host tool behavior is part of the short-drama preset contract as well:
   // keep the local `allowMutations` registration boundary in sync with the
   // integrated Harness build used by Desktop development and profile smokes.

@@ -101,6 +101,7 @@ import {
 } from './windows-volume-diagnostics.ts'
 import type { RendererBootReport } from './renderer-boot-contract.ts'
 import { desktopLocaleFromLanguageTag } from './tray-locale.ts'
+import { migrateLegacyDshHome } from './home-migration.ts'
 
 const BIN_NAME = 'dsh-plugin-desktop'
 const PRODUCT_NAME = 'Zenwit'
@@ -439,6 +440,13 @@ async function start(): Promise<void> {
       platform: process.platform,
     })
     for (const [name, value] of Object.entries(shellEnvironmentResolution.updates)) process.env[name] = value
+    const legacyHomeMigration = migrateLegacyDshHome({ environment: process.env, homeDirectory: app.getPath('home') })
+    if (legacyHomeMigration.status === 'failed') {
+      throw new Error(
+        `${BIN_NAME}: failed to migrate legacy home ${legacyHomeMigration.legacy} to ${legacyHomeMigration.target}`,
+        { cause: legacyHomeMigration.error },
+      )
+    }
     const homeDir = resolveDshHome()
     const windowsVolumeConcerns = diagnoseWindowsVolumes(process.platform, [
       { label: 'application install', path: process.execPath },

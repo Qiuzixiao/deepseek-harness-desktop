@@ -14,6 +14,7 @@ import {
   smokePackagedDiagnosticWorker,
   verifyUnpackedArchiveMirror,
   verifyPackagedRuntime,
+  verifyPackagedHomePathDefault,
   type ArchiveLister,
   type FileProbe,
   type PackageResolver,
@@ -44,6 +45,14 @@ function completePackageResolver(unpackedRoot: string): PackageResolver {
 }
 
 describe('packaged desktop runtime verification', () => {
+  it('rejects a packaged legacy home-paths implementation', () => {
+    const unpackedRoot = resolvePackagedUnpackedRoot(context('/build', 'win32'))
+    const filename = join(unpackedRoot, 'node_modules/@deepseek-ai/dsh-home-paths/lib/index.js')
+    expect(() => verifyPackagedHomePathDefault(unpackedRoot, () => 'const DSH_HOME_DIR_NAME = ".dsh";'))
+      .toThrow(`packaged runtime at ${filename} still uses the legacy .dsh home default`)
+    expect(() => verifyPackagedHomePathDefault(unpackedRoot, () => 'const DSH_HOME_DIR_NAME = ".zenwit";'))
+      .not.toThrow()
+  })
   it('requires the Zenwit short-drama Client shell in both packaged runtime trees', () => {
     const packageRoot = 'node_modules/@deepseek-ai/dsh-client-ui-short-drama'
 
@@ -116,9 +125,10 @@ describe('packaged desktop runtime verification', () => {
       runtimeContext,
       () => { calls.push('static') },
       async (unpackedRoot) => { calls.push(unpackedRoot) },
+      () => { calls.push('home') },
     )
 
-    expect(calls).toEqual(['static', resolvePackagedUnpackedRoot(runtimeContext)])
+    expect(calls).toEqual(['static', 'home', resolvePackagedUnpackedRoot(runtimeContext)])
   })
 
   it('tracks the ConPTY-only native surface shipped by node-pty 1.2', () => {

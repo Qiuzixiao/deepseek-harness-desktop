@@ -16,16 +16,26 @@ const plugin = readJson('dsh-plugin-desktop/package.json')
 const fabric = readJson('dsh-community-fabric/package.json')
 const market = readJson('dsh-community-market/package.json')
 const harnessPackage = readJson('deepseek-harness/package.json')
+const integratedSourceOverrides = new Map([
+  ['@deepseek-ai/dsh-client-ui-short-drama', 'file:../deepseek-harness/packages/client/ui-short-drama'],
+  ['@deepseek-ai/dsh-screenplay-project-library', 'file:../deepseek-harness/packages/screenplay/project-library'],
+])
+const desktopWorkspaceDependencies = new Map([
+  ['dsh-file-upload', 'workspace:*'],
+  ['dsh-short-drama', 'workspace:*'],
+])
 
 if (workspace.packageManager !== 'yarn@4.18.0') {
   fail('the product workspace must pin yarn@4.18.0')
 }
 if (JSON.stringify(workspace.workspaces) !== JSON.stringify([
   'dsh-plugin-desktop',
+  'dsh-file-upload',
+  'dsh-short-drama',
   'dsh-community-fabric',
   'dsh-community-market',
 ])) {
-  fail('the root Yarn workspace must contain the desktop, community-fabric, and community-market packages')
+  fail('the root Yarn workspace must contain the desktop, file-upload, short-drama, community-fabric, and community-market packages')
 }
 for (const [name, manifest] of [
   ['dsh-plugin-desktop', plugin],
@@ -71,8 +81,14 @@ for (const [owner, manifest] of [
   for (const field of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies', 'resolutions']) {
     for (const [name, range] of Object.entries(manifest[field] ?? {})) {
       if (typeof range !== 'string') continue
-      if (/^(?:workspace|portal|link):/u.test(range)
-        || (range.startsWith('file:') && range.includes('deepseek-harness'))) {
+      const isAllowedIntegratedSourceOverride = owner === 'desktop'
+        && field === 'dependencies'
+        && integratedSourceOverrides.get(name) === range
+      const isAllowedDesktopWorkspaceDependency = owner === 'desktop'
+        && field === 'dependencies'
+        && desktopWorkspaceDependencies.get(name) === range
+      if ((/^(?:workspace|portal|link):/u.test(range) && !isAllowedDesktopWorkspaceDependency)
+        || (range.startsWith('file:') && range.includes('deepseek-harness') && !isAllowedIntegratedSourceOverride)) {
         fail(`${owner} ${field}.${name} bypasses the published DSH package boundary`)
       }
     }
