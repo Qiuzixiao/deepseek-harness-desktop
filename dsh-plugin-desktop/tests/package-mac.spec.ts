@@ -47,6 +47,43 @@ function options(calls: CommandCall[], logs: string[] = []): MacSmokePackageOpti
 }
 
 describe('macOS DMG smoke packaging', () => {
+  it('builds an Apple Silicon arm64 DMG target', () => {
+    const calls: CommandCall[] = []
+    const logs: string[] = []
+    const value = {
+      ...options(calls, logs),
+      target: 'arm64' as const,
+      outputDir: '/repo/dsh-plugin-desktop/dist/mac-arm64',
+      env: {
+        ...options(calls).env,
+        DSH_PACKAGE_CHECK_ALREADY_RAN: '1',
+      },
+    }
+
+    packageMacSmoke(value)
+
+    expect(calls[0]?.args).toEqual([
+      '/repo/node_modules/electron-builder/cli.js',
+      '--mac',
+      'dmg',
+      '--arm64',
+      '--publish',
+      'never',
+      '--config.mac.notarize=false',
+      '--config.npmRebuild=false',
+      '--config.directories.output=/repo/dsh-plugin-desktop/dist/mac-arm64',
+    ])
+    expect(calls[1]?.args).toEqual([
+      '/repo/dsh-plugin-desktop/scripts/verify-mac-smoke.ts',
+      '/repo/dsh-plugin-desktop/dist/mac-arm64',
+      'arm64',
+    ])
+    expect(logs).toEqual([
+      'Building an unsigned macOS arm64 DMG smoke.',
+      'Skipping the macOS package preflight; the package gate already passed.',
+    ])
+  })
+
   it('checks without credentials, builds an unsigned DMG, then verifies it', () => {
     const calls: CommandCall[] = []
     const logs: string[] = []

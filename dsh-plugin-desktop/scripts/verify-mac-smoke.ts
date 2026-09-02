@@ -5,7 +5,10 @@ import { existsSync, mkdtempSync, readdirSync, rmdirSync, statSync } from 'node:
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { MACOS_UNIVERSAL_NATIVE_ENTRIES } from './mac-universal.ts'
+import {
+  MACOS_UNIVERSAL_NATIVE_ENTRIES,
+  type MacUniversalArch,
+} from './mac-universal.ts'
 
 /** Injectable filesystem and command boundaries for smoke verification. */
 export interface MacSmokeVerificationOptions {
@@ -29,6 +32,8 @@ export interface MacSmokeVerificationOptions {
     readonly isFile: boolean
     readonly mode: number
   }
+  /** Architectures expected in the packaged application. */
+  readonly architectures?: readonly MacUniversalArch[]
 }
 
 function listDmgs(distDir: string): readonly string[] {
@@ -48,6 +53,9 @@ function run(command: string, args: readonly string[]): void {
 
 function defaultOptions(): MacSmokeVerificationOptions {
   const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+  const architectures: readonly MacUniversalArch[] = process.argv[3] === 'arm64'
+    ? ['arm64']
+    : ['x86_64', 'arm64']
   return {
     distDir: process.argv[2] === undefined
       ? join(packageRoot, 'dist', 'mac-smoke')
@@ -62,6 +70,7 @@ function defaultOptions(): MacSmokeVerificationOptions {
       const result = statSync(path)
       return { size: result.size, isFile: result.isFile(), mode: result.mode }
     },
+    architectures,
   }
 }
 
@@ -75,6 +84,8 @@ function defaultOptions(): MacSmokeVerificationOptions {
 export function verifyMacSmoke(
   options: MacSmokeVerificationOptions = defaultOptions(),
 ): { readonly appPath: string; readonly dmgPath: string } {
+  const architectures = options.architectures ?? ['x86_64', 'arm64']
+  const nativeEntries = MACOS_UNIVERSAL_NATIVE_ENTRIES.filter(entry => architectures.includes(entry.arch))
   const dmgs = options.listDmgs(options.distDir)
   if (dmgs.length !== 1) {
     throw new Error(
@@ -114,8 +125,9 @@ export function verifyMacSmoke(
     ) {
       throw new Error(`packaged application has an invalid main executable: ${executablePath}`)
     }
-    options.run('lipo', [executablePath, '-verify_arch', 'x86_64'])
-    options.run('lipo', [executablePath, '-verify_arch', 'arm64'])
+    for (const architecture of architectures) {
+      options.run('lipo', [executablePath, '-verify_arch', architecture])
+    }
 
     const appAsarPath = join(appPath, 'Contents', 'Resources', 'app.asar')
     if (!options.exists(appAsarPath)) {
@@ -127,17 +139,17 @@ export function verifyMacSmoke(
     }
 
     const unpackedRoot = `${appAsarPath}.unpacked`
-    for (const entry of MACOS_UNIVERSAL_NATIVE_ENTRIES) {
+    for (const entry of nativeEntries) {
       const nativePath = join(unpackedRoot, entry.path)
       if (!options.exists(nativePath)) {
-        throw new Error(`universal application is missing ${nativePath}`)
+        throw new Error(`packaged application is missing ${nativePath}`)
       }
       const nativeStat = options.stat(nativePath)
       if (!nativeStat.isFile || nativeStat.size === 0) {
-        throw new Error(`universal application has an invalid native file: ${nativePath}`)
+        throw new Error(`packaged application has an invalid native file: ${nativePath}`)
       }
       if (entry.path.endsWith('/spawn-helper') && (nativeStat.mode & 0o111) === 0) {
-        throw new Error(`universal application has a non-executable node-pty helper: ${nativePath}`)
+        throw new Error(`packaged application has a non-executable node-pty helper: ${nativePath}`)
       }
       options.run('lipo', [nativePath, '-verify_arch', entry.arch])
     }

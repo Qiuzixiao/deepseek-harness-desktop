@@ -6,7 +6,12 @@ import { createRequire } from 'node:module'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { withoutMacReleaseSecrets } from './release-preflight.ts'
-import { prepareInstalledMacUniversalRuntime } from './mac-universal.ts'
+import {
+  prepareInstalledMacArm64Runtime,
+  prepareInstalledMacUniversalRuntime,
+} from './mac-universal.ts'
+
+export type MacSmokeTarget = 'universal' | 'arm64'
 
 /** Injectable native macOS packaging boundary used by focused tests. */
 export interface MacSmokePackageOptions {
@@ -34,6 +39,8 @@ export interface MacSmokePackageOptions {
   readonly verifier: string
   /** Node executable used to run package-local scripts. */
   readonly nodeExecutable: string
+  /** Electron target architecture; defaults to the universal smoke package. */
+  readonly target?: MacSmokeTarget
   /** Execute one packaging command. */
   readonly run: (
     command: string,
@@ -58,11 +65,13 @@ function run(
   }
 }
 
-function defaultOptions(): MacSmokePackageOptions {
+export function createMacSmokePackageOptions(
+  target: MacSmokeTarget = 'universal',
+): MacSmokePackageOptions {
   const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
   const workspaceRoot = resolve(desktopRoot, '..')
   const require = createRequire(import.meta.url)
-  const outputDir = resolve(desktopRoot, 'dist', 'mac-smoke')
+  const outputDir = resolve(desktopRoot, 'dist', target === 'arm64' ? 'mac-arm64' : 'mac-smoke')
   return {
     env: process.env,
     platform: process.platform,
@@ -72,13 +81,21 @@ function defaultOptions(): MacSmokePackageOptions {
     desktopRoot,
     outputDir,
     resetOutput: () => rmSync(outputDir, { recursive: true, force: true }),
-    prepareRuntime: () => prepareInstalledMacUniversalRuntime(desktopRoot),
+    prepareRuntime: () => {
+      if (target === 'arm64') prepareInstalledMacArm64Runtime(desktopRoot)
+      else prepareInstalledMacUniversalRuntime(desktopRoot)
+    },
     builderCli: require.resolve('electron-builder/cli.js'),
     verifier: fileURLToPath(new URL('./verify-mac-smoke.ts', import.meta.url)),
     nodeExecutable: process.execPath,
+    target,
     run,
     log: message => console.log(message),
   }
+}
+
+function defaultOptions(): MacSmokePackageOptions {
+  return createMacSmokePackageOptions()
 }
 
 /**
@@ -107,7 +124,12 @@ export function packageMacSmoke(options: MacSmokePackageOptions = defaultOptions
   }
 
   const cleanEnvironment = withoutMacReleaseSecrets(options.env)
-  options.log('Building an unsigned macOS DMG smoke; signing and notarization are release-only steps.')
+  const target = options.target ?? 'universal'
+  options.log(
+    target === 'arm64'
+      ? 'Building an unsigned macOS arm64 DMG smoke.'
+      : 'Building an unsigned macOS DMG smoke; signing and notarization are release-only steps.',
+  )
   if (options.env.DSH_PACKAGE_CHECK_ALREADY_RAN !== '1') {
     options.run(
       'corepack',
@@ -120,13 +142,17 @@ export function packageMacSmoke(options: MacSmokePackageOptions = defaultOptions
   }
   options.resetOutput()
   options.prepareRuntime()
+  const architectureArgs = target === 'arm64' ? ['--arm64'] : ['--universal']
+  const verifierArgs = target === 'arm64'
+    ? [options.verifier, options.outputDir, 'arm64']
+    : [options.verifier, options.outputDir]
   options.run(
     options.nodeExecutable,
     [
       options.builderCli,
       '--mac',
       'dmg',
-      '--universal',
+      ...architectureArgs,
       '--publish',
       'never',
       '--config.mac.notarize=false',
@@ -141,7 +167,7 @@ export function packageMacSmoke(options: MacSmokePackageOptions = defaultOptions
   )
   options.run(
     options.nodeExecutable,
-    [options.verifier, options.outputDir],
+    verifierArgs,
     options.desktopRoot,
     cleanEnvironment,
   )

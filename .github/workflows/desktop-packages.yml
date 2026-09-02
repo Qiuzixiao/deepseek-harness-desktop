@@ -1,0 +1,111 @@
+name: Desktop packages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DSH_TELEMETRY_DISABLED: '1'
+
+jobs:
+  windows-signed:
+    name: Windows x64 signed installer
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.23.2
+      - run: corepack enable
+      - name: Resolve Yarn cache folder
+        id: yarn-cache
+        shell: pwsh
+        run: echo "dir=$(yarn config get cacheFolder)" >> $env:GITHUB_OUTPUT
+      - uses: actions/cache@v6
+        with:
+          path: ${{ steps.yarn-cache.outputs.dir }}
+          key: yarn-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('yarn.lock', '.yarnrc.yml') }}
+      - name: Install root dependencies
+        env:
+          YARN_ENABLE_IMMUTABLE_INSTALLS: 'false'
+        run: yarn install
+      - run: yarn source:install
+      - name: Generate temporary Authenticode certificate
+        shell: pwsh
+        run: |
+          $certificatePath = Join-Path $env:RUNNER_TEMP 'zenwit-signing.pfx'
+          $password = [Guid]::NewGuid().ToString('N')
+          $securePassword = ConvertTo-SecureString $password -AsPlainText -Force
+          $certificate = New-SelfSignedCertificate `
+            -Type CodeSigningCert `
+            -Subject 'CN=Zenwit Internal Test' `
+            -CertStoreLocation 'Cert:\CurrentUser\My' `
+            -HashAlgorithm SHA256 `
+            -KeyLength 2048 `
+            -KeyExportPolicy Exportable `
+            -NotAfter (Get-Date).AddYears(1)
+          Export-PfxCertificate `
+            -Cert $certificate `
+            -FilePath $certificatePath `
+            -Password $securePassword | Out-Null
+          "WIN_CSC_LINK=$certificatePath" >> $env:GITHUB_ENV
+          "WIN_CSC_KEY_PASSWORD=$password" >> $env:GITHUB_ENV
+      - name: Build signed Windows installer
+        run: yarn dist:win-signed
+      - name: Verify Authenticode signatures
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem 'dsh-plugin-desktop/dist/Zenwit-*-x64-Setup.exe' | Select-Object -First 1
+          if ($null -eq $installer) { throw 'Signed Windows installer was not produced' }
+          $files = @($installer.FullName, (Resolve-Path 'dsh-plugin-desktop/dist/win-unpacked/Zenwit.exe').Path)
+          foreach ($file in $files) {
+            $signature = Get-AuthenticodeSignature -LiteralPath $file
+            if ($null -eq $signature.SignerCertificate -or $signature.Status -in @('NotSigned', 'HashMismatch')) {
+              throw "Authenticode signature check failed for ${file}: $($signature.Status)"
+            }
+            Write-Host "Authenticode signature present for ${file}: $($signature.Status)"
+          }
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v6
+        with:
+          name: zenwit-windows-installer-signed
+          path: dsh-plugin-desktop/dist/Zenwit-*-x64-Setup.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  macos-arm64:
+    name: macOS Apple Silicon DMG
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.23.2
+      - run: corepack enable
+      - name: Resolve Yarn cache folder
+        id: yarn-cache
+        run: echo "dir=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        with:
+          path: ${{ steps.yarn-cache.outputs.dir }}
+          key: yarn-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('yarn.lock', '.yarnrc.yml') }}
+      - run: yarn install --immutable
+      - run: yarn source:install
+      - run: yarn dist:mac-arm64
+      - name: Upload macOS Apple Silicon DMG
+        uses: actions/upload-artifact@v6
+        with:
+          name: zenwit-macos-arm64
+          path: dsh-plugin-desktop/dist/mac-arm64/*.dmg
+          if-no-files-found: error
+          retention-days: 14

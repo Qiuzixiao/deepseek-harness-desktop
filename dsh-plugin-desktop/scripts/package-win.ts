@@ -101,7 +101,7 @@ export function createWindowsPackageOptions(verifier = './verify-win-installer.t
 }
 
 /** Run the shared host and Node release gates before packaging. */
-function assertWindowsPackageHost(options: WindowsPackageOptions, artifact: string): void {
+export function assertWindowsPackageHost(options: WindowsPackageOptions, artifact: string): void {
   if (options.platform !== 'win32') {
     throw new Error(`Windows ${artifact} must be built on a native Windows host`)
   }

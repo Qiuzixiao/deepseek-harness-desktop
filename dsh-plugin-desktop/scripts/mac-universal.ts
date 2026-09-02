@@ -78,6 +78,30 @@ export interface MacUniversalPreparationOptions {
   readonly chmod: (path: string, mode: number) => void
 }
 
+/** Validate one or more architecture-specific runtime trees. */
+export function prepareMacArchitectureRuntime(
+  options: MacUniversalPreparationOptions,
+  architectures: readonly MacUniversalArch[],
+): void {
+  const root = resolve(options.desktopRoot)
+  const selected = new Set(architectures)
+  const entries = MACOS_UNIVERSAL_NATIVE_ENTRIES.filter(entry => selected.has(entry.arch))
+  const missing = entries
+    .map(entry => join(root, entry.path))
+    .filter(path => !options.exists(path))
+  if (missing.length > 0) {
+    throw new Error(
+      `macOS runtime is missing ${String(missing.length)} native file(s): ${missing.join(', ')}`,
+    )
+  }
+
+  for (const entry of entries) {
+    if (entry.path.endsWith('/spawn-helper')) {
+      options.chmod(join(root, entry.path), 0o755)
+    }
+  }
+}
+
 /**
  * Validate both CPU runtime trees and restore node-pty helper execute bits.
  * Yarn intentionally disables lifecycle scripts, so the package step owns this
@@ -87,24 +111,18 @@ export interface MacUniversalPreparationOptions {
 export function prepareMacUniversalRuntime(
   options: MacUniversalPreparationOptions,
 ): void {
-  const root = resolve(options.desktopRoot)
-  const missing = MACOS_UNIVERSAL_NATIVE_ENTRIES
-    .map(entry => join(root, entry.path))
-    .filter(path => !options.exists(path))
-  if (missing.length > 0) {
-    throw new Error(
-      `universal macOS runtime is missing ${String(missing.length)} native file(s): ${missing.join(', ')}`,
-    )
-  }
-
-  for (const entry of MACOS_UNIVERSAL_NATIVE_ENTRIES) {
-    if (entry.path.endsWith('/spawn-helper')) {
-      options.chmod(join(root, entry.path), 0o755)
-    }
-  }
+  prepareMacArchitectureRuntime(options, ['arm64', 'x86_64'])
 }
 
 /** Prepare the installed workspace dependency tree for universal packaging. */
 export function prepareInstalledMacUniversalRuntime(desktopRoot: string): void {
   prepareMacUniversalRuntime({ desktopRoot, exists: existsSync, chmod: chmodSync })
+}
+
+/** Prepare the installed workspace dependency tree for Apple Silicon packaging. */
+export function prepareInstalledMacArm64Runtime(desktopRoot: string): void {
+  prepareMacArchitectureRuntime(
+    { desktopRoot, exists: existsSync, chmod: chmodSync },
+    ['arm64'],
+  )
 }

@@ -4,6 +4,10 @@ import {
   packageWindowsInstaller,
   type WindowsPackageOptions,
 } from '../scripts/package-win.ts'
+import {
+  packageWindowsSignedInstaller,
+  windowsSigningEnvironment,
+} from '../scripts/package-win-signed.ts'
 
 interface CommandCall {
   readonly command: string
@@ -39,6 +43,52 @@ function options(calls: CommandCall[], logs: string[] = []): WindowsPackageOptio
 }
 
 describe('Windows x64 installer packaging', () => {
+  it('keeps only the selected Windows signing credentials for Electron Builder', () => {
+    expect(windowsSigningEnvironment(options([]).env)).toEqual({
+      PATH: 'C:\\Windows\\System32',
+      SAFE_VALUE: 'kept',
+      WIN_CSC_LINK: 'C:\\private\\publisher.pfx',
+      WIN_CSC_KEY_PASSWORD: 'private-windows-password',
+    })
+  })
+
+  it('builds a signed NSIS target when the package gate is already complete', () => {
+    const calls: CommandCall[] = []
+    const logs: string[] = []
+    const value = {
+      ...options(calls, logs),
+      env: {
+        ...options(calls).env,
+        DSH_PACKAGE_CHECK_ALREADY_RAN: '1',
+      },
+    }
+
+    packageWindowsSignedInstaller(value)
+
+    expect(calls).toHaveLength(2)
+    expect(calls[0]?.args).toEqual([
+      'C:\\repo\\node_modules\\electron-builder\\cli.js',
+      '--win',
+      'nsis',
+      '--x64',
+      '--publish',
+      'never',
+      '--config.win.signExecutable=true',
+      '--config.npmRebuild=false',
+    ])
+    expect(calls[0]?.env).toEqual({
+      PATH: 'C:\\Windows\\System32',
+      SAFE_VALUE: 'kept',
+      WIN_CSC_LINK: 'C:\\private\\publisher.pfx',
+      WIN_CSC_KEY_PASSWORD: 'private-windows-password',
+      DSH_PACKAGE_CHECK_ALREADY_RAN: '1',
+    })
+    expect(logs).toEqual([
+      'Building a Windows x64 NSIS installer with Authenticode signing.',
+      'Skipping the Windows package preflight; the package gate already passed.',
+    ])
+  })
+
   it('checks without credentials, builds an unsigned NSIS target, then verifies it', () => {
     const calls: CommandCall[] = []
     const logs: string[] = []

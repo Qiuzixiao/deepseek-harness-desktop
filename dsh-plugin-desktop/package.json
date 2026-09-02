@@ -128,8 +128,10 @@
     "dev": "yarn run build && node scripts/dev.mjs",
     "package:dir": "yarn run build && node scripts/package-dir.mjs",
     "dist:mac": "node scripts/release-mac.ts",
+    "dist:mac-arm64": "node scripts/package-mac-arm64.ts",
     "dist:mac-smoke": "node scripts/package-mac.ts",
     "dist:win": "node scripts/package-win.ts",
+    "dist:win-signed": "node scripts/package-win-signed.ts",
     "dist:win-portable": "node scripts/package-win-portable.ts",
     "prepack": "yarn run check"
   },
