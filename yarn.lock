@@ -2402,7 +2402,7 @@ __metadata:
 
 "@deepseek-ai/dsh-client-ui-short-drama@file:../deepseek-harness/packages/client/ui-short-drama::locator=dsh-plugin-desktop%40workspace%3Adsh-plugin-desktop":
   version: 0.1.1-rc.2
-  resolution: "@deepseek-ai/dsh-client-ui-short-drama@file:../deepseek-harness/packages/client/ui-short-drama#../deepseek-harness/packages/client/ui-short-drama::hash=3ba428&locator=dsh-plugin-desktop%40workspace%3Adsh-plugin-desktop"
+  resolution: "@deepseek-ai/dsh-client-ui-short-drama@file:../deepseek-harness/packages/client/ui-short-drama#../deepseek-harness/packages/client/ui-short-drama::hash=cf7c57&locator=dsh-plugin-desktop%40workspace%3Adsh-plugin-desktop"
   dependencies:
     "@codemirror/lang-markdown": "npm:^6.5.2"
     "@codemirror/language": "npm:^6.12.4"
@@ -2413,6 +2413,7 @@ __metadata:
     "@milkdown/kit": "npm:7.22.1"
     "@milkdown/plugin-listener": "npm:7.22.1"
     "@milkdown/preset-commonmark": "npm:7.22.1"
+    "@milkdown/preset-gfm": "npm:7.22.1"
     "@milkdown/react": "npm:7.22.1"
     codemirror: "npm:^6.0.2"
     lucide-react: "npm:1.33.0"
@@ -2426,7 +2427,7 @@ __metadata:
     "@deepseek-ai/dsh-client-ui-theme": "workspace:^"
     "@deepseek-ai/dsh-invariants": "workspace:^"
     react: ^18.2.0
-  checksum: 10c0/1a2ec0ee7b5051be596849d0a3f89327c7472b6c4bffacdc2440af41d79f7e3c5b2bc45f803eed7ab4ce383d0b5b63cfed93a173018f11374ec5ba67559aa6f6
+  checksum: 10c0/d8d9b14314d42bf7645dff0535d4b05e4d4481d21d1389aead53b38e64538053e6bcdd54b224996839d62c8eb4a181a2f043d28ce4652393ac8a7d4f4b22691f
   languageName: node
   linkType: hard
 
@@ -3547,14 +3548,14 @@ __metadata:
 
 "@deepseek-ai/dsh-screenplay-project-library@file:../deepseek-harness/packages/screenplay/project-library::locator=dsh-plugin-desktop%40workspace%3Adsh-plugin-desktop":
   version: 0.1.1-rc.2
-  resolution: "@deepseek-ai/dsh-screenplay-project-library@file:../deepseek-harness/packages/screenplay/project-library#../deepseek-harness/packages/screenplay/project-library::hash=808417&locator=dsh-plugin-desktop%40workspace%3Adsh-plugin-desktop"
+  resolution: "@deepseek-ai/dsh-screenplay-project-library@file:../deepseek-harness/packages/screenplay/project-library#../deepseek-harness/packages/screenplay/project-library::hash=defd8a&locator=dsh-plugin-desktop%40workspace%3Adsh-plugin-desktop"
   dependencies:
     zod: "npm:^4.4.3"
   peerDependencies:
     "@deepseek-ai/cordis": 4.0.1
     "@deepseek-ai/dsh-invariants": 0.1.1-rc.2
     "@deepseek-ai/dsh-typert-protocol": 0.1.1-rc.2
-  checksum: 10c0/a6805c2457dec3cfb5ccac9c841072cad0aca91f8b86d4d93c0737626b91ca04b220081f8be0c22cb04924a938672e721e5c8d3a4543e4fc33e089fe5140480f
+  checksum: 10c0/29f6b9891c839882c1accde3a6cf9e412b8aa2c22cdb5f3c51564b422369a10ac0214d4dc8d2a1a82cc3900976abbb8e0249d610ca5039391d4e04674c3cb879
   languageName: node
   linkType: hard
 
@@ -6802,24 +6803,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@napi-rs/canvas-android-arm64@npm:0.1.100":
-  version: 0.1.100
-  resolution: "@napi-rs/canvas-android-arm64@npm:0.1.100"
-  conditions: os=android & cpu=arm64
-  languageName: node
-  linkType: hard
-
 "@napi-rs/canvas-android-arm64@npm:1.0.8":
   version: 1.0.8
   resolution: "@napi-rs/canvas-android-arm64@npm:1.0.8"
   conditions: os=android & cpu=arm64
-  languageName: node
-  linkType: hard
-
-"@napi-rs/canvas-darwin-arm64@npm:0.1.100":
-  version: 0.1.100
-  resolution: "@napi-rs/canvas-darwin-arm64@npm:0.1.100"
-  conditions: os=darwin & cpu=arm64
   languageName: node
   linkType: hard
 
@@ -6830,24 +6817,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@napi-rs/canvas-darwin-x64@npm:0.1.100":
-  version: 0.1.100
-  resolution: "@napi-rs/canvas-darwin-x64@npm:0.1.100"
-  conditions: os=darwin & cpu=x64
-  languageName: node
-  linkType: hard
-
 "@napi-rs/canvas-darwin-x64@npm:1.0.8":
   version: 1.0.8
   resolution: "@napi-rs/canvas-darwin-x64@npm:1.0.8"
   conditions: os=darwin & cpu=x64
-  languageName: node
-  linkType: hard
-
-"@napi-rs/canvas-linux-arm-gnueabihf@npm:0.1.100":
-  version: 0.1.100
-  resolution: "@napi-rs/canvas-linux-arm-gnueabihf@npm:0.1.100"
-  conditions: os=linux & cpu=arm
   languageName: node
   linkType: hard
 
@@ -6858,24 +6831,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@napi-rs/canvas-linux-arm64-gnu@npm:0.1.100":
-  version: 0.1.100
-  resolution: "@napi-rs/canvas-linux-arm64-gnu@npm:0.1.100"
-  conditions: os=linux & cpu=arm64 & libc=glibc
-  languageName: node
-  linkType: hard
-
 "@napi-rs/canvas-linux-arm64-gnu@npm:1.0.8":
   version: 1.0.8
   resolution: "@napi-rs/canvas-linux-arm64-gnu@npm:1.0.8"
   conditions: os=linux & cpu=arm64 & libc=glibc
-  languageName: node
-  linkType: hard
-
-"@napi-rs/canvas-linux-arm64-musl@npm:0.1.100":
-  version: 0.1.100
-  resolution: "@napi-rs/canvas-linux-arm64-musl@npm:0.1.100"
-  conditions: os=linux & cpu=arm64 & libc=musl
   languageName: node
   linkType: hard
 
@@ -6886,24 +6845,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@napi-rs/canvas-linux-riscv64-gnu@npm:0.1.100":
-  version: 0.1.100
-  resolution: "@napi-rs/canvas-linux-riscv64-gnu@npm:0.1.100"
-  conditions: os=linux & cpu=riscv64 & libc=glibc
-  languageName: node
-  linkType: hard
-
 "@napi-rs/canvas-linux-riscv64-gnu@npm:1.0.8":
   version: 1.0.8
   resolution: "@napi-rs/canvas-linux-riscv64-gnu@npm:1.0.8"
   conditions: os=linux & cpu=riscv64 & libc=glibc
-  languageName: node
-  linkType: hard
-
-"@napi-rs/canvas-linux-x64-gnu@npm:0.1.100":
-  version: 0.1.100
-  resolution: "@napi-rs/canvas-linux-x64-gnu@npm:0.1.100"
-  conditions: os=linux & cpu=x64 & libc=glibc
   languageName: node
   linkType: hard
 
@@ -6914,24 +6859,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@napi-rs/canvas-linux-x64-musl@npm:0.1.100":
-  version: 0.1.100
-  resolution: "@napi-rs/canvas-linux-x64-musl@npm:0.1.100"
-  conditions: os=linux & cpu=x64 & libc=musl
-  languageName: node
-  linkType: hard
-
 "@napi-rs/canvas-linux-x64-musl@npm:1.0.8":
   version: 1.0.8
   resolution: "@napi-rs/canvas-linux-x64-musl@npm:1.0.8"
   conditions: os=linux & cpu=x64 & libc=musl
-  languageName: node
-  linkType: hard
-
-"@napi-rs/canvas-win32-arm64-msvc@npm:0.1.100":
-  version: 0.1.100
-  resolution: "@napi-rs/canvas-win32-arm64-msvc@npm:0.1.100"
-  conditions: os=win32 & cpu=arm64
   languageName: node
   linkType: hard
 
@@ -6942,63 +6873,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@napi-rs/canvas-win32-x64-msvc@npm:0.1.100":
-  version: 0.1.100
-  resolution: "@napi-rs/canvas-win32-x64-msvc@npm:0.1.100"
-  conditions: os=win32 & cpu=x64
-  languageName: node
-  linkType: hard
-
 "@napi-rs/canvas-win32-x64-msvc@npm:1.0.8":
   version: 1.0.8
   resolution: "@napi-rs/canvas-win32-x64-msvc@npm:1.0.8"
   conditions: os=win32 & cpu=x64
-  languageName: node
-  linkType: hard
-
-"@napi-rs/canvas@npm:^0.1.65":
-  version: 0.1.100
-  resolution: "@napi-rs/canvas@npm:0.1.100"
-  dependencies:
-    "@napi-rs/canvas-android-arm64": "npm:0.1.100"
-    "@napi-rs/canvas-darwin-arm64": "npm:0.1.100"
-    "@napi-rs/canvas-darwin-x64": "npm:0.1.100"
-    "@napi-rs/canvas-linux-arm-gnueabihf": "npm:0.1.100"
-    "@napi-rs/canvas-linux-arm64-gnu": "npm:0.1.100"
-    "@napi-rs/canvas-linux-arm64-musl": "npm:0.1.100"
-    "@napi-rs/canvas-linux-riscv64-gnu": "npm:0.1.100"
-    "@napi-rs/canvas-linux-x64-gnu": "npm:0.1.100"
-    "@napi-rs/canvas-linux-x64-musl": "npm:0.1.100"
-    "@napi-rs/canvas-win32-arm64-msvc": "npm:0.1.100"
-    "@napi-rs/canvas-win32-x64-msvc": "npm:0.1.100"
-  dependenciesMeta:
-    "@napi-rs/canvas-android-arm64":
-      optional: true
-    "@napi-rs/canvas-darwin-arm64":
-      optional: true
-    "@napi-rs/canvas-darwin-x64":
-      optional: true
-    "@napi-rs/canvas-linux-arm-gnueabihf":
-      optional: true
-    "@napi-rs/canvas-linux-arm64-gnu":
-      optional: true
-    "@napi-rs/canvas-linux-arm64-musl":
-      optional: true
-    "@napi-rs/canvas-linux-riscv64-gnu":
-      optional: true
-    "@napi-rs/canvas-linux-x64-gnu":
-      optional: true
-    "@napi-rs/canvas-linux-x64-musl":
-      optional: true
-    "@napi-rs/canvas-win32-arm64-msvc":
-      optional: true
-    "@napi-rs/canvas-win32-x64-msvc":
-      optional: true
-    canvas:
-      built: true
-    skia-canvas:
-      built: true
-  checksum: 10c0/d3dfca5620a41c34addd344bd4c448a5334d3f32f2562ec8390507b3897747ed1de9f08fcb9169cff6dd27111afb5b3eaf7e42cc1494c8fa4128e7d4235f6bea
   languageName: node
   linkType: hard
 
@@ -10408,7 +10286,7 @@ __metadata:
     esbuild: "npm:^0.24.2"
     mammoth: "npm:^1.8.0"
     markitdown-node: "npm:^1.5.2"
-    pdfjs-dist: "npm:^4.10.38"
+    pdfjs-dist: "npm:^6.2.108"
     read-excel-file: "npm:^5.8.7"
     typescript: "npm:^5.7.2"
   peerDependencies:
@@ -14644,18 +14522,6 @@ __metadata:
     node-ensure: "npm:^0.0.0"
     worker-loader: "npm:^1.0.0"
   checksum: 10c0/decc1a554a0477eef3036f1aea5c4418f408b572c3c0d13f12f57b46b6c927fc970caba2269726c0bd2a9847f2d5f54c715f2d931d32b8388a2cb019f88fae47
-  languageName: node
-  linkType: hard
-
-"pdfjs-dist@npm:^4.10.38":
-  version: 4.10.38
-  resolution: "pdfjs-dist@npm:4.10.38"
-  dependencies:
-    "@napi-rs/canvas": "npm:^0.1.65"
-  dependenciesMeta:
-    "@napi-rs/canvas":
-      optional: true
-  checksum: 10c0/77b022109be7aac00372750a53decea3979409e6ef1cf93bf554351569cd4d1fafc70afae4a9a3e4b4de3facf59d3acd54d324b0fcff781374bcb00493d449ce
   languageName: node
   linkType: hard
 

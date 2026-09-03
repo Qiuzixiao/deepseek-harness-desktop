@@ -79,7 +79,7 @@ export function decodeText(data: Buffer, encoding: 'utf8' | 'utf16le' | 'gb18030
 /** Extract text from a PDF using pdfjs-dist (Mozilla's PDF.js, legacy build). */
 async function extractPdf(data: Buffer, maxBytes: number): Promise<{ text: string; truncated: boolean }> {
   const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs')
-  const doc = await getDocument({
+  const loadingTask = getDocument({
     data: new Uint8Array(data),
     // Node has no web worker; these options keep the legacy build self-contained.
     disableWorker: true,
@@ -89,7 +89,8 @@ async function extractPdf(data: Buffer, maxBytes: number): Promise<{ text: strin
     disableWorker: boolean
     isEvalSupported: boolean
     useSystemFonts: boolean
-  }).promise
+  })
+  const doc = await loadingTask.promise
   try {
     const pages: string[] = []
     let total = 0
@@ -120,7 +121,7 @@ async function extractPdf(data: Buffer, maxBytes: number): Promise<{ text: strin
     }
     return { text: pages.join('\n\n'), truncated: total > maxBytes || pages.length < pageCount }
   } finally {
-    await doc.destroy()
+    await loadingTask.destroy()
   }
 }
 

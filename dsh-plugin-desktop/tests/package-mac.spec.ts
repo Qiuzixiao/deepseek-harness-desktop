@@ -115,6 +115,7 @@ describe('macOS DMG smoke packaging', () => {
         PATH: '/usr/bin:/bin',
         SAFE_VALUE: 'kept',
         CSC_IDENTITY_AUTO_DISCOVERY: 'false',
+        DSH_UNSIGNED_MAC_PACKAGE: '1',
       },
     })
     expect(calls[2]).toEqual({

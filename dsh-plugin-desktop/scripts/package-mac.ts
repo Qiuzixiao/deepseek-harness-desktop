@@ -163,6 +163,7 @@ export function packageMacSmoke(options: MacSmokePackageOptions = defaultOptions
     {
       ...cleanEnvironment,
       CSC_IDENTITY_AUTO_DISCOVERY: 'false',
+      DSH_UNSIGNED_MAC_PACKAGE: '1',
     },
   )
   options.run(

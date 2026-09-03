@@ -1,6 +1,7 @@
 /** Fail-loud verification of the runtime entries sealed into Electron's app.asar. */
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { isAbsolute, join, relative, sep } from 'node:path'
@@ -424,6 +425,49 @@ export function verifyPackagedRuntime(
 }
 
 /**
+ * Remove Electron's embedded ad-hoc signatures from an unsigned macOS smoke
+ * package. Electron ships its Mach-O binaries with linker signatures; leaving
+ * those signatures in an otherwise unsigned bundle makes Gatekeeper report a
+ * misleading "application is damaged" error after download. This is only
+ * enabled for the explicit unsigned smoke build and never for releases.
+ */
+export function stripUnsignedMacSignatures(context: PackagedRuntimeContext): void {
+  if (context.electronPlatformName !== 'darwin' || process.env.DSH_UNSIGNED_MAC_PACKAGE !== '1') {
+    return
+  }
+  const appPath = join(
+    context.appOutDir,
+    `${context.packager.appInfo.productFilename}.app`,
+  )
+  const result = spawnSync('codesign', ['--remove-signature', '--deep', appPath], {
+    stdio: 'ignore',
+  })
+  if (result.error !== undefined) throw result.error
+  if (result.status !== 0) {
+    throw new Error(`codesign --remove-signature --deep exited with ${String(result.status)}`)
+  }
+  // `--deep` only reaches nested code when the outer bundle has a signature.
+  // Electron's embedded framework and native Node modules can remain ad-hoc
+  // signed after the outer signature is removed, so strip those Mach-O files
+  // explicitly as well. Non-code files simply make codesign return non-zero;
+  // find continues and the package remains intentionally unsigned.
+  const nested = spawnSync('find', [
+    appPath,
+    '-type', 'f',
+    '(', '-perm', '-111', '-o',
+    '-name', '*.node', '-o',
+    '-name', '*.dylib', '-o',
+    '-name', '*.so',
+    ')',
+    '-exec', 'codesign', '--remove-signature', '{}', ';',
+  ], { stdio: 'ignore' })
+  if (nested.error !== undefined) throw nested.error
+  if (nested.status !== 0) {
+    throw new Error(`find/codesign signature cleanup exited with ${String(nested.status)}`)
+  }
+}
+
+/**
  * Run the static packaged-runtime check as Electron Builder's afterPack hook.
  * @param context - Electron Builder's afterPack context.
  * @returns A promise that rejects before signing when the runtime is incomplete.
@@ -438,6 +482,7 @@ export async function afterPack(
   const unpackedRoot = resolvePackagedUnpackedRoot(context)
   verifyHome(unpackedRoot)
   await smoke(unpackedRoot)
+  stripUnsignedMacSignatures(context)
 }
 
 export default afterPack

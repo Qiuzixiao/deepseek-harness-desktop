@@ -643,6 +643,17 @@ describe('published package surface', () => {
       'resources/**',
       'package.json',
       '!node_modules/node-pty/build/**',
+      '!**/*.map',
+      '!**/*.d.ts',
+      '!**/{test,tests,__tests__,coverage,examples,docs,documentation}/**',
+      '!node_modules/@img/sharp-win32-arm64/**',
+      '!node_modules/@img/sharp-win32-ia32/**',
+      '!node_modules/@napi-rs/canvas-win32-arm64-msvc/**',
+      '!node_modules/@vscode/ripgrep-win32-arm64/**',
+      '!node_modules/@vscode/ripgrep-win32-ia32/**',
+      '!node_modules/@koromix/koffi-win32-arm64/**',
+      '!node_modules/@koromix/koffi-win32-ia32/**',
+      '!node_modules/node-pty/prebuilds/win32-arm64/**',
     ])
     expect(manifest.build?.mac?.icon).toBe('build/app-icon-mac.png')
     expect(manifest.build?.mac?.mergeASARs).toBe(false)
