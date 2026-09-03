@@ -1,4 +1,4 @@
-/** Build an unsigned macOS DMG smoke artifact on a native macOS host. */
+/** Build an ad-hoc signed macOS DMG smoke artifact on a native macOS host. */
 
 import { spawnSync } from 'node:child_process'
 import { rmSync } from 'node:fs'
@@ -99,7 +99,7 @@ function defaultOptions(): MacSmokePackageOptions {
 }
 
 /**
- * Run the headless release gates and package one unsigned macOS DMG smoke.
+ * Run the headless release gates and package one ad-hoc signed macOS DMG smoke.
  *
  * The signed and notarized release stays a manual step on a credentialed
  * machine; this smoke exists so macOS packaging regressions fail in CI before
@@ -127,8 +127,8 @@ export function packageMacSmoke(options: MacSmokePackageOptions = defaultOptions
   const target = options.target ?? 'universal'
   options.log(
     target === 'arm64'
-      ? 'Building an unsigned macOS arm64 DMG smoke.'
-      : 'Building an unsigned macOS DMG smoke; signing and notarization are release-only steps.',
+      ? 'Building an ad-hoc signed macOS arm64 DMG smoke.'
+      : 'Building an ad-hoc signed macOS DMG smoke; Developer ID signing and notarization are release-only steps.',
   )
   if (options.env.DSH_PACKAGE_CHECK_ALREADY_RAN !== '1') {
     options.run(
@@ -156,6 +156,8 @@ export function packageMacSmoke(options: MacSmokePackageOptions = defaultOptions
       '--publish',
       'never',
       '--config.mac.notarize=false',
+      '--config.mac.identity=-',
+      '--config.mac.hardenedRuntime=false',
       '--config.npmRebuild=false',
       `--config.directories.output=${options.outputDir}`,
     ],
@@ -163,7 +165,6 @@ export function packageMacSmoke(options: MacSmokePackageOptions = defaultOptions
     {
       ...cleanEnvironment,
       CSC_IDENTITY_AUTO_DISCOVERY: 'false',
-      DSH_UNSIGNED_MAC_PACKAGE: '1',
     },
   )
   options.run(

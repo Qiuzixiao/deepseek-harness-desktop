@@ -1,4 +1,4 @@
-/** Build an unsigned Apple Silicon macOS DMG smoke artifact. */
+/** Build an ad-hoc signed Apple Silicon macOS DMG smoke artifact. */
 
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'

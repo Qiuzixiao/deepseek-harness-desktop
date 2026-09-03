@@ -70,6 +70,8 @@ describe('macOS DMG smoke packaging', () => {
       '--publish',
       'never',
       '--config.mac.notarize=false',
+      '--config.mac.identity=-',
+      '--config.mac.hardenedRuntime=false',
       '--config.npmRebuild=false',
       '--config.directories.output=/repo/dsh-plugin-desktop/dist/mac-arm64',
     ])
@@ -79,7 +81,7 @@ describe('macOS DMG smoke packaging', () => {
       'arm64',
     ])
     expect(logs).toEqual([
-      'Building an unsigned macOS arm64 DMG smoke.',
+      'Building an ad-hoc signed macOS arm64 DMG smoke.',
       'Skipping the macOS package preflight; the package gate already passed.',
     ])
   })
@@ -107,6 +109,8 @@ describe('macOS DMG smoke packaging', () => {
         '--publish',
         'never',
         '--config.mac.notarize=false',
+        '--config.mac.identity=-',
+        '--config.mac.hardenedRuntime=false',
         '--config.npmRebuild=false',
         '--config.directories.output=/repo/dsh-plugin-desktop/dist/mac-smoke',
       ],
@@ -115,7 +119,6 @@ describe('macOS DMG smoke packaging', () => {
         PATH: '/usr/bin:/bin',
         SAFE_VALUE: 'kept',
         CSC_IDENTITY_AUTO_DISCOVERY: 'false',
-        DSH_UNSIGNED_MAC_PACKAGE: '1',
       },
     })
     expect(calls[2]).toEqual({
@@ -128,7 +131,7 @@ describe('macOS DMG smoke packaging', () => {
       env: { PATH: '/usr/bin:/bin', SAFE_VALUE: 'kept' },
     })
     expect(logs).toEqual([
-      'Building an unsigned macOS DMG smoke; signing and notarization are release-only steps.',
+      'Building an ad-hoc signed macOS DMG smoke; Developer ID signing and notarization are release-only steps.',
     ])
   })
 
@@ -154,11 +157,13 @@ describe('macOS DMG smoke packaging', () => {
       '--publish',
       'never',
       '--config.mac.notarize=false',
+      '--config.mac.identity=-',
+      '--config.mac.hardenedRuntime=false',
       '--config.npmRebuild=false',
       '--config.directories.output=/repo/dsh-plugin-desktop/dist/mac-smoke',
     ])
     expect(logs).toEqual([
-      'Building an unsigned macOS DMG smoke; signing and notarization are release-only steps.',
+      'Building an ad-hoc signed macOS DMG smoke; Developer ID signing and notarization are release-only steps.',
       'Skipping the macOS package preflight; the package gate already passed.',
     ])
   })
