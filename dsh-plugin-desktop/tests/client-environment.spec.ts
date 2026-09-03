@@ -110,6 +110,8 @@ describe('advanced desktop layout', () => {
       expect(css).toMatch(/\.dshDesktopFrame\[data-desktop-platform="win32"\] \.dshDesktopConversationSurface,\s*\.dshDesktopFrame\[data-desktop-platform="win32"\] \.dshDesktopDetailsSurface \{ grid-row: 2; \}/)
       expect(css).toMatch(/\.dshDesktopWindowsCaptionRow \{[^}]*grid-column: 2 \/ -1;[^}]*grid-row: 1;/)
       expect(css).toMatch(new RegExp(`\\.dshDesktopWindowsCaptionRow::before \\{[^}]*inset: 0 ${WINDOWS_CAPTION_CONTROLS_WIDTH}px 0 0;[^}]*-webkit-app-region: drag;`))
+      expect(css).toMatch(new RegExp(`body\\[data-dsh-desktop-platform="win32"\\] \\[data-zenwit-frame\\] \\{[^}]*padding-top: ${WINDOWS_TITLEBAR_HEIGHT}px;`))
+      expect(css).toMatch(new RegExp(`body\\[data-dsh-desktop-platform="win32"\\] \\[data-zenwit-frame\\]::before \\{[^}]*right: ${WINDOWS_CAPTION_CONTROLS_WIDTH}px;[^}]*height: ${WINDOWS_TITLEBAR_HEIGHT}px;[^}]*-webkit-app-region: drag;`))
       expect(css).toContain('html:has([aria-modal="true"]) .dshDesktopWindowsCaptionRow::before { -webkit-app-region: no-drag !important; }')
       expect(css).toContain('html:has([aria-modal="true"]) [data-zenwit-frame]::before { -webkit-app-region: no-drag !important; }')
       expect(css).not.toMatch(/data-desktop-platform="win32"[^{}]*header[^{}]*\{[^}]*padding-right/)

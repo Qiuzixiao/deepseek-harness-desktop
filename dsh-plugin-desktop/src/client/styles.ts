@@ -26,6 +26,8 @@ body[data-dsh-desktop-mode="advanced"][data-dsh-desktop-material="off"] .dshDesk
 .dshDesktopMacCaptionRow::before { content: ""; position: absolute; top: 0; right: 0; left: 0; height: ${MACOS_DRAG_REGION_HEIGHT}px; user-select: none; -webkit-app-region: drag; }
 body[data-dsh-desktop-platform="darwin"] [data-zenwit-frame] { position: relative; box-sizing: border-box; padding-top: ${MACOS_TITLEBAR_HEIGHT}px; }
 body[data-dsh-desktop-platform="darwin"] [data-zenwit-frame]::before { content: ""; position: absolute; z-index: 0; top: 0; right: 0; left: ${MACOS_TRAFFIC_LIGHT_SAFE_WIDTH}px; height: ${MACOS_DRAG_REGION_HEIGHT}px; user-select: none; -webkit-app-region: drag; }
+body[data-dsh-desktop-platform="win32"] [data-zenwit-frame] { position: relative; box-sizing: border-box; padding-top: ${WINDOWS_TITLEBAR_HEIGHT}px; }
+body[data-dsh-desktop-platform="win32"] [data-zenwit-frame]::before { content: ""; position: absolute; z-index: 0; top: 0; right: ${WINDOWS_CAPTION_CONTROLS_WIDTH}px; left: 0; height: ${WINDOWS_TITLEBAR_HEIGHT}px; user-select: none; -webkit-app-region: drag; }
 .dshDesktopConversationSurface { grid-column: 2; grid-row: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--dsw-alias-bg-base); }
 .dshDesktopDetailsSurface { grid-column: 3; grid-row: 1; min-width: 0; min-height: 0; overflow: hidden; background: var(--dsw-alias-bg-base); border-left: 1px solid var(--dsw-alias-border-l2); }
 .dshDesktopFrame[data-details-collapsed] .dshDesktopDetailsSurface { border-left: none; }
