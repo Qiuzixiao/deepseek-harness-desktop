@@ -12,6 +12,7 @@ import { FsError, type FsTarget, type FsVersion } from '@deepseek-ai/dsh-fs'
 import { sniff } from './detect.ts'
 import { convertDocument } from './convert.ts'
 import type { ConvertOptions } from './convert.ts'
+import { renderDocumentPage } from './render.ts'
 
 export interface ReadDocumentConfig {
   readLimit: number
@@ -89,20 +90,6 @@ function sessionCwd(exec: { agent?: { session?: { header?: { cwd?: string } } } 
   return exec.agent?.session?.header?.cwd
 }
 
-function renderEnvelope(path: string, value: { offset: number; lines: Array<{ number: number; text: string }>; totalLines: number }): string {
-  // Envelope with a two-line body preview: the model sees at a glance that the
-  // content lives in `lines`, not just metadata.
-  const preview = value.lines
-    .slice(0, 2)
-    .map((l) => `  ${l.number}: ${l.text.slice(0, 120)}`)
-    .join('\n')
-  return [
-    `### document ${path}`,
-    `offset ${value.offset}, ${value.lines.length}/${value.totalLines} lines; full content in \`lines\`:`,
-    preview
-  ].join('\n')
-}
-
 export function defineReadDocumentTool(ctx: {
   fs: {
     resolve(path: string, opts?: { cwd?: string; signal?: AbortSignal }): Promise<FsTarget>
@@ -163,7 +150,7 @@ export function defineReadDocumentTool(ctx: {
       render: (_args, value) => [
         {
           type: 'text',
-          text: renderEnvelope(value.path, value)
+          text: renderDocumentPage(value.path, value)
         }
       ]
     },
