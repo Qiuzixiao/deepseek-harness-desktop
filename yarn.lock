@@ -2402,7 +2402,7 @@ __metadata:
 
 "@deepseek-ai/dsh-client-ui-short-drama@file:../deepseek-harness/packages/client/ui-short-drama::locator=dsh-plugin-desktop%40workspace%3Adsh-plugin-desktop":
   version: 0.1.1-rc.2
-  resolution: "@deepseek-ai/dsh-client-ui-short-drama@file:../deepseek-harness/packages/client/ui-short-drama#../deepseek-harness/packages/client/ui-short-drama::hash=cf7c57&locator=dsh-plugin-desktop%40workspace%3Adsh-plugin-desktop"
+  resolution: "@deepseek-ai/dsh-client-ui-short-drama@file:../deepseek-harness/packages/client/ui-short-drama#../deepseek-harness/packages/client/ui-short-drama::hash=f84979&locator=dsh-plugin-desktop%40workspace%3Adsh-plugin-desktop"
   dependencies:
     "@codemirror/lang-markdown": "npm:^6.5.2"
     "@codemirror/language": "npm:^6.12.4"
@@ -2427,7 +2427,7 @@ __metadata:
     "@deepseek-ai/dsh-client-ui-theme": "workspace:^"
     "@deepseek-ai/dsh-invariants": "workspace:^"
     react: ^18.2.0
-  checksum: 10c0/d8d9b14314d42bf7645dff0535d4b05e4d4481d21d1389aead53b38e64538053e6bcdd54b224996839d62c8eb4a181a2f043d28ce4652393ac8a7d4f4b22691f
+  checksum: 10c0/3c803fc40c6fcc4a128154bc3fa6054babdce85a3215b4beb340fe90c4a1285aea13be5a926be2ea99a95503131d493b9b975b836cff463db7e12d71a85446fb
   languageName: node
   linkType: hard
 
@@ -3548,14 +3548,14 @@ __metadata:
 
 "@deepseek-ai/dsh-screenplay-project-library@file:../deepseek-harness/packages/screenplay/project-library::locator=dsh-plugin-desktop%40workspace%3Adsh-plugin-desktop":
   version: 0.1.1-rc.2
-  resolution: "@deepseek-ai/dsh-screenplay-project-library@file:../deepseek-harness/packages/screenplay/project-library#../deepseek-harness/packages/screenplay/project-library::hash=defd8a&locator=dsh-plugin-desktop%40workspace%3Adsh-plugin-desktop"
+  resolution: "@deepseek-ai/dsh-screenplay-project-library@file:../deepseek-harness/packages/screenplay/project-library#../deepseek-harness/packages/screenplay/project-library::hash=83cc16&locator=dsh-plugin-desktop%40workspace%3Adsh-plugin-desktop"
   dependencies:
     zod: "npm:^4.4.3"
   peerDependencies:
     "@deepseek-ai/cordis": 4.0.1
     "@deepseek-ai/dsh-invariants": 0.1.1-rc.2
     "@deepseek-ai/dsh-typert-protocol": 0.1.1-rc.2
-  checksum: 10c0/29f6b9891c839882c1accde3a6cf9e412b8aa2c22cdb5f3c51564b422369a10ac0214d4dc8d2a1a82cc3900976abbb8e0249d610ca5039391d4e04674c3cb879
+  checksum: 10c0/5c2a61402350498212c6c047f4e6969a48c4ebba0a1d4e1f48609b9c14986ba223f83e93de18549d9bc4be69a22d25d7a4371cb753a55203fdfbc97e88814179
   languageName: node
   linkType: hard
 
