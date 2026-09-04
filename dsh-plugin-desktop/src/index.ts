@@ -41,6 +41,7 @@ import {
   DESKTOP_PROJECT_STRUCTURE_PATH,
   DESKTOP_PROJECT_RESOURCES_PATH,
   DESKTOP_PROJECT_NODE_PATH,
+  DESKTOP_PROJECT_IMPORT_PATH,
   DESKTOP_PROJECT_REVEAL_PATH,
   DESKTOP_PROJECT_TERMINAL_PATH,
   DESKTOP_RESTART_PATH,
@@ -60,7 +61,7 @@ import {
   handleDesktopTerminalOpenRequest,
   handleDesktopProjectPathActionRequest,
 } from './desktop-settings-route.ts'
-import { handleProjectFileRequest, handleProjectLibraryDeleteRequest, handleProjectLibraryRequest, handleProjectLibraryResourcesRequest, handleProjectLibraryStructureRequest, handleProjectNodeRequest } from './project-library-route.ts'
+import { handleProjectFileRequest, handleProjectImportRequest, handleProjectLibraryDeleteRequest, handleProjectLibraryRequest, handleProjectLibraryResourcesRequest, handleProjectLibraryStructureRequest, handleProjectNodeRequest } from './project-library-route.ts'
 import type {} from './desktop-settings-controller.ts'
 import type DesktopSettingsController from './desktop-settings-controller.ts'
 import { desktopBootRecoveryInjections } from './desktop-boot-recovery.ts'
@@ -234,6 +235,7 @@ export function apply(ctx: Context, config: Config): void {
       [DESKTOP_PROJECT_RESOURCES_PATH, handleProjectLibraryResourcesRequest],
       [DESKTOP_PROJECT_FILE_PATH, handleProjectFileRequest],
       [DESKTOP_PROJECT_NODE_PATH, handleProjectNodeRequest],
+      [DESKTOP_PROJECT_IMPORT_PATH, handleProjectImportRequest],
       [DESKTOP_PROJECT_REVEAL_PATH, (req: IncomingMessage, res: ServerResponse, origin: string, controller: DesktopSettingsController) => handleDesktopProjectPathActionRequest(req, res, origin, controller, 'reveal')],
       [DESKTOP_PROJECT_TERMINAL_PATH, (req: IncomingMessage, res: ServerResponse, origin: string, controller: DesktopSettingsController) => handleDesktopProjectPathActionRequest(req, res, origin, controller, 'terminal')],
       [DESKTOP_PROFILE_CREATE_PATH, handleDesktopProfileCreateRequest],

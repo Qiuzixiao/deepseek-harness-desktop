@@ -7,6 +7,7 @@ import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import {
   handleProjectLibraryRequest,
   handleProjectNodeRequest,
+  handleProjectImportRequest,
   PROJECT_LIBRARY_ROOT,
 } from '../src/project-library-route.ts'
 
@@ -29,6 +30,15 @@ function request(method: string, body: unknown): IncomingMessage {
 function response(): { status: number; body: unknown; writeHead: (status: number) => void; end: (value: string) => void } {
   const result = { status: 0, body: undefined as unknown, writeHead(status: number) { result.status = status }, end(value: string) { result.body = JSON.parse(value) } }
   return result
+}
+
+function importRequest(projectPath: string, destinationPath: string, name: string, body: string | Buffer = 'docx-bytes'): IncomingMessage {
+  const req = Readable.from([Buffer.isBuffer(body) ? body : Buffer.from(body)]) as IncomingMessage
+  req.method = 'POST'
+  req.url = `/api/desktop/projects/import?${new URLSearchParams({ projectPath, destinationPath, name })}`
+  req.headers = { host: '127.0.0.1:19473', origin: TEST_ORIGIN, 'sec-fetch-site': 'same-origin' }
+  Object.defineProperty(req, 'socket', { value: { remoteAddress: '127.0.0.1' } })
+  return req
 }
 
 describe('project node operations', () => {
@@ -90,6 +100,53 @@ describe('project node operations', () => {
     const metadata = response()
     await handleProjectNodeRequest(request('POST', { path: join(project, '.zenwit-project', 'bad.txt'), kind: 'file' }), metadata as never, TEST_ORIGIN)
     expect(metadata.status).toBe(403)
+  })
+})
+
+describe('project file import', () => {
+  mkdirSync(PROJECT_LIBRARY_ROOT, { recursive: true })
+  const project = mkdtempSync(join(PROJECT_LIBRARY_ROOT, `.dsh-import-test-${randomUUID()}-`))
+
+  afterAll(() => {
+    rmSync(project, { recursive: true, force: true })
+  })
+
+  it('copies an operator-selected file into the requested project directory', async () => {
+    mkdirSync(join(project, '.zenwit-project'), { recursive: true })
+    writeFileSync(join(project, '.zenwit-project', 'project.json'), JSON.stringify({ version: 2, agentId: 'short-drama' }))
+    const bytes = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0xff, 0x80])
+    const res = response()
+    await handleProjectImportRequest(importRequest(project, project, '示例2.docx', bytes), res as never, TEST_ORIGIN)
+    expect(res.status).toBe(200)
+    expect(readFileSync(join(project, '示例2.docx'))).toEqual(bytes)
+
+    const empty = response()
+    await handleProjectImportRequest(importRequest(project, project, '空白.txt', Buffer.alloc(0)), empty as never, TEST_ORIGIN)
+    expect(empty.status).toBe(200)
+    expect(readFileSync(join(project, '空白.txt'))).toEqual(Buffer.alloc(0))
+  })
+
+  it('rejects duplicate names, project metadata, and oversized files', async () => {
+    mkdirSync(join(project, '.zenwit-project'), { recursive: true })
+    writeFileSync(join(project, '.zenwit-project', 'project.json'), JSON.stringify({ version: 2, agentId: 'short-drama' }))
+    writeFileSync(join(project, 'existing.pdf'), 'kept')
+
+    const duplicate = response()
+    await handleProjectImportRequest(importRequest(project, project, 'existing.pdf'), duplicate as never, TEST_ORIGIN)
+    expect(duplicate.status).toBe(409)
+    expect(readFileSync(join(project, 'existing.pdf'), 'utf8')).toBe('kept')
+
+    const metadata = response()
+    await handleProjectImportRequest(importRequest(project, join(project, '.zenwit-project'), 'secret.txt'), metadata as never, TEST_ORIGIN)
+    expect(metadata.status).toBe(400)
+    expect(existsSync(join(project, '.zenwit-project', 'secret.txt'))).toBe(false)
+
+    const oversized = response()
+    const oversizedRequest = importRequest(project, project, 'large.docx')
+    oversizedRequest.headers['content-length'] = String(100 * 1024 * 1024 + 1)
+    await handleProjectImportRequest(oversizedRequest, oversized as never, TEST_ORIGIN)
+    expect(oversized.status).toBe(413)
+    expect(existsSync(join(project, 'large.docx'))).toBe(false)
   })
 })
 

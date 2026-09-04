@@ -115,6 +115,20 @@ describe('Zenwit workspace layout', () => {
     expect(within(menu).getByRole('menuitem', { name: '添加到聊天' })).toBeTruthy()
   })
 
+  it('imports a native file from the tree context menu and refreshes the structure', async () => {
+    mountWorkspace()
+    const files = screen.getByRole('complementary', { name: '文件目录' })
+    fireEvent.contextMenu(files.querySelector('[role="tree"]')!, { clientX: 20, clientY: 30 })
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: '导入文档' }))
+    const picker = files.querySelector('input[type="file"]') as HTMLInputElement
+    const file = new File(['docx'], '示例2.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
+    fireEvent.change(picker, { target: { files: [file] } })
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/desktop/projects/import?projectPath=%2Fproject&destinationPath=%2Fproject&name=%E7%A4%BA%E4%BE%8B2.docx', expect.objectContaining({
+      method: 'POST',
+      body: file,
+    })))
+  })
+
   it('closes an open file tab after confirmed deletion', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     mountWorkspace()

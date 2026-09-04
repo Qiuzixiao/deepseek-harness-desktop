@@ -44,6 +44,8 @@ export const DESKTOP_PROJECT_FILE_PATH = '/api/desktop/projects/file'
 export const DESKTOP_PROJECT_RESOURCES_PATH = '/api/desktop/projects/resources'
 /** Daily file and folder operations inside a project. */
 export const DESKTOP_PROJECT_NODE_PATH = '/api/desktop/projects/node'
+/** Import one operator-selected file into a project directory. */
+export const DESKTOP_PROJECT_IMPORT_PATH = '/api/desktop/projects/import'
 /** Reveal one project file or folder in the native file manager. */
 export const DESKTOP_PROJECT_REVEAL_PATH = '/api/desktop/projects/reveal'
 /** Open the launcher-owned terminal at one project path. */

@@ -5,7 +5,7 @@
  * controls plus the reused DSH conversation. Both column boundaries resize.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { ChangeEvent, ReactNode } from 'react'
 import type { GlobalStandardProps, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import { IconNewChatOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
@@ -214,6 +214,8 @@ export function Workspace({
   const [nodeName, setNodeName] = useState('')
   const [nodeBusy, setNodeBusy] = useState(false)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const importPickerRef = useRef<HTMLInputElement | null>(null)
+  const importTargetRef = useRef(projectPath)
   const selectionPopoverRef = useRef<HTMLDivElement>(null)
   const conversationControlRef = useRef<HTMLDivElement>(null)
   const historyPopoverRef = useRef<HTMLDivElement>(null)
@@ -514,6 +516,44 @@ export function Workspace({
     } catch (error) { setLoadError(error instanceof Error ? error.message : String(error)) }
   }
 
+  const openImportPicker = (targetPath: string): void => {
+    setContextMenu(null)
+    importTargetRef.current = targetPath
+    importPickerRef.current?.click()
+  }
+
+  const importFiles = async (event: ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const files = Array.from(event.target.files ?? [])
+    event.target.value = ''
+    if (files.length === 0) return
+    setLoadError(null)
+    let imported = false
+    try {
+      for (const file of files) {
+        const query = new URLSearchParams({
+          projectPath,
+          destinationPath: importTargetRef.current,
+          name: file.name,
+        })
+        const response = await fetch('/api/desktop/projects/import?' + query.toString(), {
+          method: 'POST',
+          body: file,
+        })
+        const payload = await response.json().catch(() => ({})) as { error?: string }
+        if (!response.ok) {
+          if (response.status === 409) throw new Error(`同名文件已存在：${file.name}`)
+          if (response.status === 413) throw new Error(`文件不能超过 100 MiB：${file.name}`)
+          throw new Error(payload.error ?? `${file.name}：导入失败（${response.status}）`)
+        }
+        imported = true
+      }
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : String(error))
+    } finally {
+      if (imported) await reloadStructure()
+    }
+  }
+
   const nativeProjectAction = async (action: 'reveal' | 'terminal', path: string) => {
     setContextMenu(null)
     try {
@@ -626,6 +666,7 @@ export function Workspace({
               <button type="button" title="项目操作" aria-label="项目操作" aria-haspopup="menu" aria-expanded={contextMenu?.node === null} onClick={openProjectMenu}><MoreHorizontal size={16} /></button>
             </div>
           </div>
+          <input ref={importPickerRef} type="file" multiple hidden onChange={event => { void importFiles(event) }} />
           {loadError !== null && (
             <div className={css.structureError} role="alert">
               <span>{loadError}</span>
@@ -662,6 +703,7 @@ export function Workspace({
       </div>
       {contextMenu !== null && (
         <div className={css.contextMenu} style={{ left: contextMenu.x, top: contextMenu.y }} role="menu" onPointerDown={event => event.stopPropagation()}>
+          <button type="button" role="menuitem" onClick={() => openImportPicker(contextMenu.node?.kind === 'dir' ? contextMenu.node.path : contextMenu.node === null ? projectPath : parentPath(contextMenu.node.path))}><FilePlus size={14} />导入文档</button>
           <button type="button" role="menuitem" onClick={() => openNodeDialog('file', contextMenu.node?.kind === 'dir' ? contextMenu.node.path : projectPath)}><FilePlus size={14} />新建文件</button>
           <button type="button" role="menuitem" onClick={() => openNodeDialog('directory', contextMenu.node?.kind === 'dir' ? contextMenu.node.path : projectPath)}><FolderPlus size={14} />新建文件夹</button>
           {contextMenu.node !== null && <>

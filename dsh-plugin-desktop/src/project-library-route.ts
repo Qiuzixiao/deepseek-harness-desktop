@@ -16,6 +16,7 @@ export const PROJECT_LIBRARY_ROOT = join(homedir(), 'Projects')
 const PROJECT_METADATA_DIR = '.zenwit-project'
 const PROJECT_METADATA_FILE = join(PROJECT_METADATA_DIR, 'project.json')
 const MAX_PROJECT_BODY_BYTES = 2 * 1024 * 1024
+const MAX_PROJECT_IMPORT_BYTES = 100 * 1024 * 1024
 const INVALID_BODY = Symbol('invalid project body')
 
 function projectSlug(name: string): string {
@@ -455,6 +456,56 @@ export async function handleProjectNodeRequest(req: IncomingMessage, res: Server
     catch (error) { return nodeError(res, 500, error instanceof Error ? error.message : String(error)) }
   }
   return finishJson(res, 405, { error: 'method not allowed' })
+}
+
+/** POST /api/desktop/projects/import — persist one operator-selected file in a project directory. */
+export async function handleProjectImportRequest(req: IncomingMessage, res: ServerResponse, expectedOrigin: string): Promise<void> {
+  if (req.method !== 'POST') return finishJson(res, 405, { error: 'method not allowed' })
+  if (!authorize(req, res, expectedOrigin, true)) return
+  const url = new URL(req.url ?? '', 'http://localhost')
+  const projectPath = url.searchParams.get('projectPath')?.trim() ?? ''
+  const destinationPath = url.searchParams.get('destinationPath')?.trim() ?? ''
+  const name = url.searchParams.get('name')?.normalize('NFC') ?? ''
+  if (projectPath === '' || destinationPath === '' || name === '') {
+    return finishJson(res, 400, { error: 'projectPath, destinationPath, and name are required' })
+  }
+  if (!isProjectPath(projectPath)) return finishJson(res, 403, { error: 'path outside project library' })
+  const project = canonicalPath(projectPath)
+  const destination = canonicalPath(destinationPath)
+  if (destination !== project && !destination.startsWith(project + sep)) {
+    return finishJson(res, 403, { error: 'destination outside project' })
+  }
+  let destinationIsDirectory = false
+  try { destinationIsDirectory = statSync(destination).isDirectory() } catch { /* handled below */ }
+  if (isInsideStateDir(project, destination) || !destinationIsDirectory) {
+    return finishJson(res, 400, { error: 'destination directory is invalid' })
+  }
+  if (!validNodeName(name)) return finishJson(res, 400, { error: 'invalid file name' })
+  const target = join(destination, name)
+  if (!isInsideLibrary(target) || existsSync(target)) {
+    return finishJson(res, existsSync(target) ? 409 : 403, { error: existsSync(target) ? 'a node with that name already exists' : 'destination outside project' })
+  }
+  const declaredLength = req.headers['content-length']
+  if (declaredLength !== undefined && (!/^\d+$/u.test(declaredLength) || Number(declaredLength) > MAX_PROJECT_IMPORT_BYTES)) {
+    return finishJson(res, 413, { error: 'file is larger than 100 MiB' })
+  }
+  try {
+    let size = 0
+    const chunks: Buffer[] = []
+    for await (const chunk of req) {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array)
+      size += buffer.byteLength
+      if (size > MAX_PROJECT_IMPORT_BYTES) return finishJson(res, 413, { error: 'file is larger than 100 MiB' })
+      chunks.push(buffer)
+    }
+    writeFileSync(target, Buffer.concat(chunks), { flag: 'wx' })
+    return finishJson(res, 200, { ok: true, path: target, node: { name, path: target, kind: 'file' } })
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+      return finishJson(res, 409, { error: 'a node with that name already exists' })
+    }
+    return finishJson(res, 500, { error: error instanceof Error ? error.message : String(error) })
+  }
 }
 
 /**
