@@ -31,6 +31,12 @@ const ALLOWED_LICENSES = new Set([
   'CC0-1.0',
   'Zlib',
   'Python-2.0',
+  'MIT-0',
+  'BlueOak-1.0.0',
+  'BSD',
+  '(MIT OR GPL-3.0-or-later)',
+  '(MPL-2.0 OR Apache-2.0)',
+  '(MIT AND Zlib)',
 ])
 
 /**
