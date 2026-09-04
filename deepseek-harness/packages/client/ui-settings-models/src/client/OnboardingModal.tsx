@@ -6,6 +6,7 @@ import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './OnboardingModal.module.css'
 
 const ignoreImplicitDismiss = (): void => {}
+const inertRoots = new WeakMap<HTMLElement, { count: number, previous: boolean }>()
 
 /**
  * Render a blocking onboarding dialog and keep the application root inert.
@@ -26,9 +27,25 @@ export function OnboardingModal({
   useEffect(() => {
     const appRoot = document.getElementById('root')
     if (appRoot === null) return
-    const previous = appRoot.inert
+    const existing = inertRoots.get(appRoot)
+    if (existing !== undefined) {
+      existing.count += 1
+      return () => {
+        existing.count -= 1
+        if (existing.count > 0) return
+        appRoot.inert = existing.previous
+        inertRoots.delete(appRoot)
+      }
+    }
+    const lock = { count: 1, previous: appRoot.inert }
+    inertRoots.set(appRoot, lock)
     appRoot.inert = true
-    return () => { appRoot.inert = previous }
+    return () => {
+      lock.count -= 1
+      if (lock.count > 0) return
+      appRoot.inert = lock.previous
+      inertRoots.delete(appRoot)
+    }
   }, [])
 
   useEffect(() => {

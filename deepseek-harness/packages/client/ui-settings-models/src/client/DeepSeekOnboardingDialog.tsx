@@ -6,7 +6,7 @@
  * the onboarding plugin's shared modal, so the key is entered once.
  */
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
@@ -36,6 +36,16 @@ export interface DeepSeekOnboardingInjected {
 export type DeepSeekOnboardingDialogProps =
   PropsRuntime<'settings.onboarding'> & InjectFace<DeepSeekOnboardingInjected>
 
+const DISMISSED_FOR_SESSION_KEY = 'dsh.onboarding.deepseek-official.dismissed'
+
+function readSessionDismissal(): boolean {
+  try { return window.sessionStorage.getItem(DISMISSED_FOR_SESSION_KEY) === '1' } catch { return false }
+}
+
+function writeSessionDismissal(): void {
+  try { window.sessionStorage.setItem(DISMISSED_FOR_SESSION_KEY, '1') } catch { /* use this mount only */ }
+}
+
 /* v8 ignore next 3 -- closed-union defaults only defend future source widening */
 function assertNever(_value: never): never {
   throw new Error('unexpected DeepSeek onboarding state')
@@ -51,6 +61,7 @@ export function DeepSeekOnboardingDialog(props: DeepSeekOnboardingDialogProps): 
   const { complete, controller, useModels, api, t } = props
   const state = useModels(snapshot => snapshot)
   const readiness = onboardingReadiness(state)
+  const [dismissed, setDismissed] = useState(readSessionDismissal)
 
   useEffect(() => {
     if (state.status === 'idle') void controller.load()
@@ -58,11 +69,14 @@ export function DeepSeekOnboardingDialog(props: DeepSeekOnboardingDialogProps): 
 
   useEffect(() => {
     if (
-      readiness.kind === 'adapter-absent'
+      dismissed
+      || readiness.kind === 'adapter-absent'
       || readiness.kind === 'provider-ready'
       || readiness.kind === 'unavailable'
     ) complete()
-  }, [complete, readiness.kind])
+  }, [complete, dismissed, readiness.kind])
+
+  if (dismissed) return null
 
   switch (readiness.kind) {
     case 'loading':
@@ -87,7 +101,8 @@ export function DeepSeekOnboardingDialog(props: DeepSeekOnboardingDialogProps): 
 
   const finishCredential = (changed: boolean): void => {
     if (!changed) {
-      complete()
+      writeSessionDismissal()
+      setDismissed(true)
       return
     }
     void controller.load()

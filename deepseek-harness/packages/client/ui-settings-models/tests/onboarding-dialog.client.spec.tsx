@@ -7,11 +7,13 @@ import type { RpcResponse, SettingsNamespaceView } from '@deepseek-ai/dsh-api-re
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-web-react'
 import { DeepSeekOnboardingDialog } from '../src/client/DeepSeekOnboardingDialog.tsx'
 import type { DeepSeekOnboardingDialogProps } from '../src/client/DeepSeekOnboardingDialog.tsx'
+import { OnboardingModal } from '../src/client/OnboardingModal.tsx'
 import { ModelsSettingsStore } from '../src/client/store.ts'
 import { en } from '../src/client/locales.ts'
 
 afterEach(() => {
   cleanup()
+  window.sessionStorage.clear()
   document.getElementById('root')?.remove()
 })
 
@@ -146,6 +148,24 @@ function harness(options: {
 }
 
 describe('DeepSeekOnboardingDialog', () => {
+  it('restores app interactivity after overlapping onboarding steps unmount', () => {
+    const appRoot = document.createElement('div')
+    appRoot.id = 'root'
+    appRoot.inert = false
+    document.body.append(appRoot)
+    const view = render(<>
+      <OnboardingModal key="first" title="First">first</OnboardingModal>
+      <OnboardingModal key="second" title="Second">second</OnboardingModal>
+    </>)
+    expect(appRoot.inert).toBe(true)
+
+    view.rerender(<OnboardingModal key="second" title="Second">second</OnboardingModal>)
+    expect(appRoot.inert).toBe(true)
+
+    view.unmount()
+    expect(appRoot.inert).toBe(false)
+  })
+
   it('renders when the shell root is absent', async () => {
     const h = harness()
     document.getElementById('root')!.remove()
@@ -213,13 +233,19 @@ describe('DeepSeekOnboardingDialog', () => {
 
   it('allows configure-later dismissal without opening settings', async () => {
     const h = harness()
-    render(<DeepSeekOnboardingDialog {...h.props} />)
+    const view = render(<DeepSeekOnboardingDialog {...h.props} />)
     await screen.findByRole('dialog')
     fireEvent.click(screen.getByRole('button', { name: en.onboardingLater }))
     expect(h.complete).toHaveBeenCalledOnce()
     expect(h.openSection).not.toHaveBeenCalled()
     expect(h.set).not.toHaveBeenCalled()
     expect(h.mutate).not.toHaveBeenCalled()
+
+    view.unmount()
+    const remounted = harness()
+    render(<DeepSeekOnboardingDialog {...remounted.props} />)
+    await waitFor(() => { expect(remounted.complete).toHaveBeenCalledOnce() })
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('does not block the product when DeepSeek setup is unavailable', async () => {
