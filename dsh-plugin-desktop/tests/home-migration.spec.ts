@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { migrateLegacyDshHome } from '../src/home-migration.ts'
+import { applyLegacyHomeFallback, migrateLegacyDshHome } from '../src/home-migration.ts'
 
 describe('legacy home migration', () => {
   it('copies ~/.dsh to ~/.zenwit without removing the legacy home', () => {
@@ -42,5 +42,37 @@ describe('legacy home migration', () => {
     expect(result.status).toBe('failed')
     expect(result.legacy).toBe(join(root, '.dsh'))
     expect(existsSync(join(root, '.zenwit'))).toBe(false)
+  })
+
+  it('defers Windows migration so startup can use the legacy home immediately', () => {
+    const root = mkdtempSync(join(tmpdir(), 'zenwit-home-migration-windows-'))
+    mkdirSync(join(root, '.dsh'))
+    const environment: NodeJS.ProcessEnv = {}
+
+    const result = migrateLegacyDshHome({
+      homeDirectory: root,
+      environment,
+      platform: 'win32',
+      copy: () => { throw new Error('copy should not run') },
+    })
+
+    expect(result.status).toBe('deferred')
+    applyLegacyHomeFallback(result, environment)
+    expect(environment.DSH_HOME).toBe(join(root, '.dsh'))
+    expect(existsSync(join(root, '.zenwit'))).toBe(false)
+  })
+
+  it('falls back to the legacy home after a non-Windows copy failure', () => {
+    const root = mkdtempSync(join(tmpdir(), 'zenwit-home-migration-fallback-'))
+    mkdirSync(join(root, '.dsh'))
+    const environment: NodeJS.ProcessEnv = {}
+    const result = migrateLegacyDshHome({
+      homeDirectory: root,
+      environment,
+      copy: () => { throw new Error('copy failed') },
+    })
+
+    applyLegacyHomeFallback(result, environment)
+    expect(environment.DSH_HOME).toBe(join(root, '.dsh'))
   })
 })

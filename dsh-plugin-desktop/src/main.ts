@@ -101,7 +101,7 @@ import {
 } from './windows-volume-diagnostics.ts'
 import type { RendererBootReport } from './renderer-boot-contract.ts'
 import { desktopLocaleFromLanguageTag } from './tray-locale.ts'
-import { migrateLegacyDshHome } from './home-migration.ts'
+import { applyLegacyHomeFallback, migrateLegacyDshHome } from './home-migration.ts'
 
 const BIN_NAME = 'dsh-plugin-desktop'
 const PRODUCT_NAME = 'Zenwit'
@@ -440,11 +440,22 @@ async function start(): Promise<void> {
       platform: process.platform,
     })
     for (const [name, value] of Object.entries(shellEnvironmentResolution.updates)) process.env[name] = value
-    const legacyHomeMigration = migrateLegacyDshHome({ environment: process.env, homeDirectory: app.getPath('home') })
-    if (legacyHomeMigration.status === 'failed') {
-      throw new Error(
-        `${BIN_NAME}: failed to migrate legacy home ${legacyHomeMigration.legacy} to ${legacyHomeMigration.target}`,
-        { cause: legacyHomeMigration.error },
+    const legacyHomeMigration = migrateLegacyDshHome({
+      environment: process.env,
+      homeDirectory: app.getPath('home'),
+      platform: process.platform,
+    })
+    applyLegacyHomeFallback(legacyHomeMigration, process.env)
+    if (legacyHomeMigration.status === 'deferred') {
+      electronLogger.error(
+        `${BIN_NAME}: warning: deferring legacy home migration on Windows; using ${legacyHomeMigration.legacy} as DSH_HOME`,
+      )
+    } else if (legacyHomeMigration.status === 'failed') {
+      const detail = legacyHomeMigration.error instanceof Error
+        ? legacyHomeMigration.error.message
+        : String(legacyHomeMigration.error)
+      electronLogger.error(
+        `${BIN_NAME}: warning: legacy home migration failed (${maskSecrets(detail)}); using ${legacyHomeMigration.legacy} as DSH_HOME`,
       )
     }
     const homeDir = resolveDshHome()
