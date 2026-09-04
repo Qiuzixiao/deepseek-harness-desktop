@@ -91,10 +91,33 @@ describe('MenuView', () => {
     const options = screen.getAllByRole('option')
     expect(options[0]?.textContent).toContain('添加文件')
     expect(options[1]?.textContent).toContain('goal')
-    fireEvent.click(options[0]!)
+    fireEvent.mouseDown(options[0]!, { button: 0 })
     expect(onSelect).toHaveBeenCalledTimes(1)
     expect(onDismiss).toHaveBeenCalledTimes(1)
+    fireEvent.click(options[0]!, { detail: 1 })
+    expect(onSelect).toHaveBeenCalledTimes(1)
     expect(onPick).not.toHaveBeenCalled()
+  })
+
+  it('keeps launcher actions keyboard accessible through synthetic clicks', () => {
+    const menu = createSnapshotStore<MenuState>(openState())
+    const launcher = createSnapshotStore<string | null>('command')
+    const onSelect = vi.fn()
+    const onDismiss = vi.fn()
+    render(
+      <MenuView
+        menu={menu}
+        launcher={launcher}
+        actions={[{ id: 'add-file', label: '添加文件', onSelect }]}
+        onPick={vi.fn()}
+        onDismiss={onDismiss}
+        t={t}
+      />,
+    )
+
+    fireEvent.click(screen.getAllByRole('option')[0]!, { detail: 0 })
+    expect(onSelect).toHaveBeenCalledTimes(1)
+    expect(onDismiss).toHaveBeenCalledTimes(1)
   })
 
   it('renders null while closed and appears when the store opens', () => {

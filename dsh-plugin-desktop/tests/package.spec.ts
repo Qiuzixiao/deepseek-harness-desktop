@@ -162,6 +162,8 @@ describe('published package surface', () => {
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/notifications')
     expect(readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')).toContain('name: dsh-plugin-desktop/updates')
     const desktopPatch = readFileSync(new URL('cordis.patch.yml', packageRoot), 'utf8')
+    expect(desktopPatch).toContain('uploadMaxBytes: 104857600')
+    expect(desktopPatch).toContain('maxFileBytes: 104857600')
     expect(desktopPatch).toMatch(/- id: ui-trajectory\n  disabled: true/)
   })
 

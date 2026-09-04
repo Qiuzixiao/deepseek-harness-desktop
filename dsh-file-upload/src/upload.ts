@@ -121,7 +121,7 @@ export function createUploadHandler(options: UploadOptions) {
     const declared = Number(req.headers['content-length'])
     if (Number.isFinite(declared) && declared > maxBytes) {
       res.writeHead(413, { 'content-type': 'application/json' })
-      res.end(JSON.stringify({ error: 'payload too large' }))
+      res.end(JSON.stringify({ error: 'payload too large', maxBytes }))
       return
     }
     inflight += 1
@@ -133,7 +133,7 @@ export function createUploadHandler(options: UploadOptions) {
         total += buf.length
         if (total > maxBytes) {
           res.writeHead(413, { 'content-type': 'application/json' })
-          res.end(JSON.stringify({ error: 'payload too large' }))
+          res.end(JSON.stringify({ error: 'payload too large', maxBytes }))
           return
         }
         chunks.push(buf)

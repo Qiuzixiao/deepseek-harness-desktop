@@ -46,6 +46,12 @@ export function hasFilePayload(transfer: DataTransfer): boolean {
     || Array.from(transfer.items).some(item => item.kind === 'file')
 }
 
+/** Whether at least one dragged operating-system item is a directory. */
+function hasDirectoryPayload(transfer: DataTransfer): boolean {
+  return Array.from(transfer.items).some(item =>
+    item.kind === 'file' && item.webkitGetAsEntry()?.isDirectory === true)
+}
+
 /** Return the one dropped directory File, rejecting ordinary files and multi-selection. */
 export function singleDroppedDirectory(transfer: DataTransfer): File | undefined {
   const items = Array.from(transfer.items).filter(item => item.kind === 'file')
@@ -124,7 +130,7 @@ export function installWorkspaceFolderDrop(
   const onDragOver = (event: DragEvent): void => {
     const transfer = event.dataTransfer
     const target = workspaceTarget(event.target)
-    if (transfer === null || target === undefined || !hasFilePayload(transfer)) return
+    if (transfer === null || target === undefined || !hasDirectoryPayload(transfer)) return
     event.preventDefault()
     const acceptable = !busy && singleDroppedDirectory(transfer) !== undefined
     transfer.dropEffect = acceptable ? 'copy' : 'none'
@@ -140,7 +146,7 @@ export function installWorkspaceFolderDrop(
   const onDrop = (event: DragEvent): void => {
     const transfer = event.dataTransfer
     const target = workspaceTarget(event.target)
-    if (transfer === null || target === undefined || !hasFilePayload(transfer)) return
+    if (transfer === null || target === undefined || !hasDirectoryPayload(transfer)) return
     event.preventDefault()
     event.stopPropagation()
     clearTimer()

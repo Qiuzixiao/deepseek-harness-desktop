@@ -260,6 +260,25 @@ describe('image draft rail', () => {
     expect(intakeFiles).toHaveBeenCalledTimes(2)
   })
 
+  it('accepts Windows file drops when only dataTransfer.items identifies the payload', () => {
+    const intakeFiles = vi.fn(() => Promise.resolve())
+    bench({ intakeFiles })
+    const documentFile = new File([Uint8Array.of(1, 2)], 'notes.docx', {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    })
+
+    fireEvent.drop(document.body, {
+      dataTransfer: {
+        types: [],
+        items: [{ kind: 'file', getAsFile: () => documentFile }],
+        files: [documentFile],
+        dropEffect: 'none',
+      },
+    })
+
+    expect(intakeFiles).toHaveBeenCalledWith([documentFile])
+  })
+
   it('refreshes the document card when upload status settles', () => {
     const attachment: ComposerAttachment = {
       kind: 'document',

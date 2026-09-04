@@ -6,12 +6,12 @@
     - id: file-upload
       name: dsh-file-upload
       config:
-        uploadMaxBytes: 26214400
+        uploadMaxBytes: 104857600
         allowedExtensions: []
         uploadTtlMs: 604800000
         sweepIntervalMs: 3600000
         maxConcurrentUploads: 4
-        maxFileBytes: 26214400
+        maxFileBytes: 104857600
         readLimit: 2000
         sheetRowLimit: 200
         maxSheets: 5

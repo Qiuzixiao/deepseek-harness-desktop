@@ -85,9 +85,14 @@ export function MenuView({ menu, onPick, onDismiss, launcher, actions, t }: Menu
             role="option"
             className={css.item}
             disabled={action.disabled}
-            onMouseDown={ev => { ev.preventDefault() }}
-            onClick={() => {
-              if (action.disabled) return
+            onMouseDown={(ev) => {
+              if (action.disabled || ev.button !== 0) return
+              ev.preventDefault()
+              action.onSelect()
+              onDismiss()
+            }}
+            onClick={(ev) => {
+              if (action.disabled || ev.detail !== 0) return
               action.onSelect()
               onDismiss()
             }}

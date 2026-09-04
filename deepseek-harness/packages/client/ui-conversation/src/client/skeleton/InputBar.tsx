@@ -474,8 +474,11 @@ export function InputBar({
   }, [addImages, attachments, imageLimits, intakeFiles, showToast, t])
   const canAcceptDrop = !locked && !machineBusy && canAcceptFiles
   useEffect(() => {
-    const hasFiles = (event: globalThis.DragEvent): boolean =>
-      event.dataTransfer?.types.includes('Files') ?? false
+    const hasFiles = (event: globalThis.DragEvent): boolean => {
+      const transfer = event.dataTransfer
+      return transfer !== null && (Array.from(transfer.types ?? []).includes('Files')
+        || Array.from(transfer.items ?? []).some(item => item.kind === 'file'))
+    }
     const reset = (): void => {
       dragDepthRef.current = 0
       setDragActive(false)

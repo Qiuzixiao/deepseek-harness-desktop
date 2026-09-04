@@ -1,8 +1,11 @@
+// @vitest-environment jsdom
+
 import { describe, expect, it, vi } from 'vitest'
 import type { WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-client-runtime/client'
 import {
   adoptWorkspaceFolder,
   hasFilePayload,
+  installWorkspaceFolderDrop,
   singleDroppedDirectory,
   type WorkspaceFolderDropActions,
 } from '../src/client/workspace-folder-drop.ts'
@@ -69,5 +72,33 @@ describe('desktop workspace folder drop', () => {
     )).rejects.toThrow('Zenwit rejected this workspace location')
     expect(actions.validateDirectory).toHaveBeenCalledWith('E:\\repo')
     expect(actions.create).not.toHaveBeenCalled()
+  })
+
+  it('lets ordinary files continue to the page-wide upload listener', () => {
+    const target = document.createElement('div')
+    target.dataset.dshWorkspaceDropTarget = ''
+    document.body.appendChild(target)
+    const actions: WorkspaceFolderDropActions = {
+      create: vi.fn(),
+      startSession: vi.fn(),
+    }
+    const dispose = installWorkspaceFolderDrop(actions, {
+      __DSH_DESKTOP_FILE_PATH__: { getPathForFile: () => '' },
+    })
+    const uploadDrop = vi.fn()
+    document.addEventListener('drop', uploadDrop)
+    const dataTransfer = transfer([{ directory: false }])
+    const event = new Event('drop', { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'dataTransfer', { value: dataTransfer })
+
+    try {
+      target.dispatchEvent(event)
+      expect(uploadDrop).toHaveBeenCalledOnce()
+      expect(actions.create).not.toHaveBeenCalled()
+    } finally {
+      document.removeEventListener('drop', uploadDrop)
+      dispose()
+      target.remove()
+    }
   })
 })

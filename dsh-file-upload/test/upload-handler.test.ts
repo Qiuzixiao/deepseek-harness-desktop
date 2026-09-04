@@ -90,6 +90,7 @@ test('upload handler: oversized payload rejected 413', async () => {
       body: new Uint8Array(2 * 1024 * 1024)
     })
     assert.equal(res.status, 413)
+    assert.deepEqual(await res.json(), { error: 'payload too large', maxBytes: 1024 * 1024 })
   } finally {
     server.close()
   }
