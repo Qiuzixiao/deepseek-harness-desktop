@@ -161,10 +161,11 @@ function createHarness(platform: DesktopRuntime['platform'] = 'darwin'): PluginH
 }
 
 describe('desktop Host plugin', () => {
-  it('defaults to enhanced mode and validates both schemas', () => {
+  it('defaults to the supported platform mode and validates both schemas', () => {
+    const defaultMode = process.platform === 'linux' ? 'compatibility' : 'advanced'
     expect(Config({} as DesktopConfig)).toEqual({
       ...config,
-      mode: 'advanced',
+      mode: defaultMode,
       macosMaterial: 'off',
       windowsMaterial: 'off',
     })
@@ -175,7 +176,7 @@ describe('desktop Host plugin', () => {
       windowsMaterial: 'off',
     })
     expect(DesktopSettingsSchema({} as DesktopSettings)).toEqual({
-      mode: 'advanced',
+      mode: defaultMode,
       macosMaterial: 'off',
       windowsMaterial: 'off',
       port: 43_120,
