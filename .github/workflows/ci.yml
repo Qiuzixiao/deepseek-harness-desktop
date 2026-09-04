@@ -198,4 +198,4 @@ jobs:
           node-version: 22.23.2
       - run: corepack enable
       - run: yarn check:layout
-      - run: yarn upstream:version
+      - run: yarn source:version
