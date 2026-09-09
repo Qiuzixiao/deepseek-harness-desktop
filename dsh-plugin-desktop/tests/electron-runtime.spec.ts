@@ -94,7 +94,7 @@ const electron = vi.hoisted(() => {
     setTemplateImage: vi.fn(),
   }
   const webContents = {
-    executeJavaScript: vi.fn(async (_code: string, _userGesture?: boolean) => null as string | null),
+    executeJavaScript: vi.fn(async (_code: string, _userGesture?: boolean) => null as unknown),
     getZoomLevel: vi.fn(() => zoomLevel),
     on: vi.fn(),
     off: vi.fn(),
@@ -304,6 +304,23 @@ describe('Electron desktop runtime', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.restoreAllMocks()
+  })
+
+  it('asks before discarding unsaved workspace edits on application exit', async () => {
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    const release = runtime.schedule({ ...spec, mode: 'advanced' })
+    await runtime.mountScheduled()
+    electron.webContents.executeJavaScript.mockResolvedValueOnce(false).mockResolvedValueOnce(false)
+    electron.dialog.showMessageBox.mockResolvedValue({ response: 0, checkboxChecked: false })
+    expect(await runtime.confirmDocumentExit()).toBe(false)
+    electron.dialog.showMessageBox.mockResolvedValue({ response: 1, checkboxChecked: false })
+    expect(await runtime.confirmDocumentExit()).toBe(true)
+    electron.webContents.executeJavaScript.mockResolvedValueOnce(true)
+    electron.dialog.showMessageBox.mockClear()
+    expect(await runtime.confirmDocumentExit()).toBe(true)
+    expect(electron.dialog.showMessageBox).not.toHaveBeenCalled()
+    await release()
   })
 
   it('uses the native macOS frame, Dock icon, and template tray image', async () => {

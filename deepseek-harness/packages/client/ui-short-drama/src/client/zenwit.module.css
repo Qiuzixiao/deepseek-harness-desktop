@@ -812,13 +812,42 @@
 }
 
 /* editor */
+.documentEditor {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.documentEditor[hidden] { display: none; }
+.historyActions {
+  display: flex;
+  gap: 2px;
+  padding-right: 8px;
+  border-right: 1px solid var(--zw-hairline);
+}
+.historyActions button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--zw-r-sm);
+  background: transparent;
+  color: var(--zw-text);
+  cursor: pointer;
+}
+.historyActions button:hover:not(:disabled) { background: var(--zw-surface-2); }
+.historyActions button:disabled { opacity: .35; cursor: default; }
+.historyActions button:focus-visible { outline: 2px solid var(--zw-brand); outline-offset: 1px; }
 .editorToolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  align-items: stretch;
   min-height: 48px;
-  border-bottom: 1px solid var(--zw-hairline);
-  background: var(--zw-surface);
+  border-bottom: 1px solid var(--zw-hairline-strong);
+  background: var(--zw-surface-2);
 }
 .documentTabsViewport {
   display: flex;
@@ -826,24 +855,55 @@
   overflow: hidden;
 }
 .editorHeaderActions {
+  position: relative;
+  z-index: 2;
   display: flex;
   flex: none;
   align-items: center;
   gap: 8px;
   min-height: 48px;
-  margin-left: 8px;
-  padding: 6px 10px 6px 4px;
+  padding: 8px 12px;
   box-sizing: border-box;
-  background: transparent;
+  border-left: 1px solid var(--zw-hairline-strong);
+  background: var(--zw-surface);
+  box-shadow: -6px 0 12px -6px var(--zw-hairline-strong);
 }
+.structureSearch { display: grid; gap: 4px; flex: none; padding: 8px 12px; border-bottom: 1px solid var(--zw-hairline); color: var(--zw-faint); }
+.panelToggle { display: grid; place-items: center; width: 26px; height: 26px; flex: none; padding: 0; border: 0; border-radius: var(--zw-r-sm); background: transparent; color: var(--zw-muted); cursor: pointer; }
+.panelToggle:hover { background: var(--zw-brand-soft); color: var(--zw-brand); }
+.leftRail, .paneChat { position: relative; }
+.panelToggle { position: absolute; top: 7px; right: 5px; z-index: 2; }
+.leftRail[data-collapsed] > :not(.panelToggle), .paneChat[data-collapsed] > :not(.panelToggle) { display: none; }
+.paneChat:not([data-collapsed]) > .conversationBar { padding-right: 38px; }
+.quickOpenResults button[aria-current="true"] { background: var(--zw-brand-soft); color: var(--zw-brand); }
+.quickOpenResults button { overflow-wrap: anywhere; }
+.quickOpenResults p { padding: 8px; color: var(--zw-muted); }
+.documentOutline button { flex-shrink: 0; overflow-wrap: anywhere; }
+.findInput { box-sizing: border-box; width: 100%; min-width: 0; height: 28px; padding: 0 8px; border: 1px solid var(--zw-hairline); border-radius: var(--zw-r-sm); background: var(--zw-surface-2); color: var(--zw-text); font: inherit; font-size: 12px; }
+.documentOutline { display: grid; gap: 2px; max-height: 220px; padding: 10px 8px; overflow: auto; border-top: 1px solid var(--zw-hairline); }
+.documentOutline > strong { padding: 0 6px 4px; color: var(--zw-muted); font-size: 11px; }
+.documentOutline > span { padding: 0 6px; color: var(--zw-faint); font-size: 11px; }
+.documentOutline button { display: flex; justify-content: space-between; gap: 8px; padding: 4px 6px; overflow: hidden; border: 0; border-radius: 6px; background: transparent; color: var(--zw-text); font-size: 11px; text-align: left; cursor: pointer; }
+.documentOutline button:hover { background: var(--zw-brand-soft); }
+.documentOutline button small { flex: none; color: var(--zw-faint); }
+.editorMeta { position: absolute; right: 14px; bottom: 8px; z-index: 3; padding: 3px 7px; border-radius: var(--zw-r-sm); color: var(--zw-faint); background: var(--zw-surface); font-size: 11px; pointer-events: none; }
+.quickOpenOverlay { position: fixed; inset: 0; z-index: 1300; display: grid; place-items: start center; padding-top: 15vh; background: rgba(15, 24, 34, .18); }
+.quickOpen { width: min(520px, calc(100vw - 32px)); padding: 14px; border: 1px solid var(--zw-hairline-strong); border-radius: var(--zw-r-card); background: var(--zw-surface); box-shadow: var(--zw-shadow-float); }
+.quickOpenHeading { display: flex; justify-content: space-between; margin-bottom: 10px; color: var(--zw-text); font-size: 13px; font-weight: 650; }
+.quickOpenHeading kbd { color: var(--zw-faint); font: 11px var(--zw-mono); }
+.quickOpen > input { width: 100%; box-sizing: border-box; padding: 9px 10px; border: 1px solid var(--zw-hairline-strong); border-radius: var(--zw-r-sm); background: var(--zw-surface-2); color: var(--zw-text); font: inherit; }
+.quickOpenResults { display: grid; gap: 3px; max-height: 320px; margin-top: 8px; overflow: auto; }
+.quickOpenResults button { display: flex; justify-content: space-between; gap: 12px; padding: 9px 10px; border: 0; border-radius: var(--zw-r-sm); background: transparent; color: var(--zw-text); text-align: left; cursor: pointer; }
+.quickOpenResults button:hover { background: var(--zw-brand-soft); }
+.quickOpenResults span { overflow: hidden; color: var(--zw-faint); font-size: 11px; text-overflow: ellipsis; }
 .documentTabs {
   display: flex;
   flex: 1;
-  align-items: flex-end;
-  gap: 3px;
+  align-items: center;
+  gap: 4px;
   width: 100%;
   height: 48px;
-  padding: 7px 10px 0;
+  padding: 0 12px;
   box-sizing: border-box;
   min-width: 0;
   overflow-x: auto;
@@ -851,8 +911,7 @@
   scrollbar-width: thin;
 }
 .documentTabsEmpty {
-  align-self: center;
-  padding: 0 4px 1px;
+  padding: 0 4px;
   color: var(--zw-faint);
   font-size: 12px;
   white-space: nowrap;
@@ -860,48 +919,26 @@
 .documentTab {
   display: flex;
   position: relative;
-  flex: 0 0 190px;
-  min-width: 120px;
-  max-width: 230px;
+  flex: 0 0 auto;
+  min-width: 96px;
+  max-width: 180px;
+  height: 32px;
+  box-sizing: border-box;
   align-items: center;
   overflow: hidden;
   border: 1px solid transparent;
-  border-bottom: 0;
-  border-radius: 11px 11px 0 0;
-  background: color-mix(in srgb, var(--zw-surface) 40%, transparent);
-  transform: translateY(1px);
-  transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+  border-radius: var(--zw-r-sm);
+  background: transparent;
+  transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
 .documentTabActive {
-  z-index: 1;
   border-color: var(--zw-hairline-strong);
   background: var(--zw-surface);
-  box-shadow: 0 -3px 12px rgba(31, 52, 73, .08), 0 1px 0 var(--zw-surface);
-  transform: translateY(0);
+  box-shadow: 0 1px 2px var(--zw-hairline);
 }
-.documentTabActive::before {
-  position: absolute;
-  top: 0;
-  left: 14px;
-  width: 30px;
-  height: 2px;
-  border-radius: 0 0 4px 4px;
-  background: var(--zw-brand);
-  content: '';
-}
-.documentTabActive::after {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 11px;
-  height: 11px;
-  border-left: 1px solid var(--zw-hairline-strong);
-  border-bottom: 1px solid var(--zw-hairline-strong);
-  border-radius: 0 0 0 5px;
-  background: var(--zw-surface-2);
-  content: '';
-  transform: translate(1px, -1px) rotate(45deg);
-  transform-origin: top right;
+.documentTabActive .documentTabSelect {
+  color: var(--zw-ink);
+  font-weight: 600;
 }
 .documentTabSelect,
 .documentTabClose {
@@ -916,7 +953,8 @@
   flex: 1;
   align-items: center;
   gap: 4px;
-  padding: 8px 6px 8px 12px;
+  height: 100%;
+  padding: 0 6px 0 10px;
   text-align: left;
   font: inherit;
   font-size: 12px;
@@ -926,8 +964,7 @@
   color: var(--zw-muted);
 }
 .documentTab:not(.documentTabActive):hover {
-  background: color-mix(in srgb, var(--zw-surface) 72%, transparent);
-  transform: translateY(0);
+  background: var(--zw-surface);
 }
 .documentTabName {
   min-width: 0;
@@ -969,9 +1006,9 @@
   gap: 6px;
   min-height: 32px;
   padding: 0 10px;
-  border-radius: 8px;
-  border: 1px solid var(--zw-hairline-strong);
-  background: color-mix(in srgb, var(--zw-surface-2) 72%, var(--zw-surface));
+  border-radius: var(--zw-r-sm);
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--zw-text);
   font-size: 13px;
   font-weight: 500;
@@ -991,7 +1028,7 @@
   gap: 7px;
   min-height: 32px;
   padding: 0 7px;
-  border-radius: 8px;
+  border-radius: var(--zw-r-sm);
   color: var(--zw-muted);
   font-size: 12px;
   white-space: nowrap;
@@ -1061,7 +1098,7 @@
   min-height: 32px;
   margin-right: 0;
   padding: 0 12px;
-  border-radius: 8px;
+  border-radius: var(--zw-r-sm);
   border: 1px solid var(--zw-brand);
   background: var(--zw-brand);
   color: #fff;
@@ -1069,13 +1106,12 @@
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--zw-brand) 20%, transparent);
+  box-shadow: 0 1px 2px var(--zw-hairline);
   transition: background 120ms, box-shadow 120ms, transform 120ms;
 }
 .saveButton:hover:not(:disabled) {
   background: var(--zw-brand-deep);
-  box-shadow: 0 6px 16px color-mix(in srgb, var(--zw-brand) 28%, transparent);
-  transform: translateY(-1px);
+  box-shadow: 0 1px 3px var(--zw-hairline-strong);
 }
 .saveButton:disabled {
   cursor: wait;
@@ -1139,6 +1175,8 @@
   white-space: pre-wrap;
   overflow-wrap: break-word;
 }
+.visualEditor :global(.searchMatch) { background: color-mix(in srgb, var(--zw-brand) 18%, transparent); border-radius: 2px; }
+.visualEditor :global(.searchMatchActive) { background: var(--zw-brand); color: var(--zw-surface); border-radius: 2px; outline: 2px solid var(--zw-brand); outline-offset: 1px; }
 /* Keep Milkdown's inline soft-break node for Markdown round-tripping, but show it as a new line here. */
 .visualEditor :global(.ProseMirror span[data-type="hardbreak"][data-is-inline="true"]) {
   display: block;
@@ -1252,9 +1290,8 @@
 @media (max-width: 760px) {
   .editorHeaderActions {
     gap: 5px;
-    margin-left: 4px;
-    padding-right: 7px;
-    padding-left: 0;
+    padding-right: 8px;
+    padding-left: 8px;
   }
   .autoSaveLabel {
     display: none;
@@ -1266,16 +1303,15 @@
     font-size: 12px;
   }
   .documentTab {
-    flex-basis: 156px;
+    max-width: 156px;
   }
 }
 
 @media (max-width: 460px) {
   .editorHeaderActions {
     gap: 3px;
-    margin-left: 2px;
-    padding-right: 5px;
-    padding-left: 0;
+    padding-right: 6px;
+    padding-left: 6px;
   }
   .toggleButton,
   .saveButton {
@@ -1287,8 +1323,8 @@
     padding-left: 6px;
   }
   .documentTab {
-    flex-basis: 138px;
-    min-width: 110px;
+    max-width: 138px;
+    min-width: 96px;
   }
 }
 .selectionPopover {
@@ -1494,3 +1530,11 @@
 .modalConfirm:hover {
   background: var(--zw-brand-deep);
 }
+
+.editorFindOverlay { position: absolute; top: 54px; right: 12px; z-index: 10; display: flex; align-items: center; gap: 4px; max-width: calc(100% - 24px); box-sizing: border-box; padding: 6px; border: 1px solid var(--zw-hairline-strong); border-radius: var(--zw-r-sm); background: var(--zw-surface); box-shadow: var(--zw-shadow-float); }
+.editorFindOverlay input { min-width: 0; width: 210px; padding: 6px 8px; border: 1px solid var(--zw-hairline-strong); border-radius: var(--zw-r-sm); background: var(--zw-surface-2); color: var(--zw-text); font: inherit; font-size: 12px; }
+.editorFindOverlay input:focus { outline: 1px solid var(--zw-brand); }
+.editorFindOverlay > span { flex: none; min-width: 38px; text-align: center; color: var(--zw-muted); font-size: 11px; }
+.editorFindOverlay button { display: grid; place-items: center; flex: none; width: 24px; height: 26px; padding: 0; border: 0; border-radius: var(--zw-r-sm); background: transparent; color: var(--zw-muted); cursor: pointer; }
+.editorFindOverlay button:disabled { opacity: .4; cursor: default; }
+.editorFindOverlay button:not(:disabled):hover { background: var(--zw-brand-soft); color: var(--zw-brand); }

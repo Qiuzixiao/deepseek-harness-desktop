@@ -381,13 +381,20 @@ async function start(): Promise<void> {
     async () => { await generation.release() },
     finalExit,
   )
-  const requestQuit = (code: number): void => { void shutdown.request(code) }
+  let quitConfirmation: Promise<void> | undefined
+  const requestQuit = (code: number): void => {
+    if (code !== 0) { void shutdown.request(code); return }
+    if (quitConfirmation !== undefined) return
+    quitConfirmation = runtime.confirmDocumentExit().then(async confirmed => {
+      if (confirmed) await shutdown.request(code)
+    }).finally(() => { quitConfirmation = undefined })
+  }
   removeUncaughtExceptionLogging = installDesktopUncaughtExceptionLogging(
     process,
     electronLogger,
     requestQuit,
   )
-  removeShutdownRequests = installShutdownRequests(process, app, requestQuit)
+  removeShutdownRequests = installShutdownRequests(process, app, code => { void shutdown.request(code) }, requestQuit)
 
   const openStartupRecoveryWindow = async (
     failureDetail: string,

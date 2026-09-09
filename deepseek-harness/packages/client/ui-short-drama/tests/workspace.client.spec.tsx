@@ -12,7 +12,7 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
 
 vi.mock('../src/client/Editor.tsx', () => ({
   Editor: () => <div data-testid="editor" />,
-  VisualEditor: ({ initialDoc, onSelectionChange }: { initialDoc: string, onSelectionChange?: (selection: unknown) => void }) => <div data-testid="visual-editor">{initialDoc}<button type="button" onClick={() => onSelectionChange?.({ text: '第一集', from: 2, to: 5, startLine: 1, endLine: 1, rect: { left: 10, top: 10, right: 40, bottom: 30 } })}>选择文本</button></div>,
+  VisualEditor: ({ initialDoc, onSelectionChange }: { initialDoc: string, onSelectionChange?: (selection: unknown) => void }) => <div contentEditable suppressContentEditableWarning data-testid="visual-editor">{initialDoc}<button type="button" onClick={() => onSelectionChange?.({ text: '第一集', from: 2, to: 5, startLine: 1, endLine: 1, rect: { left: 10, top: 10, right: 40, bottom: 30 } })}>选择文本</button></div>,
 }))
 
 afterEach(() => {
@@ -271,4 +271,32 @@ describe('Zenwit workspace layout', () => {
     fireEvent.pointerUp(window, { pointerId: 2, clientX: 850 })
     await waitFor(() => expect(workspace.style.gridTemplateColumns).toContain('520px'))
   })
+})
+
+it('searches nested filenames without opening a document and restores the tree after clearing', async () => {
+  mountWorkspace()
+  await screen.findByRole('treeitem', { name: /剧本/ })
+  const search = screen.getByRole('textbox', { name: '搜索文件' })
+  fireEvent.change(search, { target: { value: 'episode-2' } })
+  expect(screen.getByRole('treeitem', { name: /episode-2.md/ })).toBeTruthy()
+  expect(screen.queryByRole('treeitem', { name: /episode-1.md/ })).toBeNull()
+  fireEvent.click(screen.getByRole('treeitem', { name: /episode-2.md/ }))
+  await screen.findByRole('tab', { name: /episode-2.md/ })
+  fireEvent.change(search, { target: { value: '' } })
+  fireEvent.click(screen.getByRole('treeitem', { name: /剧本/ }))
+  expect(screen.getByRole('treeitem', { name: /episode-1.md/ })).toBeTruthy()
+})
+
+it('opens正文查找浮层 from the editor shortcut without adding a scope switcher to the file tree', async () => {
+  mountWorkspace()
+  fireEvent.click(await screen.findByRole('treeitem', { name: /剧本/ }))
+  fireEvent.click(await screen.findByRole('treeitem', { name: /episode-1.md/ }))
+  await screen.findByRole('tab', { name: /episode-1.md/ })
+  expect(screen.queryByRole('button', { name: '文件' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '正文' })).toBeNull()
+  fireEvent.keyDown(screen.getByTestId('visual-editor'), { key: 'f', code: 'KeyF', ctrlKey: true })
+  expect(screen.getByRole('search', { name: '当前文档查找' })).toBeTruthy()
+  expect(screen.getByRole('textbox', { name: '查找当前文档正文' })).toBeTruthy()
+  fireEvent.keyDown(window, { key: 'Escape' })
+  expect(screen.queryByRole('search', { name: '当前文档查找' })).toBeNull()
 })

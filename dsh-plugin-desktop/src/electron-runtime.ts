@@ -243,6 +243,11 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
     this.generation?.show()
   }
 
+  /** Preserve unsaved workspace edits before a normal application exit. */
+  async confirmDocumentExit(): Promise<boolean> {
+    return await this.generation?.confirmDocumentExit() ?? true
+  }
+
   /** @inheritdoc */
   notifyAttention(notification: DesktopNotification): void {
     this.generation?.notifyAttention(notification)

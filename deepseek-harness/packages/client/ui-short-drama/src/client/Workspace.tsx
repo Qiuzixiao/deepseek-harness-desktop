@@ -12,9 +12,9 @@ import {
   ArrowLeft, ChevronDown, ChevronRight, File, FileJson, FileText,
   Folder, FolderOpen, History, X, FilePlus, FolderPlus, RefreshCw, ChevronsDownUp,
   Copy, Pencil, Trash2, MessageSquare, Code2, Eye, Save,
-  FolderSearch, MoreHorizontal, Terminal,
+  FolderSearch, MoreHorizontal, Terminal, Undo2, Redo2, Search, ChevronUp, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
 } from 'lucide-react'
-import { Editor, VisualEditor, type DocumentSelection } from './Editor.tsx'
+import { Editor, VisualEditor, type DocumentSelection, type EditorHistory, type EditorNavigation } from './Editor.tsx'
 import css from './zenwit.module.css'
 
 /** One real tree node: a directory or file under the project root. */
@@ -123,6 +123,20 @@ function readPersistedTabs(projectPath: string): PersistedDocumentTabs | null {
   }
 }
 
+function flattenFiles(nodes: TreeNode[]): TreeNode[] {
+  return nodes.flatMap(node => node.kind === 'file' ? [node] : flattenFiles(node.children ?? []))
+}
+
+function filterTree(nodes: TreeNode[], query: string): TreeNode[] {
+  if (!query.trim()) return nodes
+  const needle = query.trim().toLocaleLowerCase()
+  return nodes.flatMap(node => {
+    const children = filterTree(node.children ?? [], query)
+    if (node.path.toLocaleLowerCase().includes(needle)) return [node]
+    return children.length > 0 ? [{ ...node, children }] : []
+  })
+}
+
 interface ResizeHandleProps {
   label: string
   value: number
@@ -195,16 +209,44 @@ export function Workspace({
   const [documents, setDocuments] = useState<OpenDocument[]>([])
   const [activePath, setActivePath] = useState<string | null>(null)
   const [pendingClosePath, setPendingClosePath] = useState<string | null>(null)
+  const [leaving, setLeaving] = useState(false)
+  const [leaveError, setLeaveError] = useState<string | null>(null)
   const [autoSave, setAutoSave] = useState(true)
+  const [editorHistories, setEditorHistories] = useState<Record<string, EditorHistory | null>>({})
+  const [editorNavigation, setEditorNavigation] = useState<Record<string, EditorNavigation | null>>({})
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [leftWidth, setLeftWidth] = useState(LEFT_DEFAULT)
   const [rightWidth, setRightWidth] = useState(RIGHT_DEFAULT)
+  const [leftCollapsed, setLeftCollapsed] = useState(false)
+  const [rightCollapsed, setRightCollapsed] = useState(false)
+  const [layoutProject, setLayoutProject] = useState<string | null>(null)
+  const findInput = useRef<HTMLInputElement>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const quickReturnFocus = useRef<HTMLElement | null>(null)
+  const [outlineOpen, setOutlineOpen] = useState(true)
+  const [quickOpen, setQuickOpen] = useState(false)
+  const [quickQuery, setQuickQuery] = useState('')
+  const [fileQuery, setFileQuery] = useState('')
+  const [findQuery, setFindQuery] = useState('')
+  const [contentSearchOpen, setContentSearchOpen] = useState(false)
+  const [findResult, setFindResult] = useState({ index: 0, total: 0 })
+  const [quickIndex, setQuickIndex] = useState(0)
   const leftDragBase = useRef(LEFT_DEFAULT)
   const rightDragBase = useRef(RIGHT_DEFAULT)
   const documentsRef = useRef(documents)
   const tabsRestoredRef = useRef(false)
   documentsRef.current = documents
+  const savingPaths = useRef(new Set<string>())
   const activeDocument = documents.find(document => document.path === activePath) ?? null
+  const navigation = activePath === null ? null : editorNavigation[activePath]
+  const countText = (text: string) => [...text.replace(/\s/gu, '')].length
+  const wordCount = countText(navigation?.text() ?? activeDocument?.draft ?? '')
+  const headings = navigation?.headings() ?? []
+  const quickFiles = flattenFiles(structure?.tree ?? []).filter(node => node.path.slice(projectPath.length + 1).toLocaleLowerCase().includes(quickQuery.toLocaleLowerCase()))
+  const runFind = (direction: 'first' | 'next' | 'previous', query = findQuery) => {
+    if (activePath === null) return
+    setFindResult(editorNavigation[activePath]?.find(query, direction) ?? { index: 0, total: 0 })
+  }
   const agentLabel = structure?.agentId === 'short-drama'
     ? '短剧创作'
     : structure?.agentId ?? '未绑定 Agent'
@@ -327,6 +369,56 @@ export function Workspace({
   }, [projectPath])
 
   useEffect(() => {
+    let saved: { left?: number, right?: number, leftCollapsed?: boolean, rightCollapsed?: boolean } | null = null
+    try { saved = JSON.parse(window.localStorage.getItem(`zenwit.layout.${projectPath}`) ?? 'null') } catch { /* Ignore corrupt preferences. */ }
+    setLeftWidth(typeof saved?.left === 'number' && Number.isFinite(saved.left) ? clamp(saved.left, LEFT_MIN, LEFT_MAX) : LEFT_DEFAULT)
+    setRightWidth(typeof saved?.right === 'number' && Number.isFinite(saved.right) ? clamp(saved.right, RIGHT_MIN, RIGHT_MAX) : RIGHT_DEFAULT)
+    setLeftCollapsed(saved?.leftCollapsed === true)
+    setRightCollapsed(saved?.rightCollapsed === true)
+    setLayoutProject(projectPath)
+  }, [projectPath])
+  useEffect(() => {
+    if (layoutProject !== projectPath) return
+    try { window.localStorage.setItem(`zenwit.layout.${projectPath}`, JSON.stringify({ left: leftWidth, right: rightWidth, leftCollapsed, rightCollapsed })) } catch { /* Layout remains usable without storage. */ }
+  }, [leftWidth, rightWidth, leftCollapsed, rightCollapsed, projectPath, layoutProject])
+  useEffect(() => {
+    setFindResult(navigation?.find(contentSearchOpen ? findQuery : '', 'first') ?? { index: 0, total: 0 })
+  }, [activePath, navigation, findQuery, contentSearchOpen])
+  useEffect(() => {
+    setFindResult(navigation?.find(contentSearchOpen ? findQuery : '', 'count') ?? { index: 0, total: 0 })
+  }, [activeDocument?.draft])
+  useEffect(() => {
+    if (quickOpen) return
+    quickReturnFocus.current?.focus()
+    quickReturnFocus.current = null
+  }, [quickOpen])
+  useEffect(() => {
+    document.querySelector('[data-quick-result="true"]')?.scrollIntoView?.({ block: 'nearest' })
+  }, [quickIndex, quickQuery])
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const mod = event.metaKey || event.ctrlKey
+      if (mod && event.key.toLowerCase() === 'p') {
+        event.preventDefault()
+        if (!quickOpen) quickReturnFocus.current = document.activeElement as HTMLElement
+        setQuickOpen(true); setQuickQuery(''); setQuickIndex(0)
+      }
+      const target = event.target instanceof HTMLElement ? event.target : null
+      const isEditorTarget = (target !== null && target.closest('[contenteditable="true"]') !== null) || event.target === window || event.target === document.body
+      if (mod && event.key.toLowerCase() === 'f' && activeDocument?.visualMode && !quickOpen && isEditorTarget) {
+        event.preventDefault(); setContentSearchOpen(true)
+        window.requestAnimationFrame(() => { findInput.current?.focus(); findInput.current?.select() })
+      }
+      if (event.key === 'Escape') {
+        if (quickOpen) { event.preventDefault(); setQuickOpen(false) }
+        else if (contentSearchOpen) { setFindQuery(''); setContentSearchOpen(false); navigation?.focus() }
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [activeDocument?.visualMode, navigation, quickOpen, contentSearchOpen])
+
+  useEffect(() => {
     if (!tabsRestoredRef.current) return
     const key = DOCUMENT_TABS_STORAGE_PREFIX + projectPath
     if (documents.length === 0) {
@@ -390,19 +482,22 @@ export function Workspace({
 
   const saveDocument = async (path: string): Promise<boolean> => {
     const file = documentsRef.current.find(document => document.path === path)
-    if (file === undefined || file.saving) return false
+    if (file === undefined || savingPaths.current.has(path)) return false
+    savingPaths.current.add(path)
     const content = file.draft
     setDocuments(previous => previous.map(document => document.path === path ? { ...document, saving: true, saveStatus: null } : document))
     try {
       const res = await fetch('/api/desktop/projects/file', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path: file.path, content }),
+        body: JSON.stringify({ path: file.path, content, expectedContent: file.content }),
       })
       if (!res.ok) throw new Error('save ' + res.status)
-      setDocuments(previous => previous.map(document => document.path === path
+      const saved = documentsRef.current.map(document => document.path === path
         ? { ...document, content, dirty: document.draft !== content, saving: false, saveStatus: '已保存' }
-        : document))
+        : document)
+      documentsRef.current = saved
+      setDocuments(saved)
       void reloadStructure()
       return true
     } catch (e) {
@@ -410,12 +505,14 @@ export function Workspace({
         ? { ...document, saving: false, saveStatus: '保存失败：' + String(e instanceof Error ? e.message : e) }
         : document))
       return false
+    } finally {
+      savingPaths.current.delete(path)
     }
   }
 
   useEffect(() => {
     if (!autoSave) return
-    const timers = documents.filter(document => document.dirty && !document.saving).map(document =>
+    const timers = documents.filter(document => document.dirty && !document.saving && !document.saveStatus?.startsWith('保存失败')).map(document =>
       window.setTimeout(() => { void saveDocument(document.path) }, 800))
     return () => timers.forEach(timer => window.clearTimeout(timer))
   }, [autoSave, documents])
@@ -423,6 +520,7 @@ export function Workspace({
   const closeDocument = async (path: string, discard = false) => {
     const document = documentsRef.current.find(item => item.path === path)
     if (document === undefined) return
+    if (savingPaths.current.has(path)) return
     if (document.dirty && !discard) {
       setPendingClosePath(path)
       return
@@ -436,9 +534,37 @@ export function Workspace({
   const confirmSaveAndClose = async () => {
     if (pendingClosePath === null) return
     const path = pendingClosePath
-    setPendingClosePath(null)
-    if (await saveDocument(path)) await closeDocument(path, true)
+    if (await saveDocument(path)) {
+      if (documentsRef.current.find(document => document.path === path)?.dirty) return
+      setPendingClosePath(null)
+      await closeDocument(path)
+    }
   }
+
+  const saveAndLeave = async () => {
+    setLeaveError(null)
+    for (const document of documentsRef.current) {
+      if (document.dirty && !await saveDocument(document.path)) {
+        setLeaveError('保存未完成，请重试或取消离开。')
+        return
+      }
+    }
+    if (documentsRef.current.some(document => document.dirty || document.saving)) {
+      setLeaveError('仍有未保存的修改，请再次保存。')
+      return
+    }
+    await closeProject()
+  }
+
+  useEffect(() => {
+    const protectUnload = (event: BeforeUnloadEvent) => {
+      if (!documentsRef.current.some(document => document.dirty || document.saving)) return
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', protectUnload)
+    return () => window.removeEventListener('beforeunload', protectUnload)
+  }, [])
 
   const openNodeDialog = (mode: NodeDialogState['mode'], targetPath: string, initialName = '') => {
     setContextMenu(null)
@@ -583,7 +709,7 @@ export function Workspace({
 
   /** Recursive tree render: a folder expands to reveal its real contents. */
   const renderNodes = (nodes: TreeNode[]): ReactNode[] => nodes.map(node => {
-    const isOpen = expanded.has(node.path)
+    const isOpen = fileQuery.trim() !== '' || expanded.has(node.path)
     const isSelected = node.kind === 'file' && activePath === node.path
     const isDirty = node.kind === 'file' && documents.some(document => document.path === node.path && document.dirty)
     const detail = node.kind === 'dir'
@@ -636,13 +762,14 @@ export function Workspace({
     <div
       className={css.workspace}
       data-testid="workspace-grid"
-      style={{ gridTemplateColumns: `${leftWidth}px 14px minmax(0, 1fr) 14px ${rightWidth}px` }}
+      style={{ gridTemplateColumns: `${leftCollapsed ? 36 : leftWidth}px 14px minmax(240px, 1fr) 14px ${rightCollapsed ? 36 : rightWidth}px` }}
     >
-      <div className={css.leftRail}>
+      <div className={css.leftRail} data-collapsed={leftCollapsed || undefined}>
+        <button className={css.panelToggle} type="button" aria-label={leftCollapsed ? '展开文件目录' : '折叠文件目录'} aria-expanded={!leftCollapsed} onClick={() => setLeftCollapsed(value => !value)}>{leftCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}</button>
         <aside className={css.paneStructure} aria-label="文件目录">
           <div className={css.structureHeader}>
             <div className={css.structureNavRow}>
-              <button className={css.backButton} type="button" onClick={() => void closeProject()}>
+              <button className={css.backButton} type="button" onClick={() => { if (documents.some(document => document.dirty || document.saving)) setLeaving(true); else void closeProject() }}>
                 <ArrowLeft size={15} strokeWidth={2} aria-hidden="true" />
                 <span>项目库</span>
               </button>
@@ -662,11 +789,16 @@ export function Workspace({
           <div className={css.structureSectionBar}>
             <span className={css.structureSectionTitle}>项目文件</span>
             <div className={css.structureToolbar}>
+              <button type="button" title="搜索文件" aria-label="搜索文件" onClick={() => fileInput.current?.focus()}><Search size={15} aria-hidden="true" /></button>
               <button type="button" title="新建文件" aria-label="新建文件" onClick={() => openNodeDialog('file', projectPath)}><FilePlus size={15} /></button>
               <button type="button" title="项目操作" aria-label="项目操作" aria-haspopup="menu" aria-expanded={contextMenu?.node === null} onClick={openProjectMenu}><MoreHorizontal size={16} /></button>
             </div>
           </div>
+          <div className={css.structureSearch}>
+            <input ref={fileInput} className={css.findInput} aria-label="搜索文件" placeholder="搜索文件名或路径" value={fileQuery} onChange={event => setFileQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') setFileQuery('') }} />
+          </div>
           <input ref={importPickerRef} type="file" multiple hidden onChange={event => { void importFiles(event) }} />
+          {structure !== null && fileQuery.trim() !== '' && filterTree(structure.tree, fileQuery).length === 0 && <div className={css.structureError} role="status">没有匹配的文件，请换个文件名或路径。</div>}
           {loadError !== null && (
             <div className={css.structureError} role="alert">
               <span>{loadError}</span>
@@ -684,8 +816,12 @@ export function Workspace({
                 <strong>还没有文件</strong>
                 <button type="button" onClick={() => openNodeDialog('file', projectPath)}>新建第一个文件</button>
               </li>
-            ) : renderNodes(structure.tree)}
+            ) : renderNodes(filterTree(structure.tree, fileQuery))}
           </ul>
+          {activeDocument?.visualMode && <div className={css.documentOutline}>
+            <button type="button" aria-expanded={outlineOpen} onClick={() => setOutlineOpen(value => !value)}>文档大纲<ChevronDown size={14} /></button>
+            {outlineOpen && (headings.length === 0 ? <span>暂无标题</span> : headings.map(heading => <button type="button" key={heading.position} style={{ paddingLeft: 6 + (heading.level - 1) * 10 }} onClick={() => navigation?.jump(heading.position)}>{heading.title || '未命名标题'}</button>))}
+          </div>}
           <div className={css.paneFooter}>
             <span className={css.agentStatusDot} data-active={structure?.agentId !== undefined || undefined} aria-hidden="true" />
             <span className={css.agentStatusLabel}>Agent</span>
@@ -756,6 +892,10 @@ export function Workspace({
           </div>
           {activeDocument !== null && (
             <div className={css.editorHeaderActions}>
+              {activeDocument.visualMode && <div className={css.historyActions} role="group" aria-label="编辑历史">
+                <button type="button" title="撤销 (⌘Z / Ctrl+Z)" aria-label="撤销" disabled={!editorHistories[activeDocument.path]?.canUndo} onClick={() => editorHistories[activeDocument.path]?.undo()}><Undo2 size={15} aria-hidden="true" /></button>
+                <button type="button" title="重做 (⇧⌘Z / Ctrl+Shift+Z)" aria-label="重做" disabled={!editorHistories[activeDocument.path]?.canRedo} onClick={() => editorHistories[activeDocument.path]?.redo()}><Redo2 size={15} aria-hidden="true" /></button>
+              </div>}
               <button
                 className={css.toggleButton}
                 type="button"
@@ -779,11 +919,34 @@ export function Workspace({
         </div>
         {activeDocument === null ? (
           <div className={css.editorPlaceholder}>点击左侧文件打开，或展开目录查看内容</div>
-        ) : activeDocument.visualMode ? (
-          <VisualEditor key={activeDocument.path} initialDoc={activeDocument.draft} onSelectionChange={next => { if (next !== null) setSelection({ ...next, path: activeDocument.path }) }} onChange={doc => setDocuments(previous => previous.map(document => document.path === activeDocument.path ? { ...document, draft: doc, dirty: true, saveStatus: null } : document))} />
-        ) : (
-          <Editor key={activeDocument.path} initialDoc={activeDocument.draft} mode="markdown" onSelectionChange={next => { if (next !== null) setSelection({ ...next, path: activeDocument.path }) }} onChange={doc => setDocuments(previous => previous.map(document => document.path === activeDocument.path ? { ...document, draft: doc, dirty: true, saveStatus: null } : document))} />
-        )}
+        ) : null}
+        {documents.map(document => (
+          <div key={document.path} className={css.documentEditor} hidden={document.path !== activePath}>
+            {document.visualMode ? (
+              <VisualEditor initialDoc={document.draft} onNavigationChange={navigation => setEditorNavigation(previous => ({ ...previous, [document.path]: navigation }))}
+                onHistoryChange={history => setEditorHistories(previous => {
+                  const next = { ...previous }
+                  if (history === null) delete next[document.path]
+                  else next[document.path] = history
+                  return next
+                })}
+                onSelectionChange={next => { if (document.path === activePath) setSelection(next === null ? null : { ...next, path: document.path }) }}
+                onChange={draft => setDocuments(previous => previous.map(item => item.path === document.path ? { ...item, draft, dirty: draft !== item.content, saveStatus: null } : item))} />
+            ) : (
+              <Editor initialDoc={document.draft} mode="markdown"
+                onSelectionChange={next => { if (document.path === activePath) setSelection(next === null ? null : { ...next, path: document.path }) }}
+                onChange={draft => setDocuments(previous => previous.map(item => item.path === document.path ? { ...item, draft, dirty: draft !== item.content, saveStatus: null } : item))} />
+            )}
+          </div>
+        ))}
+        {contentSearchOpen && activeDocument?.visualMode && <div className={css.editorFindOverlay} role="search" aria-label="当前文档查找">
+          <input autoFocus ref={findInput} aria-label="查找当前文档正文" placeholder="查找当前文档正文" value={findQuery} onChange={event => setFindQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); runFind(event.shiftKey ? 'previous' : 'next') } }} />
+          <span role="status">{findQuery ? findResult.total ? `${findResult.index}/${findResult.total}` : '无结果' : ''}</span>
+          <button type="button" aria-label="上一个匹配" title="上一个匹配（Shift+Enter）" disabled={!findResult.total} onClick={() => runFind('previous')}><ChevronUp size={15} /></button>
+          <button type="button" aria-label="下一个匹配" title="下一个匹配（Enter）" disabled={!findResult.total} onClick={() => runFind('next')}><ChevronDown size={15} /></button>
+          <button type="button" aria-label="关闭查找" title="关闭查找（Esc）" onClick={() => { setContentSearchOpen(false); navigation?.focus() }}><X size={15} /></button>
+        </div>}
+        {activeDocument !== null && <div className={css.editorMeta} aria-label="文档统计">{wordCount} 字{selection?.path === activePath ? ` · 选中 ${countText(selection.text)} 字` : ''}<span title="可视化模式按正文非空白字符计数，包含标点；源码模式按源码计数。"> ⓘ</span></div>}
         {selection !== null && activeDocument !== null && (
           <div ref={selectionPopoverRef} className={css.selectionPopover} style={{ left: `clamp(12px, ${selection.rect.left}px, calc(100% - 372px))`, top: `clamp(58px, ${selection.rect.bottom + 8}px, calc(100% - 118px))` }} role="dialog" aria-label="局部编辑">
             <div className={css.selectionPopoverActions}>
@@ -792,7 +955,22 @@ export function Workspace({
             </div>
           </div>
         )}
-        {activeDocument?.saveStatus !== null && activeDocument !== null && <div className={css.saveStatus}>{activeDocument.saveStatus}</div>}
+        {activeDocument !== null && <div className={css.saveStatus} role="status" aria-live="polite">
+          {activeDocument.saving ? '保存中…' : activeDocument.saveStatus?.startsWith('保存失败') ? activeDocument.saveStatus : activeDocument.dirty ? '未保存' : '已保存'}
+          {activeDocument.saveStatus?.startsWith('保存失败') && !activeDocument.saving && <button type="button" onClick={() => void saveDocument(activeDocument.path)}>重试保存</button>}
+        </div>}
+        {leaving && <div className={css.closeDialogOverlay}>
+          <div className={css.closeDialog} role="dialog" aria-modal="true" aria-labelledby="leave-project-title">
+            <h2 id="leave-project-title">离开前保存修改？</h2>
+            <p>当前项目有未保存的文档。</p>
+            {leaveError && <p role="alert">{leaveError}</p>}
+            <div className={css.closeDialogActions}>
+              <button type="button" onClick={() => { setLeaving(false); setLeaveError(null) }}>取消</button>
+              <button type="button" disabled={documents.some(document => document.saving)} onClick={() => void closeProject()}>放弃并离开</button>
+              <button type="button" disabled={documents.some(document => document.saving)} onClick={() => void saveAndLeave()}>保存并离开</button>
+            </div>
+          </div>
+        </div>}
         {pendingClosePath !== null && (
           <div className={css.closeDialogOverlay} role="presentation">
             <div className={css.closeDialog} role="dialog" aria-modal="true" aria-labelledby="close-document-title">
@@ -800,8 +978,8 @@ export function Workspace({
               <p>要保存对「{documents.find(document => document.path === pendingClosePath)?.name ?? ''}」的修改吗？</p>
               <div className={css.closeDialogActions}>
                 <button type="button" className={css.closeDialogCancel} onClick={() => setPendingClosePath(null)}>取消</button>
-                <button type="button" className={css.closeDialogDiscard} onClick={() => { const path = pendingClosePath; setPendingClosePath(null); void closeDocument(path, true) }}>放弃修改</button>
-                <button type="button" className={css.closeDialogSave} onClick={() => void confirmSaveAndClose()}>保存并关闭</button>
+                <button type="button" className={css.closeDialogDiscard} disabled={documents.some(document => document.path === pendingClosePath && document.saving)} onClick={() => { const path = pendingClosePath; setPendingClosePath(null); void closeDocument(path, true) }}>放弃修改</button>
+                <button type="button" className={css.closeDialogSave} disabled={documents.some(document => document.path === pendingClosePath && document.saving)} onClick={() => void confirmSaveAndClose()}>保存并关闭</button>
               </div>
             </div>
           </div>
@@ -813,7 +991,8 @@ export function Workspace({
         onStart={() => { rightDragBase.current = rightWidth }}
         onDrag={resizeRight}
       />
-      <aside className={css.paneChat} aria-label="对话">
+      <aside className={css.paneChat} aria-label="对话" data-collapsed={rightCollapsed || undefined}>
+        <button className={css.panelToggle} type="button" aria-label={rightCollapsed ? '展开对话面板' : '折叠对话面板'} aria-expanded={!rightCollapsed} onClick={() => setRightCollapsed(value => !value)}>{rightCollapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}</button>
         <div className={css.conversationBar}>
           <div ref={conversationControlRef} className={css.conversationControl}>
             <button
@@ -876,6 +1055,7 @@ export function Workspace({
           openFileInWorkspace,
         })}
       </aside>
+      {quickOpen && <div className={css.quickOpenOverlay} role="presentation" onClick={() => setQuickOpen(false)}><div className={css.quickOpen} role="dialog" aria-modal="true" aria-label="快速打开文件" onClick={event => event.stopPropagation()}><div className={css.quickOpenHeading}>快速打开文件 <kbd>⌘P / Ctrl+P · Esc 关闭</kbd></div><input autoFocus aria-label="搜索文件" value={quickQuery} onChange={event => { setQuickQuery(event.target.value); setQuickIndex(0) }} onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); setQuickIndex(index => Math.max(0, Math.min(index + 1, quickFiles.length - 1))) } if (event.key === 'ArrowUp') { event.preventDefault(); setQuickIndex(index => Math.max(index - 1, 0)) } if (event.key === 'Enter' && quickFiles[quickIndex]) { const node = quickFiles[quickIndex]!; setQuickOpen(false); void openFilePath(node.path, node.name) } }} placeholder="输入文件名或路径" /><div className={css.quickOpenResults}>{quickFiles.length === 0 && <p>没有匹配的文件</p>}{quickFiles.map((node, index) => <button type="button" data-quick-result={index === quickIndex ? 'true' : undefined} aria-current={index === quickIndex ? 'true' : undefined} key={node.path} onClick={() => { setQuickOpen(false); void openFilePath(node.path, node.name) }}>{node.name}<span>{node.path.slice(projectPath.length + 1)}</span></button>)}</div></div></div>}
     </div>
   )
 }

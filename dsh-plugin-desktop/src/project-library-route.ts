@@ -7,6 +7,8 @@ import {
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { homedir } from 'node:os'
+import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
+import { DocumentRecoveryStore } from './document-recovery.ts'
 import { normalizeProjectTags, readProjectTags } from '@deepseek-ai/dsh-screenplay-project-library/types'
 import { BodyTooLargeError, isJsonRequest, isSameOriginLoopbackRequest, readJson } from './desktop-http-security.ts'
 
@@ -546,49 +548,73 @@ export async function handleProjectLibraryResourcesRequest(req: IncomingMessage,
  * POST /api/desktop/projects/file — write a project file (atomic-ish).
  */
 export async function handleProjectFileRequest(req: IncomingMessage, res: ServerResponse, expectedOrigin: string): Promise<void> {
+  if (req.method !== 'GET' && req.method !== 'POST') return finishJson(res, 405, { error: 'method not allowed' })
+  if (!authorize(req, res, expectedOrigin, req.method === 'POST')) return
   const url = new URL(req.url ?? '', 'http://localhost')
-  if (req.method === 'GET') {
-    if (!authorize(req, res, expectedOrigin, false)) return
-    const filePath = url.searchParams.get('path')
-    if (filePath === null || filePath.length === 0) return finishJson(res, 400, { error: 'path query is required' })
-    const project = enclosingProjectRoot(filePath)
-    if (project === undefined) return finishJson(res, 403, { error: 'path outside a project' })
-    const target = canonicalPath(filePath)
-    if (isInsideStateDir(project, target)) return finishJson(res, 403, { error: 'cannot read project metadata' })
-    try {
-      const content = readFileSync(target, 'utf8')
-      return finishJson(res, 200, { content })
-    } catch {
-      return finishJson(res, 404, { error: 'file not found' })
+  const body = req.method === 'POST' ? await readBody(req, res) : {}
+  if (body === INVALID_BODY) return
+  const b = body as Record<string, unknown>
+  const filePath = req.method === 'GET' ? url.searchParams.get('path') : b.path
+  if (typeof filePath !== 'string' || filePath.length === 0) return finishJson(res, 400, { error: 'path is required' })
+  const project = enclosingProjectRoot(filePath)
+  if (project === undefined) return finishJson(res, 403, { error: 'path outside a project' })
+  const target = canonicalPath(filePath)
+  if (isInsideStateDir(project, target)) return finishJson(res, 403, { error: 'cannot access project metadata' })
+  const store = new DocumentRecoveryStore(join(resolveDshHome(), 'desktop', 'document-recovery'))
+  try {
+    const record = store.read(project, target)
+    const exists = existsSync(target)
+    const disk = exists ? readFileSync(target, 'utf8') : null
+    if (req.method === 'GET') {
+      if (disk !== null && record.versions.at(-1)?.content !== disk) {
+        store.checkpoint(record, disk)
+        store.update(project, record)
+      }
+      return finishJson(res, exists ? 200 : 404, { content: disk, recovery: record.draft ?? null, versions: record.versions })
     }
-  }
-  if (req.method === 'POST') {
-    if (!authorize(req, res, expectedOrigin, true)) return
-    const body = await readBody(req, res)
-    if (body === INVALID_BODY) return
-    const b = body as Record<string, unknown>
-    const filePath = typeof b.path === 'string' ? b.path : ''
-    const content = typeof b.content === 'string' ? b.content : ''
-    if (filePath.length === 0) return finishJson(res, 400, { error: 'path is required' })
-    // Writes stay inside a registered project and never touch its metadata.
-    const project = enclosingProjectRoot(filePath)
-    if (project === undefined) return finishJson(res, 403, { error: 'path outside a project' })
-    const target = canonicalPath(filePath)
-    if (isInsideStateDir(project, target)) return finishJson(res, 403, { error: 'cannot write project metadata' })
+    if (b.action === 'discard-draft') {
+      delete record.draft
+      store.update(project, record)
+      return finishJson(res, 200, { ok: true })
+    }
+    if (typeof b.content !== 'string') return finishJson(res, 400, { error: 'content must be a string' })
+    if (b.action === 'draft') {
+      if (typeof b.baseline !== 'string') return finishJson(res, 400, { error: 'baseline is required' })
+      record.draft = { content: b.content, baseline: b.baseline, time: Date.now() }
+      store.update(project, record)
+      return finishJson(res, 200, { ok: true })
+    }
+    if (b.action === 'checkpoint') {
+      store.checkpoint(record, b.content)
+      store.update(project, record)
+      return finishJson(res, 200, { ok: true, versions: record.versions })
+    }
+    if (b.action !== undefined) return finishJson(res, 400, { error: 'unknown file action' })
+    if (!(typeof b.expectedContent === 'string' || b.expectedContent === null)) return finishJson(res, 428, { error: 'expectedContent is required' })
+    if (disk !== b.expectedContent) return finishJson(res, 409, { error: 'file changed externally', content: disk })
     const parent = dirname(target)
     if (!existsSync(parent)) return finishJson(res, 400, { error: 'parent directory does not exist' })
-    // Atomic write: temp file in the same directory, then rename over the target.
+    if (disk !== null) store.checkpoint(record, disk)
+    store.checkpoint(record, b.content)
+    // Preserve a recoverable copy before touching the project file.
+    store.update(project, record)
     const tmp = join(parent, '.' + basename(target) + '.' + randomBytes(6).toString('hex') + '.tmp')
     try {
-      writeFileSync(tmp, content)
+      writeFileSync(tmp, b.content, { flag: 'wx', mode: 0o600 })
+      // Detect writers that changed the file while the recovery copy was being written.
+      const current = existsSync(target) ? readFileSync(target, 'utf8') : null
+      if (current !== disk) return finishJson(res, 409, { error: 'file changed externally', content: current })
       renameSync(tmp, target)
-      return finishJson(res, 200, { ok: true })
-    } catch (error) {
-      try { if (existsSync(tmp)) renameSync(tmp, target) } catch { /* ignore */ }
-      return finishJson(res, 500, { error: error instanceof Error ? error.message : String(error) })
+    } finally { rmSync(tmp, { force: true }) }
+    // A newer draft may already be queued; clear only the content actually saved.
+    if (record.draft?.content === b.content) {
+      delete record.draft
+      store.update(project, record)
     }
+    return finishJson(res, 200, { ok: true })
+  } catch (error) {
+    return finishJson(res, 500, { error: error instanceof Error ? error.message : String(error) })
   }
-  return finishJson(res, 405, { error: 'method not allowed' })
 }
 
 function isInsideLibrary(filePath: string): boolean {

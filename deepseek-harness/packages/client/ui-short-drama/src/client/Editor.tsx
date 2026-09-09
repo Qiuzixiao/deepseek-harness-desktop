@@ -1,12 +1,18 @@
-/** CodeMirror 6 editor, remounted per document via React key. */
+/** Document-owned CodeMirror and Milkdown editors, retained while their tab is open. */
 import { useEffect, useRef } from 'react'
 import { EditorView, basicSetup } from 'codemirror'
 import { markdown } from '@codemirror/lang-markdown'
-import { defaultValueCtx, editorViewCtx, Editor as MilkdownEditor, rootCtx } from '@milkdown/core'
+import { defaultValueCtx, editorViewCtx, Editor as MilkdownEditor, rootCtx, serializerCtx } from '@milkdown/core'
 import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react'
 import { listener, listenerCtx } from '@milkdown/plugin-listener'
 import { commonmark } from '@milkdown/preset-commonmark'
 import { gfm } from '@milkdown/preset-gfm'
+import { history } from '@milkdown/kit/plugin/history'
+import { undo, redo, undoDepth, redoDepth } from '@milkdown/kit/prose/history'
+import type { Node as ProseMirrorNode } from '@milkdown/kit/prose/model'
+import { Plugin, PluginKey, TextSelection } from '@milkdown/kit/prose/state'
+import { Decoration, DecorationSet } from '@milkdown/kit/prose/view'
+import { $prose } from '@milkdown/kit/utils'
 import { dlkjb } from './dlkjb-language.ts'
 import css from './zenwit.module.css'
 
@@ -115,17 +121,81 @@ export function Editor({ initialDoc, onChange, onSelectionChange, mode = 'markdo
   return <div ref={host} className={css.editor} />
 }
 
+/** Commands and availability for one live visual editor instance. */
+export interface EditorHistory {
+  canUndo: boolean
+  canRedo: boolean
+  undo: () => void
+  redo: () => void
+}
+
+/** Search operations owned by one live visual editor. */
+export interface EditorNavigation {
+  find: (query: string, direction: 'first' | 'next' | 'previous' | 'count') => { index: number, total: number }
+  headings: () => Array<{ title: string, level: number, position: number }>
+  jump: (position: number) => void
+  text: () => string
+  focus: () => void
+}
+
+interface SearchIndex {
+  text: string
+  positions: number[]
+}
+
+/** Build searchable plain text while retaining ProseMirror positions. */
+function buildSearchIndex(doc: ProseMirrorNode): SearchIndex {
+  const characters: string[] = []
+  const positions: number[] = []
+  const append = (value: string, position: number): void => {
+    for (let index = 0; index < value.length; index += 1) {
+      characters.push(value[index]!)
+      positions.push(position + index)
+    }
+  }
+  const visit = (node: ProseMirrorNode, position: number, root = false): void => {
+    if (node.isText) {
+      append(node.text ?? '', position)
+      return
+    }
+    if (node.type.name === 'hardbreak') {
+      characters.push('\n')
+      positions.push(position)
+      return
+    }
+    if (node.isBlock && !root && characters.length > 0 && characters.at(-1) !== '\n') {
+      characters.push('\n')
+      positions.push(position)
+    }
+    node.forEach((child, offset) => visit(child, root ? offset : position + 1 + offset))
+  }
+  visit(doc, 0, true)
+  return { text: characters.join(''), positions }
+}
+const searchPluginKey = new PluginKey<SearchDecorationState>('zenwit-search')
+
+interface SearchDecorationState {
+  matches: Array<{ from: number, to: number }>
+  active: number
+}
+
 interface VisualEditorProps {
   initialDoc: string
   onChange: (doc: string) => void
   onSelectionChange?: (selection: DocumentSelection | null) => void
+  onHistoryChange?: (history: EditorHistory | null) => void
+  onNavigationChange?: (navigation: EditorNavigation | null) => void
 }
 
 /** Typora-style Markdown editing surface. The document remains Markdown at the boundary. */
-function VisualEditorInner({ initialDoc, onChange, onSelectionChange }: VisualEditorProps) {
+function VisualEditorInner({ initialDoc, onChange, onSelectionChange, onHistoryChange, onNavigationChange }: VisualEditorProps) {
   const onChangeRef = useRef(onChange)
   const onSelectionChangeRef = useRef(onSelectionChange)
   const selectionTimer = useRef<number | undefined>(undefined)
+  const onHistoryChangeRef = useRef(onHistoryChange)
+  const onNavigationChangeRef = useRef(onNavigationChange)
+  onHistoryChangeRef.current = onHistoryChange
+  onNavigationChangeRef.current = onNavigationChange
   onChangeRef.current = onChange
   onSelectionChangeRef.current = onSelectionChange
   useEffect(() => () => {
@@ -135,7 +205,6 @@ function VisualEditorInner({ initialDoc, onChange, onSelectionChange }: VisualEd
     .config(ctx => {
       ctx.set(rootCtx, root)
       ctx.set(defaultValueCtx, initialDoc)
-      ctx.get(listenerCtx).markdownUpdated((_ctx, markdownText) => onChangeRef.current(markdownText))
       ctx.get(listenerCtx).selectionUpdated((selectionCtx, selection) => {
         if (selectionTimer.current !== undefined) window.clearTimeout(selectionTimer.current)
         selectionTimer.current = window.setTimeout(() => {
@@ -145,6 +214,7 @@ function VisualEditorInner({ initialDoc, onChange, onSelectionChange }: VisualEd
             return
           }
           const view = selectionCtx.get(editorViewCtx)
+          if (!view.hasFocus()) return
           const { from, to } = selection
           onSelectionChangeRef.current?.({
             text: view.state.doc.textBetween(from, to, '\n'), from, to,
@@ -162,6 +232,97 @@ function VisualEditorInner({ initialDoc, onChange, onSelectionChange }: VisualEd
     })
     .use(commonmark)
     .use(gfm)
+    .use(history)
+    .use($prose(ctx => new Plugin({
+      key: searchPluginKey,
+      view(view) {
+        const initialNode = view.state.doc
+        const publishSearch = (matches: Array<{ from: number, to: number }>, active: number): void => {
+          view.dispatch(view.state.tr.setMeta(searchPluginKey, { matches, active }))
+        }
+        const findMatches = (query: string): Array<{ from: number, to: number }> => {
+          const matches: Array<{ from: number, to: number }> = []
+          const needle = query.toLocaleLowerCase()
+          if (needle === '') return matches
+          const index = buildSearchIndex(view.state.doc)
+          const haystack = index.text.toLocaleLowerCase()
+          let offset = haystack.indexOf(needle)
+          while (offset >= 0) {
+            const from = index.positions[offset]
+            const last = index.positions[offset + query.length - 1]
+            if (from !== undefined && last !== undefined) matches.push({ from, to: last + 1 })
+            offset = haystack.indexOf(needle, offset + Math.max(1, needle.length))
+          }
+          return matches
+        }
+        const publishHistory = () => onHistoryChangeRef.current?.({
+          canUndo: undoDepth(view.state) > 0,
+          canRedo: redoDepth(view.state) > 0,
+          undo: () => { undo(view.state, view.dispatch); view.focus() },
+          redo: () => { redo(view.state, view.dispatch); view.focus() },
+        })
+        publishHistory()
+        const find: EditorNavigation['find'] = (query, direction) => {
+          const matches = findMatches(query)
+          if (matches.length === 0) {
+            publishSearch([], -1)
+            return { index: 0, total: 0 }
+          }
+          const selection = view.state.selection
+          const selectedIndex = matches.findIndex(match => match.from === selection.from && match.to === selection.to)
+          if (direction === 'count') {
+            publishSearch(matches, selectedIndex)
+            return { index: selectedIndex + 1, total: matches.length }
+          }
+          let index = direction === 'first' ? 0 : direction === 'next'
+            ? matches.findIndex(match => match.from > selection.from)
+            : matches.findLastIndex(match => match.to < selection.to)
+          if (index < 0) index = direction === 'previous' ? matches.length - 1 : 0
+          const match = matches[index]!
+          view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, match.from, match.to)).setMeta(searchPluginKey, { matches, active: index }).scrollIntoView())
+          // Search keeps focus in its input, so reveal the decoration instead of
+          // relying on ProseMirror's focused DOM selection for scrolling.
+          view.dom.querySelector('[data-search-current="true"]')?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' })
+          return { index: index + 1, total: matches.length }
+        }
+        onNavigationChangeRef.current?.({ find, focus: () => view.focus(),
+          text: () => view.state.doc.textContent,
+          headings: () => {
+            const headings: Array<{ title: string, level: number, position: number }> = []
+            view.state.doc.descendants((node, position) => {
+              if (node.type.name === 'heading') headings.push({ title: node.textContent, level: Number(node.attrs.level), position: position + 1 })
+            })
+            return headings
+          },
+          jump: position => { view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, position)).scrollIntoView()); view.focus() },
+        })
+        return {
+          update(_view, previous) {
+            if (view.state.doc.eq(previous.doc)) return
+            onChangeRef.current(view.state.doc.eq(initialNode) ? initialDoc : ctx.get(serializerCtx)(view.state.doc))
+            publishHistory()
+          },
+          destroy() { onHistoryChangeRef.current?.(null); onNavigationChangeRef.current?.(null) },
+        }
+      },
+      state: {
+        init: (): SearchDecorationState => ({ matches: [], active: -1 }),
+        apply(transaction, previous) {
+          const next = transaction.getMeta(searchPluginKey) as SearchDecorationState | undefined
+          return next ?? (transaction.docChanged ? { matches: [], active: -1 } : previous)
+        },
+      },
+      props: {
+        decorations(state) {
+          const search = searchPluginKey.getState(state)
+          if (search === undefined) return DecorationSet.empty
+          return DecorationSet.create(state.doc, search.matches.map((match, index) => Decoration.inline(match.from, match.to, {
+            class: index === search.active ? 'searchMatchActive' : 'searchMatch',
+            'data-search-current': String(index === search.active),
+          })))
+        },
+      },
+    })))
     .use(listener), [])
 
   return <div className={css.visualEditor}><Milkdown /></div>

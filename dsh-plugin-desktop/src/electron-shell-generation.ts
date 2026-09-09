@@ -300,6 +300,26 @@ export class ElectronShellGeneration {
       : await dialog.showOpenDialog(window, options)
   }
 
+  /** Ask the renderer's unload guard before an operator-requested application exit. */
+  async confirmDocumentExit(): Promise<boolean> {
+    const window = this.window
+    if (window === undefined || window.isDestroyed() || this.options.spec.mode === 'compatibility') return true
+    try {
+      const canLeave = await window.webContents.executeJavaScript("window.dispatchEvent(new Event('beforeunload', { cancelable: true }))")
+      if (canLeave === true) return true
+      this.show()
+      const result = await this.showMessageBox({
+        type: 'warning', title: '文档尚未保存', message: '退出会丢失未保存的修改。',
+        detail: '选择返回工作台以保存文档，或放弃修改并退出。',
+        buttons: ['返回工作台', '放弃修改并退出'], defaultId: 0, cancelId: 0, noLink: true,
+      })
+      return result.response === 1
+    } catch (cause) {
+      this.options.logError(`dsh-plugin-desktop: document exit check failed: ${String(cause)}`)
+      return false
+    }
+  }
+
   async showMessageBox(options: Electron.MessageBoxOptions): Promise<Electron.MessageBoxReturnValue> {
     const window = this.window
     return window === undefined || window.isDestroyed()
