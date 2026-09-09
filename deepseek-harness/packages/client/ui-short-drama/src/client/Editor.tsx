@@ -1,8 +1,9 @@
 /** Document-owned CodeMirror and Milkdown editors, retained while their tab is open. */
 import { useEffect, useRef } from 'react'
 import { EditorView, basicSetup } from 'codemirror'
+import { EditorState as CodeEditorState } from '@codemirror/state'
 import { markdown } from '@codemirror/lang-markdown'
-import { defaultValueCtx, editorViewCtx, Editor as MilkdownEditor, rootCtx, serializerCtx } from '@milkdown/core'
+import { defaultValueCtx, parserCtx, editorViewCtx, Editor as MilkdownEditor, rootCtx, serializerCtx } from '@milkdown/core'
 import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react'
 import { listener, listenerCtx } from '@milkdown/plugin-listener'
 import { commonmark } from '@milkdown/preset-commonmark'
@@ -10,7 +11,7 @@ import { gfm } from '@milkdown/preset-gfm'
 import { history } from '@milkdown/kit/plugin/history'
 import { undo, redo, undoDepth, redoDepth } from '@milkdown/kit/prose/history'
 import type { Node as ProseMirrorNode } from '@milkdown/kit/prose/model'
-import { Plugin, PluginKey, TextSelection } from '@milkdown/kit/prose/state'
+import { EditorState as ProseEditorState, Plugin, PluginKey, TextSelection } from '@milkdown/kit/prose/state'
 import { Decoration, DecorationSet } from '@milkdown/kit/prose/view'
 import { $prose } from '@milkdown/kit/utils'
 import { dlkjb } from './dlkjb-language.ts'
@@ -35,6 +36,7 @@ export interface DocumentSelection {
 }
 
 export interface EditorProps {
+  externalUpdate?: { content: string } | undefined
   initialDoc: string
   onChange: (doc: string) => void
   onSelectionChange?: (selection: DocumentSelection | null) => void
@@ -51,7 +53,13 @@ function selectionRect(from: { left: number, top: number, right: number, bottom:
 }
 
 /** Editor (keyed by the parent per open document). */
-export function Editor({ initialDoc, onChange, onSelectionChange, mode = 'markdown' }: EditorProps) {
+export function Editor({ initialDoc, externalUpdate, onChange, onSelectionChange, mode = 'markdown' }: EditorProps) {
+  const replaceExternal = useRef<((text: string) => void) | null>(null)
+  const appliedExternal = useRef(externalUpdate)
+  useEffect(() => {
+    if (externalUpdate && externalUpdate !== appliedExternal.current) replaceExternal.current?.(externalUpdate.content)
+    appliedExternal.current = externalUpdate
+  }, [externalUpdate])
   const host = useRef<HTMLDivElement>(null)
   const onChangeRef = useRef(onChange)
   const onSelectionChangeRef = useRef(onSelectionChange)
@@ -89,11 +97,19 @@ export function Editor({ initialDoc, onChange, onSelectionChange, mode = 'markdo
       if (!updateEvent.selectionSet) return
       scheduleSelection(updateEvent.view)
     })
+    const extensions = [basicSetup, mode === 'dlkjb' ? dlkjb : markdown(), updateListener]
     const view = new EditorView({
       doc: initialDoc,
-      extensions: [basicSetup, mode === 'dlkjb' ? dlkjb : markdown(), updateListener],
+      extensions,
       parent: host.current!,
     })
+    replaceExternal.current = text => {
+      const scrollTop = view.scrollDOM.scrollTop
+      const anchor = Math.min(view.state.selection.main.anchor, text.length)
+      view.setState(CodeEditorState.create({ doc: text, extensions, selection: { anchor } }))
+      view.scrollDOM.scrollTop = scrollTop
+      onSelectionChangeRef.current?.(null)
+    }
     const clearSelection = (): void => onSelectionChangeRef.current?.(null)
     const beginPointerSelection = (): void => {
       pointerSelecting = true
@@ -113,6 +129,7 @@ export function Editor({ initialDoc, onChange, onSelectionChange, mode = 'markdo
       view.dom.removeEventListener('pointerdown', beginPointerSelection)
       view.dom.removeEventListener('pointerup', endPointerSelection)
       view.dom.removeEventListener('pointercancel', endPointerSelection)
+      replaceExternal.current = null
       view.destroy()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -180,6 +197,7 @@ interface SearchDecorationState {
 }
 
 interface VisualEditorProps {
+  externalUpdate?: { content: string } | undefined
   initialDoc: string
   onChange: (doc: string) => void
   onSelectionChange?: (selection: DocumentSelection | null) => void
@@ -188,7 +206,14 @@ interface VisualEditorProps {
 }
 
 /** Typora-style Markdown editing surface. The document remains Markdown at the boundary. */
-function VisualEditorInner({ initialDoc, onChange, onSelectionChange, onHistoryChange, onNavigationChange }: VisualEditorProps) {
+function VisualEditorInner({ initialDoc, externalUpdate, onChange, onSelectionChange, onHistoryChange, onNavigationChange }: VisualEditorProps) {
+  const replaceExternal = useRef<((text: string) => void) | null>(null)
+  const appliedExternal = useRef(externalUpdate)
+  useEffect(() => {
+    if (externalUpdate && externalUpdate !== appliedExternal.current) replaceExternal.current?.(externalUpdate.content)
+    appliedExternal.current = externalUpdate
+  }, [externalUpdate])
+
   const onChangeRef = useRef(onChange)
   const onSelectionChangeRef = useRef(onSelectionChange)
   const selectionTimer = useRef<number | undefined>(undefined)
@@ -236,7 +261,27 @@ function VisualEditorInner({ initialDoc, onChange, onSelectionChange, onHistoryC
     .use($prose(ctx => new Plugin({
       key: searchPluginKey,
       view(view) {
-        const initialNode = view.state.doc
+        let initialNode = view.state.doc
+        let baselineText = initialDoc
+        let replacing = false
+        replaceExternal.current = text => {
+          const doc = ctx.get(parserCtx)(text)
+          if (!doc) return
+          const scroll = []
+          for (let element: HTMLElement | null = view.dom; element; element = element.parentElement) {
+            scroll.push({ element, top: element.scrollTop, left: element.scrollLeft })
+          }
+          const selection = TextSelection.near(doc.resolve(Math.min(view.state.selection.from, doc.content.size)))
+          replacing = true
+          initialNode = doc
+          baselineText = text
+          try {
+            view.updateState(ProseEditorState.create({ doc, selection, plugins: view.state.plugins }))
+          } finally { replacing = false }
+          for (const { element, top, left } of scroll) { element.scrollTop = top; element.scrollLeft = left }
+          onSelectionChangeRef.current?.(null)
+          publishHistory()
+        }
         const publishSearch = (matches: Array<{ from: number, to: number }>, active: number): void => {
           view.dispatch(view.state.tr.setMeta(searchPluginKey, { matches, active }))
         }
@@ -299,10 +344,11 @@ function VisualEditorInner({ initialDoc, onChange, onSelectionChange, onHistoryC
         return {
           update(_view, previous) {
             if (view.state.doc.eq(previous.doc)) return
-            onChangeRef.current(view.state.doc.eq(initialNode) ? initialDoc : ctx.get(serializerCtx)(view.state.doc))
+            if (replacing) return
+            onChangeRef.current(view.state.doc.eq(initialNode) ? baselineText : ctx.get(serializerCtx)(view.state.doc))
             publishHistory()
           },
-          destroy() { onHistoryChangeRef.current?.(null); onNavigationChangeRef.current?.(null) },
+          destroy() { replaceExternal.current = null; onHistoryChangeRef.current?.(null); onNavigationChangeRef.current?.(null) },
         }
       },
       state: {

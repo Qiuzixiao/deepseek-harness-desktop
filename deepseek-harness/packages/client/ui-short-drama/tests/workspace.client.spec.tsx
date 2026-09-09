@@ -86,6 +86,19 @@ function mountWorkspace() {
 }
 
 describe('Zenwit workspace layout', () => {
+  it('refreshes an already open document from disk when returning to the application', async () => {
+    mountWorkspace()
+    fireEvent.click(await screen.findByRole('treeitem', { name: '剧本' }))
+    fireEvent.click(screen.getByRole('treeitem', { name: /episode-1\.md/ }))
+    await screen.findByText('# 第一集')
+    const originalFetch = vi.mocked(fetch).getMockImplementation()!
+    vi.mocked(fetch).mockImplementation(async (...args) => String(args[0]).includes('/file?')
+      ? new Response(JSON.stringify({ content: '# 顾长林，阿豪已删除' }))
+      : originalFetch(...args))
+    fireEvent.focus(window)
+    await waitFor(() => expect(screen.getByTestId('visual-editor').textContent).toContain('阿豪已删除'))
+  })
+
   it('creates nodes and exposes daily file actions through the application menu', async () => {
     mountWorkspace()
     const files = screen.getByRole('complementary', { name: '文件目录' })

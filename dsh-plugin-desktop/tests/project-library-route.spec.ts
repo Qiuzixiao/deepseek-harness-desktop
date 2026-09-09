@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto'
 import type { IncomingMessage } from 'node:http'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import {
+  handleProjectFileRequest,
   handleProjectLibraryRequest,
   handleProjectNodeRequest,
   handleProjectImportRequest,
@@ -27,8 +28,8 @@ function request(method: string, body: unknown): IncomingMessage {
   return req
 }
 
-function response(): { status: number; body: unknown; writeHead: (status: number) => void; end: (value: string) => void } {
-  const result = { status: 0, body: undefined as unknown, writeHead(status: number) { result.status = status }, end(value: string) { result.body = JSON.parse(value) } }
+function response(): { status: number; body: unknown; writeHead: (status: number) => void; setHeader: (name: string, value: string) => void; end: (value: string) => void } {
+  const result = { setHeader(_name: string, _value: string) {}, status: 0, body: undefined as unknown, writeHead(status: number) { result.status = status }, end(value: string) { result.body = JSON.parse(value) } }
   return result
 }
 
@@ -44,6 +45,44 @@ function importRequest(projectPath: string, destinationPath: string, name: strin
 describe('project node operations', () => {
   mkdirSync(PROJECT_LIBRARY_ROOT, { recursive: true })
   const project = mkdtempSync(join(PROJECT_LIBRARY_ROOT, `.dsh-node-test-${randomUUID()}-`))
+
+  it('refuses a stale desktop save and reads the external version without recovery payload', async () => {
+    mkdirSync(join(project, '.zenwit-project'), { recursive: true })
+    writeFileSync(join(project, '.zenwit-project', 'project.json'), '{}')
+    const file = join(project, 'sync.md')
+    writeFileSync(file, '顾长林')
+    const save = response()
+    await handleProjectFileRequest(request('POST', { path: file, content: '阿豪', expectedContent: '旧稿' }), save as never, TEST_ORIGIN)
+    expect(save.status).toBe(409)
+    expect(readFileSync(file, 'utf8')).toBe('顾长林')
+    const get = request('GET', {})
+    get.url = '/api/desktop/projects/file?sync=1&path=' + encodeURIComponent(file)
+    const latest = response()
+    await handleProjectFileRequest(get, latest as never, TEST_ORIGIN)
+    expect(latest.status).toBe(200)
+    expect(latest.body).toEqual({ content: '顾长林' })
+  })
+
+  it('uses the shared filesystem guard and rejects an intervening agent write', async () => {
+    mkdirSync(join(project, '.zenwit-project'), { recursive: true })
+    writeFileSync(join(project, '.zenwit-project', 'project.json'), '{}')
+    const file = join(project, 'sync.md')
+    writeFileSync(file, '旧稿')
+    const save = response()
+    const filesystem = {
+      resolve: async () => ({ targetKey: file, displayPath: file }),
+      stat: async () => ({ version: 'v1', type: 'file' }),
+      writeText: async (_target: unknown, _content: string, intent: unknown) => {
+        expect(intent).toEqual({ kind: 'replaceIfVersion', version: 'v1' })
+        writeFileSync(file, 'Agent 新稿')
+        throw Object.assign(new Error('stale'), { code: 'FS_STALE_VERSION' })
+      },
+    }
+    await handleProjectFileRequest(request('POST', { path: file, content: '本地稿', expectedContent: '旧稿' }), save as never, TEST_ORIGIN, filesystem as never)
+    expect(save.status).toBe(409)
+    expect(save.body).toEqual({ error: 'file changed externally', content: 'Agent 新稿' })
+    expect(readFileSync(file, 'utf8')).toBe('Agent 新稿')
+  })
 
   afterAll(() => rmSync(project, { recursive: true, force: true }))
 

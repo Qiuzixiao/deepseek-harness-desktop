@@ -73,9 +73,17 @@ it('reveals each active search highlight while focus stays in the search input a
 })
 
 it('keeps visual history across autosave and document switches and clears dirty when undo reaches the saved content', async () => {
-  const fetchMock = vi.fn(async (input: string, _init?: RequestInit) => new Response(JSON.stringify(input.includes('/structure?')
-    ? { path: '/project', root: 'Project', tree: ['one', 'two'].map(name => ({ name: `${name}.md`, path: `/project/${name}.md`, kind: 'file', detail: '' })) }
-    : { content: 'Original' }), { status: 200, headers: { 'content-type': 'application/json' } }))
+  const disk = new Map<string, string>()
+  const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+    if (init?.method === 'POST') {
+      const body = JSON.parse(init.body as string)
+      disk.set(body.path, body.content)
+      return Response.json({ ok: true })
+    }
+    return Response.json(input.includes('/structure?')
+      ? { path: '/project', root: 'Project', tree: ['one', 'two'].map(name => ({ name: `${name}.md`, path: `/project/${name}.md`, kind: 'file', detail: '' })) }
+      : { content: disk.get(new URL(input, 'http://localhost').searchParams.get('path')!) ?? 'Original' })
+  })
   vi.stubGlobal('fetch', fetchMock)
   const props = {
     projectPath: '/project', closeProject: vi.fn(), renderSlot: () => null,
@@ -163,4 +171,212 @@ it('does not close a document when new edits arrive during save', async () => {
   expect(screen.getByRole('dialog')).toBeTruthy()
   expect(editor.textContent).toContain('Newer')
   expect(within(screen.getByRole('tab', { name: /one.md/ })).getByLabelText('未保存')).toBeTruthy()
+})
+
+
+it('applies external content to the real visual editor without emitting edits or retaining stale undo', async () => {
+  let history: EditorHistory | null = null
+  let navigation: EditorNavigation | null = null
+  const onChange = vi.fn()
+  const props = { initialDoc: '阿豪', onChange, onHistoryChange: (next: EditorHistory | null) => { history = next }, onNavigationChange: (next: EditorNavigation | null) => { navigation = next } }
+  const view = render(<VisualEditor {...props} />)
+  await waitFor(() => expect(history).not.toBeNull())
+  const editor = view.container.querySelector('[contenteditable="true"]')!
+  fireEvent.paste(editor, { clipboardData: { getData: (type: string) => type === 'text/plain' ? '旧稿' : '', files: [], types: ['text/plain'] } })
+  await waitFor(() => expect(history!.canUndo).toBe(true))
+  onChange.mockClear()
+  view.rerender(<VisualEditor {...props} externalUpdate={{ content: '# 顾长林' }} />)
+  await waitFor(() => expect(editor.textContent).toBe('顾长林'))
+  expect(onChange).not.toHaveBeenCalled()
+  expect(history!.canUndo).toBe(false)
+  expect(navigation!.headings()[0]?.title).toBe('顾长林')
+  act(() => { history!.undo() })
+  expect(editor.textContent).toBe('顾长林')
+})
+
+async function syncFixture() {
+  const disk = new Map([['/project/one.md', '阿豪'], ['/project/two.md', '第二集']])
+  const fetchMock = vi.fn(async (input: string, init?: RequestInit): Promise<Response> => {
+    if (input.includes('/structure?')) return Response.json({ path: '/project', root: 'Project', tree: [...disk.keys()].map(path => ({ name: path.split('/').at(-1), path, kind: 'file', detail: '' })) })
+    if (init?.method === 'POST') {
+      const body = JSON.parse(init.body as string)
+      if (body.action) return Response.json({ ok: true })
+      const current = disk.get(body.path) ?? null
+      if (body.expectedContent !== current) return Response.json({ content: current }, { status: 409 })
+      disk.set(body.path, body.content)
+      return Response.json({ ok: true })
+    }
+    const path = new URL(input, 'http://localhost').searchParams.get('path')!
+    return Response.json({ content: disk.get(path) ?? null }, { status: disk.has(path) ? 200 : 404 })
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  const props = {
+    projectPath: '/project', closeProject: vi.fn(), renderSlot: () => null,
+    useSessions: (select: (state: unknown) => unknown) => select({ ids: [], byId: {} }),
+    useWorkspaces: (select: (state: unknown) => unknown) => select({ items: [] }),
+  } as unknown as WorkspaceProps
+  const view = render(<Workspace {...props} />)
+  fireEvent.click(await screen.findByText('one.md'))
+  await waitFor(() => expect(view.container.querySelector('[contenteditable="true"]')?.textContent).toBe('阿豪'))
+  const editor = view.container.querySelector('[contenteditable="true"]') as HTMLElement
+  return { ...view, disk, editor, fetchMock }
+}
+
+it('updates the real visual buffer after an agent write and does not autosave the old buffer', async () => {
+  const { disk, editor, fetchMock } = await syncFixture()
+  disk.set('/project/one.md', '# 顾长林')
+  fireEvent.focus(window)
+  await waitFor(() => expect(editor.textContent).toBe('顾长林'))
+  expect(screen.getByText('已同步外部修改')).toBeTruthy()
+  expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0)
+  expect(screen.getByRole('button', { name: '撤销' }).hasAttribute('disabled')).toBe(true)
+})
+
+it('backs up local edits before adopting an external version and keeps both files', async () => {
+  const { disk, editor, fetchMock } = await syncFixture()
+  fireEvent.paste(editor, { clipboardData: { getData: (type: string) => type === 'text/plain' ? '本地修改' : '', files: [], types: ['text/plain'] } })
+  const local = editor.textContent
+  disk.set('/project/one.md', '顾长林')
+  fireEvent.focus(window)
+  await screen.findByText('文件已在外部修改，本地修改已保留，自动保存已暂停。')
+  expect(editor.textContent).toBe(local)
+  await waitFor(() => expect(fetchMock.mock.calls.some(([, init]) => init?.body && JSON.parse(init.body as string).action === 'draft')).toBe(true))
+  expect(disk.get('/project/one.md')).toBe('顾长林')
+  fireEvent.click(screen.getByRole('button', { name: '查看并处理' }))
+  fireEvent.click(screen.getByRole('button', { name: '保留本地副本并采用磁盘版本' }))
+  await waitFor(() => expect(editor.textContent).toBe('顾长林'))
+  expect([...disk.entries()].some(([path, content]) => path.includes('本地副本') && content.includes('本地修改'))).toBe(true)
+})
+
+it('rejects a stale manual save even before the next poll', async () => {
+  const { disk, editor } = await syncFixture()
+  fireEvent.click(screen.getByRole('checkbox', { name: '自动保存' }))
+  fireEvent.paste(editor, { clipboardData: { getData: (type: string) => type === 'text/plain' ? '本地修改' : '', files: [], types: ['text/plain'] } })
+  disk.set('/project/one.md', '外部新稿')
+  fireEvent.click(screen.getByRole('button', { name: '保存 *' }))
+  await screen.findByText('文件已在外部修改，本地修改已保留，自动保存已暂停。')
+  expect(disk.get('/project/one.md')).toBe('外部新稿')
+  expect(editor.textContent).toContain('本地修改')
+})
+
+it('retains a removed file in the editor and does not recreate it silently', async () => {
+  const { disk, editor } = await syncFixture()
+  disk.delete('/project/one.md')
+  fireEvent.focus(window)
+  await screen.findByText('文件已删除或移动，当前内容仍保留。')
+  expect(editor.textContent).toBe('阿豪')
+  fireEvent.click(screen.getByRole('button', { name: '保存' }))
+  expect(disk.has('/project/one.md')).toBe(false)
+})
+
+it('defers external replacement during composition and protects edits made during a pending read', async () => {
+  const { disk, editor, fetchMock } = await syncFixture()
+  fireEvent.compositionStart(editor)
+  disk.set('/project/one.md', '新版本')
+  fireEvent.focus(window)
+  await act(async () => {})
+  expect(editor.textContent).toBe('阿豪')
+  fireEvent.compositionEnd(editor)
+  await waitFor(() => expect(editor.textContent).toBe('新版本'))
+  const original = fetchMock.getMockImplementation()!
+  let completeRead!: (response: Response) => void
+  fetchMock.mockImplementation(async (input, init) => input.includes('sync=1') ? await new Promise(resolve => { completeRead = resolve }) : original(input, init))
+  fireEvent.focus(window)
+  await waitFor(() => expect(completeRead).toBeTypeOf('function'))
+  fireEvent.paste(editor, { clipboardData: { getData: (type: string) => type === 'text/plain' ? '本地修改' : '', files: [], types: ['text/plain'] } })
+  await act(async () => completeRead(Response.json({ content: '过期响应' })))
+  expect(editor.textContent).toContain('本地修改')
+  expect(editor.textContent).not.toContain('过期响应')
+})
+
+it('keeps both the local buffer and conflict open if saving a backup fails', async () => {
+  const { disk, editor, fetchMock } = await syncFixture()
+  fireEvent.paste(editor, { clipboardData: { getData: (type: string) => type === 'text/plain' ? '本地修改' : '', files: [], types: ['text/plain'] } })
+  disk.set('/project/one.md', '外部新稿')
+  fireEvent.focus(window)
+  await screen.findByText('文件已在外部修改，本地修改已保留，自动保存已暂停。')
+  const original = fetchMock.getMockImplementation()!
+  fetchMock.mockImplementation(async (input, init) => init?.method === 'POST' && !JSON.parse(init.body as string).action
+    ? Response.json({ error: 'disk full' }, { status: 500 }) : original(input, init))
+  fireEvent.click(screen.getByRole('button', { name: '查看并处理' }))
+  fireEvent.click(screen.getByRole('button', { name: '保留本地副本并采用磁盘版本' }))
+  await waitFor(() => expect(screen.getAllByText(/本地副本保存失败/).length).toBeGreaterThan(0))
+  expect(screen.getByRole('dialog')).toBeTruthy()
+  expect(editor.textContent).toContain('本地修改')
+  expect(disk.get('/project/one.md')).toBe('外部新稿')
+})
+
+it('restores a persisted local draft without silently overwriting the current disk version', async () => {
+  window.localStorage.setItem('zenwit.document-tabs./project', JSON.stringify({ activePath: '/project/one.md', documents: [{ path: '/project/one.md', name: 'one.md', visualMode: true }] }))
+  const writes = vi.fn()
+  vi.stubGlobal('fetch', vi.fn(async (input: string, init?: RequestInit) => {
+    if (init?.method === 'POST') { writes(JSON.parse(init.body as string)); return Response.json({ ok: true }) }
+    return Response.json(input.includes('/structure?') ? { path: '/project', root: 'Project', tree: [] } : { content: '磁盘新稿', recovery: { content: '待恢复本地稿', baseline: '旧版' } })
+  }))
+  const props = { projectPath: '/project', closeProject: vi.fn(), renderSlot: () => null, useSessions: (s: (v: unknown) => unknown) => s({ ids: [], byId: {} }), useWorkspaces: (s: (v: unknown) => unknown) => s({ items: [] }) } as unknown as WorkspaceProps
+  const { container } = render(<Workspace {...props} />)
+  await waitFor(() => expect(container.querySelector('[contenteditable="true"]')?.textContent).toBe('待恢复本地稿'))
+  expect(screen.getByText('文件已在外部修改，本地修改已保留，自动保存已暂停。')).toBeTruthy()
+  expect(writes.mock.calls.every(([body]) => body.action === 'draft')).toBe(true)
+})
+
+it('updates an inactive document without replacing the active document', async () => {
+  const { disk, editor, container } = await syncFixture()
+  fireEvent.click(screen.getByRole('treeitem', { name: /two.md/ }))
+  await waitFor(() => expect(container.querySelectorAll('[contenteditable="true"]').length).toBe(2))
+  disk.set('/project/one.md', '后台更新')
+  fireEvent.focus(window)
+  await waitFor(() => expect(editor.textContent).toBe('后台更新'))
+  expect(screen.getByRole('tab', { name: 'two.md' }).getAttribute('aria-selected')).toBe('true')
+  expect(container.querySelectorAll('[contenteditable="true"]')[1]?.textContent).toBe('第二集')
+})
+
+it('updates from a pushed file notification with polling disabled and closes the subscription', async () => {
+  const streams: EventTarget[] = []
+  const close = vi.fn()
+  vi.stubGlobal('EventSource', class extends EventTarget {
+    onmessage: ((event: MessageEvent) => void) | null = null
+    constructor(public url: string) { super(); streams.push(this) }
+    close = close
+  })
+  const interval = window.setInterval.bind(window)
+  vi.spyOn(window, 'setInterval').mockImplementation((handler, timeout, ...args) => (timeout === 30000 || timeout === 500 ? 0 : interval(handler, timeout, ...args)) as unknown as ReturnType<typeof setInterval>)
+  const { disk, editor, unmount } = await syncFixture()
+  expect(streams).toHaveLength(1)
+  disk.set('/project/one.md', '推送后的新正文')
+  act(() => { (streams[0] as EventSource).onmessage?.(new MessageEvent('message', { data: 'changed' })) })
+  await waitFor(() => expect(editor.textContent).toBe('推送后的新正文'))
+  unmount()
+  expect(close).toHaveBeenCalledTimes(1)
+})
+
+it('drains a notification arriving during an in-flight read and reconciles reconnects without polling', async () => {
+  let stream!: EventSource
+  vi.stubGlobal('EventSource', class {
+    onmessage: ((event: MessageEvent) => void) | null = null
+    constructor() { stream = this as unknown as EventSource }
+    close() {}
+  })
+  const interval = window.setInterval.bind(window)
+  vi.spyOn(window, 'setInterval').mockImplementation((handler, timeout, ...args) => (timeout === 30000 || timeout === 500 ? 0 : interval(handler, timeout, ...args)) as unknown as ReturnType<typeof setInterval>)
+  const { disk, editor, fetchMock } = await syncFixture()
+  const original = fetchMock.getMockImplementation()!
+  let complete!: (response: Response) => void
+  let delayNext = true
+  fetchMock.mockImplementation(async (input, init) => {
+    if (input.includes('sync=1') && delayNext) {
+      delayNext = false
+      return await new Promise(resolve => { complete = resolve })
+    }
+    return original(input, init)
+  })
+  act(() => { stream.onmessage?.(new MessageEvent('message', { data: 'changed' })) })
+  await waitFor(() => expect(complete).toBeTypeOf('function'))
+  disk.set('/project/one.md', '连续写入的最终版本')
+  act(() => { stream.onmessage?.(new MessageEvent('message', { data: 'changed' })) })
+  await act(async () => complete(Response.json({ content: '阿豪' })))
+  await waitFor(() => expect(editor.textContent).toBe('连续写入的最终版本'))
+  disk.set('/project/one.md', '断线期间的修改')
+  act(() => { stream.onmessage?.(new MessageEvent('message', { data: 'ready' })) })
+  await waitFor(() => expect(editor.textContent).toBe('断线期间的修改'))
 })

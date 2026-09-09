@@ -5,9 +5,11 @@ import {
   existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync, type Dirent,
 } from 'node:fs'
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { homedir } from 'node:os'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
+import type { FileSystem } from '@deepseek-ai/dsh-fs'
+import { streamProjectFileEvents } from './project-file-events.ts'
 import { DocumentRecoveryStore } from './document-recovery.ts'
 import { normalizeProjectTags, readProjectTags } from '@deepseek-ai/dsh-screenplay-project-library/types'
 import { BodyTooLargeError, isJsonRequest, isSameOriginLoopbackRequest, readJson } from './desktop-http-security.ts'
@@ -543,11 +545,24 @@ export async function handleProjectLibraryResourcesRequest(req: IncomingMessage,
   return finishJson(res, 200, { resources: scanResources(projectPath, projectPath) })
 }
 
+/** Subscribe to filesystem changes for one authenticated project workspace. */
+export function handleProjectChangesRequest(req: IncomingMessage, res: ServerResponse, expectedOrigin: string, onSubscribe?: (stop: () => void) => void): void {
+  if (req.method !== 'GET') return finishJson(res, 405, { error: 'method not allowed' })
+  if (!authorize(req, res, expectedOrigin, false)) return
+  const path = new URL(req.url ?? '', 'http://localhost').searchParams.get('path')
+  if (!path || !isProjectPath(path)) return finishJson(res, 403, { error: 'path outside project library' })
+  try {
+    const stop = streamProjectFileEvents(realpathSync(path), res)
+    onSubscribe?.(() => { stop(); res.end() })
+  }
+  catch { finishJson(res, 503, { error: 'file notifications unavailable' }) }
+}
+
 /**
  * GET /api/desktop/projects/file?path=<absFile> — read a project file.
  * POST /api/desktop/projects/file — write a project file (atomic-ish).
  */
-export async function handleProjectFileRequest(req: IncomingMessage, res: ServerResponse, expectedOrigin: string): Promise<void> {
+export async function handleProjectFileRequest(req: IncomingMessage, res: ServerResponse, expectedOrigin: string, filesystem?: FileSystem, report?: (event: Record<string, unknown>) => void): Promise<void> {
   if (req.method !== 'GET' && req.method !== 'POST') return finishJson(res, 405, { error: 'method not allowed' })
   if (!authorize(req, res, expectedOrigin, req.method === 'POST')) return
   const url = new URL(req.url ?? '', 'http://localhost')
@@ -562,9 +577,18 @@ export async function handleProjectFileRequest(req: IncomingMessage, res: Server
   if (isInsideStateDir(project, target)) return finishJson(res, 403, { error: 'cannot access project metadata' })
   const store = new DocumentRecoveryStore(join(resolveDshHome(), 'desktop', 'document-recovery'))
   try {
-    const record = store.read(project, target)
+    const fsTarget = filesystem && req.method === 'POST' && b.action === undefined ? await filesystem.resolve(target) : undefined
+    const fsInfo = fsTarget ? await filesystem!.stat(fsTarget) : undefined
     const exists = existsSync(target)
     const disk = exists ? readFileSync(target, 'utf8') : null
+    res.setHeader('Cache-Control', 'no-store')
+    const revision = disk === null ? null : createHash('sha256').update(disk).digest('hex')
+    report?.({ path: target, operation: req.method === 'GET' ? 'read' : b.action ?? 'save', revision, ...(typeof b.expectedContent === 'string' ? { expectedRevision: createHash('sha256').update(b.expectedContent).digest('hex') } : {}) })
+    res.once?.('finish', () => { if (req.method === 'POST') report?.({ path: target, operation: b.action ?? 'save', status: res.statusCode }) })
+    if (req.method === 'GET' && url.searchParams.get('sync') === '1') {
+      return finishJson(res, exists ? 200 : 404, { content: disk })
+    }
+    const record = store.read(project, target)
     if (req.method === 'GET') {
       if (disk !== null && record.versions.at(-1)?.content !== disk) {
         store.checkpoint(record, disk)
@@ -573,14 +597,15 @@ export async function handleProjectFileRequest(req: IncomingMessage, res: Server
       return finishJson(res, exists ? 200 : 404, { content: disk, recovery: record.draft ?? null, versions: record.versions })
     }
     if (b.action === 'discard-draft') {
-      delete record.draft
+      if (b.expectedDraft === undefined || record.draft?.content === b.expectedDraft) delete record.draft
       store.update(project, record)
       return finishJson(res, 200, { ok: true })
     }
     if (typeof b.content !== 'string') return finishJson(res, 400, { error: 'content must be a string' })
     if (b.action === 'draft') {
       if (typeof b.baseline !== 'string') return finishJson(res, 400, { error: 'baseline is required' })
-      record.draft = { content: b.content, baseline: b.baseline, time: Date.now() }
+      if (disk === b.content) delete record.draft
+      else record.draft = { content: b.content, baseline: b.baseline, time: Date.now() }
       store.update(project, record)
       return finishJson(res, 200, { ok: true })
     }
@@ -598,18 +623,32 @@ export async function handleProjectFileRequest(req: IncomingMessage, res: Server
     store.checkpoint(record, b.content)
     // Preserve a recoverable copy before touching the project file.
     store.update(project, record)
-    const tmp = join(parent, '.' + basename(target) + '.' + randomBytes(6).toString('hex') + '.tmp')
-    try {
-      writeFileSync(tmp, b.content, { flag: 'wx', mode: 0o600 })
-      // Detect writers that changed the file while the recovery copy was being written.
-      const current = existsSync(target) ? readFileSync(target, 'utf8') : null
-      if (current !== disk) return finishJson(res, 409, { error: 'file changed externally', content: current })
-      renameSync(tmp, target)
-    } finally { rmSync(tmp, { force: true }) }
+    if (filesystem && fsTarget) {
+      try {
+        // The authenticated editor may write this validated project independently
+        // of the agent's session mode; share its provider/lock, not its policy.
+        await filesystem.writeText(fsTarget, b.content, fsInfo ? { kind: 'replaceIfVersion', version: fsInfo.version } : { kind: 'createIfAbsent' }, undefined, { mode: 'workspace-write', workspaceRoot: project })
+      } catch (error) {
+        if (error && typeof error === 'object' && 'code' in error && (error.code === 'FS_STALE_VERSION' || error.code === 'FS_NOT_OBSERVED')) {
+          return finishJson(res, 409, { error: 'file changed externally', content: existsSync(target) ? readFileSync(target, 'utf8') : null })
+        }
+        throw error
+      }
+    } else {
+      const tmp = join(parent, '.' + basename(target) + '.' + randomBytes(6).toString('hex') + '.tmp')
+      try {
+        writeFileSync(tmp, b.content, { flag: 'wx', mode: 0o600 })
+        // Detect writers that changed the file while the recovery copy was being written.
+        const current = existsSync(target) ? readFileSync(target, 'utf8') : null
+        if (current !== disk) return finishJson(res, 409, { error: 'file changed externally', content: current })
+        renameSync(tmp, target)
+      } finally { rmSync(tmp, { force: true }) }
+    }
     // A newer draft may already be queued; clear only the content actually saved.
-    if (record.draft?.content === b.content) {
-      delete record.draft
-      store.update(project, record)
+    const latestRecord = store.read(project, target)
+    if (latestRecord.draft?.content === b.content) {
+      delete latestRecord.draft
+      store.update(project, latestRecord)
     }
     return finishJson(res, 200, { ok: true })
   } catch (error) {

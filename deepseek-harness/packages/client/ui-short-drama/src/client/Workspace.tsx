@@ -43,6 +43,9 @@ interface OpenDocument {
   saving: boolean
   saveStatus: string | null
   visualMode: boolean
+  externalUpdate?: { content: string } | undefined
+  conflict?: { content: string | null } | undefined
+  syncError?: string | undefined
 }
 
 interface PersistedDocumentTabs {
@@ -205,6 +208,7 @@ export function Workspace({
       .filter((s): s is NonNullable<typeof s> => s !== undefined && !s.blank)
       .sort((a, b) => b.updatedAt - a.updatedAt)
   const [structure, setStructure] = useState<StructureResponse | null>(null)
+  const structureRequest = useRef(0)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [documents, setDocuments] = useState<OpenDocument[]>([])
   const [activePath, setActivePath] = useState<string | null>(null)
@@ -237,6 +241,10 @@ export function Workspace({
   const tabsRestoredRef = useRef(false)
   documentsRef.current = documents
   const savingPaths = useRef(new Set<string>())
+  const composing = useRef(false)
+  const [conflictOpen, setConflictOpen] = useState(false)
+  const syncNow = useRef<() => void>(() => {})
+
   const activeDocument = documents.find(document => document.path === activePath) ?? null
   const navigation = activePath === null ? null : editorNavigation[activePath]
   const countText = (text: string) => [...text.replace(/\s/gu, '')].length
@@ -270,14 +278,17 @@ export function Workspace({
   }, [])
 
   const reloadStructure = async (): Promise<StructureResponse | null> => {
+    const request = ++structureRequest.current
     try {
       const res = await fetch('/api/desktop/projects/structure?path=' + encodeURIComponent(projectPath))
       if (!res.ok) throw new Error('structure ' + res.status)
       const data = await res.json() as StructureResponse
+      if (request !== structureRequest.current) return null
       setStructure(data)
       setLoadError(null)
       return data
     } catch (e) {
+      if (request !== structureRequest.current) return null
       setLoadError(String(e instanceof Error ? e.message : e))
       return null
     }
@@ -347,10 +358,12 @@ export function Workspace({
     void Promise.all(persisted.documents.map(async (item): Promise<OpenDocument | null> => {
       try {
         const response = await fetch('/api/desktop/projects/file?path=' + encodeURIComponent(item.path))
-        if (!response.ok) return null
-        const body = await response.json() as { content?: unknown }
+        if (!response.ok && response.status !== 404) return null
+        const body = await response.json() as { content?: unknown, recovery?: { content: string, baseline: string } }
+        if (body.content === null && body.recovery) return { ...item, content: '', draft: body.recovery.content, dirty: true, saving: false, saveStatus: '发现未保存草稿，原文件已删除或移动', conflict: { content: null } }
         if (typeof body.content !== 'string') return null
-        return { ...item, content: body.content, draft: body.content, dirty: false, saving: false, saveStatus: null }
+        const recovery = body.recovery?.content !== body.content ? body.recovery : undefined
+        return { ...item, content: body.content, draft: recovery?.content ?? body.content, dirty: !!recovery, saving: false, saveStatus: recovery ? '发现未保存草稿，请查看并处理' : null, ...(recovery ? { conflict: { content: body.content } } : {}) }
       } catch {
         return null
       }
@@ -432,29 +445,86 @@ export function Workspace({
     window.localStorage.setItem(key, JSON.stringify(persisted))
   }, [activePath, documents, projectPath])
 
-  // Agent file writes are not visible to this pane's single on-open fetch.
-  // Poll while open so newly written project files appear without a manual reload.
+  // OS file notifications drive synchronization. The slow timer only repairs
+  // missed events; serialized reads reject obsolete local-buffer snapshots.
   useEffect(() => {
-    const timer = setInterval(() => { void reloadStructure() }, 2000)
-    return () => clearInterval(timer)
+    let disposed = false
+    let running = false
+    let pending = false
+    let frame: number | undefined
+    const sync = async () => {
+      if (disposed || composing.current) return
+      if (running) { pending = true; return }
+      pending = false
+      running = true
+      try {
+        await Promise.all(documentsRef.current.map(async snapshot => {
+          if (savingPaths.current.has(snapshot.path)) return
+          try {
+            const response = await fetch('/api/desktop/projects/file?sync=1&path=' + encodeURIComponent(snapshot.path), { cache: 'no-store' })
+            if (!response.ok && response.status !== 404) throw new Error('读取失败：' + response.status)
+            const body = await response.json() as { content: string | null }
+            if (body.content !== null && typeof body.content !== 'string') throw new Error('文件内容无效')
+            if (disposed || composing.current || savingPaths.current.has(snapshot.path)) return
+            if (documentsRef.current.find(item => item.path === snapshot.path) !== snapshot) { pending = true; return }
+            setDocuments(current => current.map(item => {
+              if (item !== snapshot) return item
+              const disk = body.content
+              if (disk === item.content && !item.conflict) return item.syncError ? { ...item, syncError: undefined } : item
+              if (disk !== null && ((!item.dirty && !item.conflict) || disk === item.draft)) {
+                return { ...item, content: disk, draft: disk, dirty: false, conflict: undefined, syncError: undefined, externalUpdate: { content: disk }, saveStatus: '已同步外部修改' }
+              }
+              return { ...item, conflict: { content: disk }, syncError: undefined }
+            }))
+          } catch (error) {
+            if (!disposed) setDocuments(current => current.map(item => item === snapshot ? { ...item, syncError: String(error instanceof Error ? error.message : error) } : item))
+          }
+        }))
+      } finally {
+        running = false
+        if (pending && !disposed) frame = window.requestAnimationFrame(() => { void sync() })
+      }
+    }
+    syncNow.current = () => { void sync() }
+    const onVisible = () => { if (document.visibilityState !== 'hidden') void sync() }
+    const changed = () => { void reloadStructure(); void sync() }
+    const events = typeof EventSource === 'undefined' ? null : new EventSource('/api/desktop/projects/changes?path=' + encodeURIComponent(projectPath))
+    if (events) events.onmessage = changed
+    // EventSource reconnects automatically; the server sends a ready event on
+    // every connection, so reconnects repair the disconnected interval too.
+    const timer = setInterval(changed, 30000)
+    window.addEventListener('focus', onVisible)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      disposed = true
+      clearInterval(timer)
+      if (frame !== undefined) window.cancelAnimationFrame(frame)
+      events?.close()
+      window.removeEventListener('focus', onVisible)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [projectPath])
+  useEffect(() => { setConflictOpen(false); syncNow.current() }, [activePath])
 
   const openFilePath = useCallback(async (path: string, name: string): Promise<boolean> => {
     const existing = documentsRef.current.find(document => document.path === path)
     if (existing !== undefined) {
       setActivePath(path)
+      syncNow.current()
       return true
     }
     try {
       const res = await fetch('/api/desktop/projects/file?path=' + encodeURIComponent(path))
       if (res.status === 404) {
-        setDocuments(previous => [...previous, { path, name, content: '', draft: '', dirty: false, saving: false, saveStatus: null, visualMode: true }])
+        const body = await res.json() as { recovery?: { content: string } }
+        setDocuments(previous => previous.some(item => item.path === path) ? previous : [...previous, { path, name, content: '', draft: body.recovery?.content ?? '', dirty: !!body.recovery, saving: false, saveStatus: null, visualMode: true, conflict: { content: null } }])
         setActivePath(path)
         return true
       }
       if (!res.ok) throw new Error('read ' + res.status)
-      const body = await res.json() as { content: string }
-      setDocuments(previous => [...previous, { path, name, content: body.content, draft: body.content, dirty: false, saving: false, saveStatus: null, visualMode: true }])
+      const body = await res.json() as { content: string, recovery?: { content: string, baseline: string } }
+      const recovery = body.recovery?.content !== body.content ? body.recovery : undefined
+      setDocuments(previous => previous.some(item => item.path === path) ? previous : [...previous, { path, name, content: body.content, draft: recovery?.content ?? body.content, dirty: !!recovery, saving: false, saveStatus: recovery ? '发现未保存草稿，请查看并处理' : null, visualMode: true, ...(recovery ? { conflict: { content: body.content } } : {}) }])
       setActivePath(path)
       return true
     } catch (e) {
@@ -480,9 +550,9 @@ export function Workspace({
     await openFilePath(node.path, node.name)
   }
 
-  const saveDocument = async (path: string): Promise<boolean> => {
+  const saveDocument = async (path: string, override?: { expectedContent: string | null }): Promise<boolean> => {
     const file = documentsRef.current.find(document => document.path === path)
-    if (file === undefined || savingPaths.current.has(path)) return false
+    if (file === undefined || savingPaths.current.has(path) || composing.current || (file.conflict && !override)) return false
     savingPaths.current.add(path)
     const content = file.draft
     setDocuments(previous => previous.map(document => document.path === path ? { ...document, saving: true, saveStatus: null } : document))
@@ -490,11 +560,16 @@ export function Workspace({
       const res = await fetch('/api/desktop/projects/file', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path: file.path, content, expectedContent: file.content }),
+        body: JSON.stringify({ path: file.path, content, expectedContent: override ? override.expectedContent : file.content }),
       })
+      if (res.status === 409) {
+        const body = await res.json() as { content: string | null }
+        setDocuments(previous => previous.map(item => item.path === path ? { ...item, saving: false, conflict: { content: body.content }, saveStatus: '保存已暂停：文件已在外部修改' } : item))
+        return false
+      }
       if (!res.ok) throw new Error('save ' + res.status)
       const saved = documentsRef.current.map(document => document.path === path
-        ? { ...document, content, dirty: document.draft !== content, saving: false, saveStatus: '已保存' }
+        ? { ...document, content, dirty: document.draft !== content, saving: false, conflict: undefined, syncError: undefined, saveStatus: '已保存' }
         : document)
       documentsRef.current = saved
       setDocuments(saved)
@@ -507,15 +582,86 @@ export function Workspace({
       return false
     } finally {
       savingPaths.current.delete(path)
+      window.requestAnimationFrame(() => syncNow.current())
     }
   }
 
   useEffect(() => {
     if (!autoSave) return
-    const timers = documents.filter(document => document.dirty && !document.saving && !document.saveStatus?.startsWith('保存失败')).map(document =>
+    const timers = documents.filter(document => document.dirty && !document.conflict && !document.syncError && !document.saving && !document.saveStatus?.startsWith('保存失败')).map(document =>
       window.setTimeout(() => { void saveDocument(document.path) }, 800))
     return () => timers.forEach(timer => window.clearTimeout(timer))
   }, [autoSave, documents])
+
+  // Persist dirty buffers independently of autosave, including conflicts. One
+  // writer per path prevents an older draft request from finishing last.
+  const draftWrites = useRef(new Map<string, Promise<void>>())
+  const persistedDrafts = useRef(new Map<string, string>())
+  useEffect(() => {
+    for (const item of documents) if (!item.dirty) persistedDrafts.current.delete(item.path)
+  }, [documents])
+  useEffect(() => {
+    let disposed = false
+    const persist = async () => {
+      await Promise.all(documentsRef.current.filter(item => item.dirty).map(async item => {
+        if (savingPaths.current.has(item.path) || draftWrites.current.has(item.path) || persistedDrafts.current.get(item.path) === item.draft) return
+        const pending = (async () => {
+        try {
+          const result = await fetch('/api/desktop/projects/file', {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ path: item.path, action: 'draft', content: item.draft, baseline: item.content }),
+          })
+          if (!result.ok) throw new Error('草稿备份失败：' + result.status)
+          persistedDrafts.current.set(item.path, item.draft)
+        } catch (error) {
+          if (!disposed) setDocuments(current => current.map(doc => doc.path === item.path ? { ...doc, saveStatus: '保存失败：' + String(error) } : doc))
+        } finally { draftWrites.current.delete(item.path) }
+        })()
+        draftWrites.current.set(item.path, pending)
+        await pending
+      }))
+    }
+    const timer = setInterval(() => { void persist() }, 500)
+    return () => { disposed = true; clearInterval(timer) }
+  }, [projectPath])
+
+  const resolveConflict = async (snapshot: OpenDocument) => {
+    if (!snapshot.conflict || savingPaths.current.has(snapshot.path)) return
+    savingPaths.current.add(snapshot.path)
+    setDocuments(current => current.map(item => item.path === snapshot.path ? { ...item, saving: true } : item))
+    try {
+      const copyPath = snapshot.path.replace(/(\.[^./\\]+)?$/, '-本地副本-' + crypto.randomUUID() + '$1')
+      const result = await fetch('/api/desktop/projects/file', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: copyPath, content: snapshot.draft, expectedContent: null }),
+      })
+      if (!result.ok) throw new Error('本地副本保存失败：' + result.status)
+      await draftWrites.current.get(snapshot.path)
+      const discarded = await fetch('/api/desktop/projects/file', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path: snapshot.path, action: 'discard-draft', expectedDraft: snapshot.draft }),
+      })
+      if (!discarded.ok) throw new Error('草稿清理失败：' + discarded.status)
+      persistedDrafts.current.delete(snapshot.path)
+      const response = await fetch('/api/desktop/projects/file?sync=1&path=' + encodeURIComponent(snapshot.path), { cache: 'no-store' })
+      if (!response.ok && response.status !== 404) throw new Error('读取最新版本失败：' + response.status)
+      const latest = await response.json() as { content: string | null }
+      // Never discard edits made while the backup was being written.
+      setDocuments(current => current.map(item => {
+        if (item.path !== snapshot.path) return item
+        if (item.draft !== snapshot.draft) return { ...item, saving: false }
+        const disk = latest.content
+        return disk === null
+          ? { ...item, path: copyPath, name: copyPath.split(/[\\/]/).at(-1)!, content: item.draft, dirty: false, saving: false, conflict: undefined }
+          : { ...item, content: disk, draft: disk, dirty: false, saving: false, conflict: undefined, externalUpdate: { content: disk }, saveStatus: '本地副本已保存，已采用磁盘版本' }
+      }))
+      if (latest.content === null && documentsRef.current.find(item => item.path === snapshot.path)?.draft === snapshot.draft) setActivePath(current => current === snapshot.path ? copyPath : current)
+      setConflictOpen(false)
+      void reloadStructure()
+    } catch (error) {
+      setDocuments(current => current.map(item => item.path === snapshot.path ? { ...item, saving: false, saveStatus: '保存失败：' + String(error) } : item))
+    } finally { savingPaths.current.delete(snapshot.path); window.requestAnimationFrame(() => syncNow.current()) }
+  }
 
   const closeDocument = async (path: string, discard = false) => {
     const document = documentsRef.current.find(item => item.path === path)
@@ -525,6 +671,19 @@ export function Workspace({
       setPendingClosePath(path)
       return
     }
+    if (discard) {
+      try {
+        savingPaths.current.add(path)
+        await draftWrites.current.get(path)
+        const response = await fetch('/api/desktop/projects/file', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path, action: 'discard-draft', expectedDraft: document.draft }) })
+        if (!response.ok) throw new Error('清理草稿失败')
+        persistedDrafts.current.delete(path)
+      } catch (error) {
+        setDocuments(current => current.map(item => item.path === path ? { ...item, saveStatus: '保存失败：' + String(error) } : item))
+        return
+      } finally { savingPaths.current.delete(path) }
+    }
+    if (discard && documentsRef.current.find(item => item.path === path)?.draft !== document.draft) return
     const index = documentsRef.current.findIndex(item => item.path === path)
     const remaining = documentsRef.current.filter(item => item.path !== path)
     setDocuments(remaining)
@@ -554,6 +713,26 @@ export function Workspace({
       return
     }
     await closeProject()
+  }
+
+  const discardAndLeave = async () => {
+    const snapshots = documentsRef.current
+    if (snapshots.some(item => savingPaths.current.has(item.path))) return
+    for (const item of snapshots) savingPaths.current.add(item.path)
+    try {
+      for (const item of snapshots) {
+        await draftWrites.current.get(item.path)
+        const response = await fetch('/api/desktop/projects/file', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ path: item.path, action: 'discard-draft', expectedDraft: item.draft }),
+        })
+        if (!response.ok) throw new Error('草稿清理失败，请重试。')
+        persistedDrafts.current.delete(item.path)
+      }
+      if (snapshots.some(item => documentsRef.current.find(current => current.path === item.path)?.draft !== item.draft)) throw new Error('仍有新的修改，请重新确认。')
+      await closeProject()
+    } catch (error) { setLeaveError(String(error instanceof Error ? error.message : error)) }
+    finally { for (const item of snapshots) savingPaths.current.delete(item.path) }
   }
 
   useEffect(() => {
@@ -854,7 +1033,7 @@ export function Workspace({
           </>}
           {contextMenu.node === null && <button type="button" role="menuitem" onClick={() => void nativeProjectAction('reveal', projectPath)}><FolderSearch size={14} />在 Finder 中显示</button>}
           {contextMenu.node === null && <button type="button" role="menuitem" onClick={() => { setContextMenu(null); setExpanded(new Set()) }}><ChevronsDownUp size={14} />全部折叠</button>}
-          <button type="button" role="menuitem" onClick={() => { setContextMenu(null); void reloadStructure() }}><RefreshCw size={14} />刷新</button>
+          <button type="button" role="menuitem" onClick={() => { setContextMenu(null); void reloadStructure(); syncNow.current() }}><RefreshCw size={14} />刷新</button>
         </div>
       )}
       {nodeDialog !== null && (
@@ -872,7 +1051,7 @@ export function Workspace({
         onStart={() => { leftDragBase.current = leftWidth }}
         onDrag={resizeLeft}
       />
-      <section className={css.paneEditor} aria-label="文档编辑器">
+      <section className={css.paneEditor} aria-label="文档编辑器" onCompositionStartCapture={() => { composing.current = true }} onCompositionEndCapture={() => { composing.current = false; syncNow.current() }}>
         <div className={css.editorToolbar}>
           <div className={css.documentTabsViewport}>
             <div className={css.documentTabs} role="tablist" aria-label="已打开文档">
@@ -923,7 +1102,7 @@ export function Workspace({
         {documents.map(document => (
           <div key={document.path} className={css.documentEditor} hidden={document.path !== activePath}>
             {document.visualMode ? (
-              <VisualEditor initialDoc={document.draft} onNavigationChange={navigation => setEditorNavigation(previous => ({ ...previous, [document.path]: navigation }))}
+              <VisualEditor initialDoc={document.draft} externalUpdate={document.externalUpdate} onNavigationChange={navigation => setEditorNavigation(previous => ({ ...previous, [document.path]: navigation }))}
                 onHistoryChange={history => setEditorHistories(previous => {
                   const next = { ...previous }
                   if (history === null) delete next[document.path]
@@ -933,7 +1112,7 @@ export function Workspace({
                 onSelectionChange={next => { if (document.path === activePath) setSelection(next === null ? null : { ...next, path: document.path }) }}
                 onChange={draft => setDocuments(previous => previous.map(item => item.path === document.path ? { ...item, draft, dirty: draft !== item.content, saveStatus: null } : item))} />
             ) : (
-              <Editor initialDoc={document.draft} mode="markdown"
+              <Editor initialDoc={document.draft} externalUpdate={document.externalUpdate} mode="markdown"
                 onSelectionChange={next => { if (document.path === activePath) setSelection(next === null ? null : { ...next, path: document.path }) }}
                 onChange={draft => setDocuments(previous => previous.map(item => item.path === document.path ? { ...item, draft, dirty: draft !== item.content, saveStatus: null } : item))} />
             )}
@@ -956,8 +1135,31 @@ export function Workspace({
           </div>
         )}
         {activeDocument !== null && <div className={css.saveStatus} role="status" aria-live="polite">
-          {activeDocument.saving ? '保存中…' : activeDocument.saveStatus?.startsWith('保存失败') ? activeDocument.saveStatus : activeDocument.dirty ? '未保存' : '已保存'}
+          {activeDocument.saving ? '保存中…' : activeDocument.saveStatus?.startsWith('保存失败') ? activeDocument.saveStatus : activeDocument.dirty ? '未保存' : activeDocument.saveStatus ?? '已保存'}
           {activeDocument.saveStatus?.startsWith('保存失败') && !activeDocument.saving && <button type="button" onClick={() => void saveDocument(activeDocument.path)}>重试保存</button>}
+        </div>}
+        {activeDocument?.syncError && <div role="alert">无法确认文件是否为最新版本：{activeDocument.syncError}。自动保存已暂停。<button type="button" onClick={() => syncNow.current()}>重新检查</button></div>}
+        {activeDocument?.conflict && <div className={css.syncNotice} role="alert">
+          <span>{activeDocument.conflict.content === null ? '文件已删除或移动，当前内容仍保留。' : '文件已在外部修改，本地修改已保留，自动保存已暂停。'}</span>
+          <button type="button" onClick={() => setConflictOpen(true)}>查看并处理</button>
+        </div>}
+        {conflictOpen && activeDocument?.conflict && <div className={css.closeDialogOverlay + ' ' + css.conflictOverlay}>
+          <div className={css.conflictDialog} role="dialog" aria-modal="true" aria-label="处理文档冲突">
+            <h2>处理文档冲突</h2><p>{activeDocument.path}</p>
+            <div className={css.conflictVersions}>
+              <label>本地修改<textarea readOnly value={activeDocument.draft} /></label>
+              <label>磁盘最新内容<textarea readOnly value={activeDocument.conflict.content ?? '文件已删除或移动'} /></label>
+            </div>
+            <p>先保留本地副本，再采用磁盘版本，避免丢失修改。</p>
+            {activeDocument.saveStatus?.startsWith('保存失败') && <p role="alert">{activeDocument.saveStatus}</p>}
+            <div className={css.closeDialogActions}>
+              <button type="button" onClick={() => setConflictOpen(false)}>稍后处理</button>
+              <button type="button" disabled={activeDocument.saving} onClick={() => void resolveConflict(activeDocument)}>保留本地副本并采用磁盘版本</button>
+              <button type="button" disabled={activeDocument.saving} onClick={() => {
+                if (window.confirm('确定用本地内容覆盖磁盘版本？磁盘版本会保留检查点。')) void saveDocument(activeDocument.path, { expectedContent: activeDocument.conflict!.content }).then(ok => { if (ok) setConflictOpen(false) })
+              }}>{activeDocument.conflict.content === null ? '重新创建原文件' : '用本地内容覆盖'}</button>
+            </div>
+          </div>
         </div>}
         {leaving && <div className={css.closeDialogOverlay}>
           <div className={css.closeDialog} role="dialog" aria-modal="true" aria-labelledby="leave-project-title">
@@ -966,7 +1168,7 @@ export function Workspace({
             {leaveError && <p role="alert">{leaveError}</p>}
             <div className={css.closeDialogActions}>
               <button type="button" onClick={() => { setLeaving(false); setLeaveError(null) }}>取消</button>
-              <button type="button" disabled={documents.some(document => document.saving)} onClick={() => void closeProject()}>放弃并离开</button>
+              <button type="button" disabled={documents.some(document => document.saving)} onClick={() => void discardAndLeave()}>放弃并离开</button>
               <button type="button" disabled={documents.some(document => document.saving)} onClick={() => void saveAndLeave()}>保存并离开</button>
             </div>
           </div>

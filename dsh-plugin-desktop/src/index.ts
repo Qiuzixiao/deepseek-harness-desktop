@@ -61,7 +61,7 @@ import {
   handleDesktopTerminalOpenRequest,
   handleDesktopProjectPathActionRequest,
 } from './desktop-settings-route.ts'
-import { handleProjectFileRequest, handleProjectImportRequest, handleProjectLibraryDeleteRequest, handleProjectLibraryRequest, handleProjectLibraryResourcesRequest, handleProjectLibraryStructureRequest, handleProjectNodeRequest } from './project-library-route.ts'
+import { handleProjectChangesRequest, handleProjectFileRequest, handleProjectImportRequest, handleProjectLibraryDeleteRequest, handleProjectLibraryRequest, handleProjectLibraryResourcesRequest, handleProjectLibraryStructureRequest, handleProjectNodeRequest } from './project-library-route.ts'
 import type {} from './desktop-settings-controller.ts'
 import type DesktopSettingsController from './desktop-settings-controller.ts'
 import { desktopBootRecoveryInjections } from './desktop-boot-recovery.ts'
@@ -227,13 +227,32 @@ export function apply(ctx: Context, config: Config): void {
         `dsh-plugin-desktop: failed to ${operation}: ${cause instanceof Error ? cause.message : String(cause)}`,
       )
     }
+    const fileSubscriptions = new Set<() => void>()
+    ctx.effect(() => () => {
+      for (const stop of fileSubscriptions) stop()
+      fileSubscriptions.clear()
+    }, 'dsh-plugin-desktop: project file subscriptions')
+    const fileReadVersions = new Map<string, unknown>()
+    const reportFileSync = (event: Record<string, unknown>): void => {
+      const path = String(event.path)
+      if (event.operation === 'read') {
+        if (fileReadVersions.has(path) && fileReadVersions.get(path) === event.revision) return
+        if (fileReadVersions.size >= 256) fileReadVersions.delete(fileReadVersions.keys().next().value!)
+        fileReadVersions.set(path, event.revision)
+      }
+      ctx.logger.info('document-sync ' + JSON.stringify(event))
+    }
     const settingsRoutes = [
       [DESKTOP_SETTINGS_PATH, handleDesktopSettingsRequest],
       [DESKTOP_PROJECT_LIBRARY_PATH, handleProjectLibraryRequest],
       [DESKTOP_PROJECT_DELETE_PATH, handleProjectLibraryDeleteRequest],
       [DESKTOP_PROJECT_STRUCTURE_PATH, handleProjectLibraryStructureRequest],
       [DESKTOP_PROJECT_RESOURCES_PATH, handleProjectLibraryResourcesRequest],
-      [DESKTOP_PROJECT_FILE_PATH, handleProjectFileRequest],
+      ['/api/desktop/projects/changes', (req: IncomingMessage, res: ServerResponse, origin: string) => handleProjectChangesRequest(req, res, origin, stop => {
+        fileSubscriptions.add(stop)
+        res.once('close', () => fileSubscriptions.delete(stop))
+      })],
+      [DESKTOP_PROJECT_FILE_PATH, (req: IncomingMessage, res: ServerResponse, origin: string) => handleProjectFileRequest(req, res, origin, ctx.get('fs'), reportFileSync)],
       [DESKTOP_PROJECT_NODE_PATH, handleProjectNodeRequest],
       [DESKTOP_PROJECT_IMPORT_PATH, handleProjectImportRequest],
       [DESKTOP_PROJECT_REVEAL_PATH, (req: IncomingMessage, res: ServerResponse, origin: string, controller: DesktopSettingsController) => handleDesktopProjectPathActionRequest(req, res, origin, controller, 'reveal')],

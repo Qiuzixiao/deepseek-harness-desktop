@@ -1538,3 +1538,15 @@
 .editorFindOverlay button { display: grid; place-items: center; flex: none; width: 24px; height: 26px; padding: 0; border: 0; border-radius: var(--zw-r-sm); background: transparent; color: var(--zw-muted); cursor: pointer; }
 .editorFindOverlay button:disabled { opacity: .4; cursor: default; }
 .editorFindOverlay button:not(:disabled):hover { background: var(--zw-brand-soft); color: var(--zw-brand); }
+
+.syncNotice { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; border-top: 1px solid var(--zw-hairline); background: var(--zw-surface); font-size: 12px; }
+.syncNotice button { flex-shrink: 0; font: inherit; color: var(--zw-brand); background: transparent; border: 0; cursor: pointer; }
+.conflictOverlay { grid-template-columns: minmax(0, 1fr); min-height: 0; overflow: auto; }
+.conflictDialog { box-sizing: border-box; min-width: 0; width: 100%; max-width: 960px; max-height: 100%; overflow: auto; padding: 20px; border: 1px solid var(--zw-hairline); border-radius: var(--zw-r-card); background: var(--zw-bg); color: var(--zw-text); box-shadow: var(--zw-shadow-float); }
+.conflictDialog h2 { margin: 0; color: var(--zw-ink); font-size: 16px; }
+.conflictDialog p { overflow-wrap: anywhere; font-size: 12px; color: var(--zw-muted); }
+.conflictVersions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 16px; font-size: 12px; }
+.conflictVersions label { min-width: 0; }
+.conflictVersions textarea { display: block; box-sizing: border-box; margin-top: 8px; width: 100%; height: 30vh; resize: vertical; padding: 8px; background: var(--zw-surface); color: inherit; border: 1px solid var(--zw-hairline); border-radius: var(--zw-r-sm); font: inherit; }
+.conflictDialog .closeDialogActions { flex-wrap: wrap; }
+.conflictDialog button { border: 1px solid var(--zw-hairline-strong); background: var(--zw-surface); color: var(--zw-text); }
