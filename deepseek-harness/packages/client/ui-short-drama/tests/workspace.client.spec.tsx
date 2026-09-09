@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { Workspace } from '../src/client/Workspace.tsx'
 import type { WorkspaceProps } from '../src/client/Workspace.tsx'
+import type { EditorNavigation } from '../src/client/Editor.tsx'
 
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
   IconChevronDownOutline14: () => <span />,
@@ -12,8 +13,27 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
 
 vi.mock('../src/client/Editor.tsx', () => ({
   Editor: () => <div data-testid="editor" />,
-  VisualEditor: ({ initialDoc, onSelectionChange }: { initialDoc: string, onSelectionChange?: (selection: unknown) => void }) => <div contentEditable suppressContentEditableWarning onBlur={() => onSelectionChange?.(null)} data-testid="visual-editor">{initialDoc}<button type="button" onClick={() => onSelectionChange?.({ text: '第一集', from: 2, to: 5, startLine: 1, endLine: 1, rect: { left: 10, top: 10, right: 40, bottom: 30 } })}>选择文本</button></div>,
+  VisualEditor: ({ initialDoc, onSelectionChange, onNavigationChange }: {
+    initialDoc: string
+    onSelectionChange?: (selection: unknown) => void
+    onNavigationChange?: (navigation: EditorNavigation) => void
+  }) => <div contentEditable suppressContentEditableWarning onBlur={() => onSelectionChange?.(null)} data-testid="visual-editor">
+    {initialDoc}
+    <button type="button" onClick={() => onSelectionChange?.({ text: '第一集', from: 2, to: 5, startLine: 1, endLine: 1, rect: { left: 10, top: 10, right: 40, bottom: 30 } })}>选择文本</button>
+    <button type="button" onClick={() => onNavigationChange?.({
+      text: () => initialDoc,
+      find: () => ({ index: 0, total: 0 }),
+      headings: () => [
+        { title: '第一集：在雨夜里，顾长林终于说出了那个埋藏已久的秘密', level: 1, position: 1 },
+        { title: '冲突升级', level: 2, position: 42 },
+      ],
+      jump: visualEditorJump,
+      focus: () => {},
+    })}>加载大纲</button>
+  </div>,
 }))
+
+const visualEditorJump = vi.fn()
 
 afterEach(() => {
   cleanup()
@@ -22,6 +42,7 @@ afterEach(() => {
 
 beforeEach(() => {
   window.localStorage.clear()
+  visualEditorJump.mockReset()
 })
 
 function mountWorkspace() {
@@ -205,6 +226,24 @@ describe('Zenwit workspace layout', () => {
     expect(screen.getByTestId('editor')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '可视化' }))
     expect(screen.getByTestId('visual-editor')).toBeTruthy()
+  })
+
+  it('keeps the document outline compact and scrolls its headings independently', async () => {
+    mountWorkspace()
+    fireEvent.click(await screen.findByRole('treeitem', { name: '剧本' }))
+    fireEvent.click(await screen.findByRole('treeitem', { name: 'episode-1.md' }))
+    fireEvent.click(await screen.findByRole('button', { name: '加载大纲' }))
+
+    const outline = screen.getByRole('button', { name: '文档大纲（2 个标题）' })
+    expect(outline.getAttribute('aria-expanded')).toBe('true')
+    const longHeading = screen.getByRole('button', { name: '第一集：在雨夜里，顾长林终于说出了那个埋藏已久的秘密' })
+    expect(longHeading.getAttribute('title')).toBe('第一集：在雨夜里，顾长林终于说出了那个埋藏已久的秘密')
+    fireEvent.click(screen.getByRole('button', { name: '冲突升级' }))
+    expect(visualEditorJump).toHaveBeenCalledWith(42)
+
+    fireEvent.click(outline)
+    expect(outline.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByLabelText('文档大纲条目')).toBeNull()
   })
 
   it('exposes an in-workspace opener for project files and declines outside paths', async () => {

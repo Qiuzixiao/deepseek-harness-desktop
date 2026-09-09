@@ -1003,8 +1003,32 @@ export function Workspace({
             ) : renderNodes(filterTree(structure.tree, fileQuery))}
           </ul>
           {activeDocument?.visualMode && <div className={css.documentOutline}>
-            <button type="button" aria-expanded={outlineOpen} onClick={() => setOutlineOpen(value => !value)}>文档大纲<ChevronDown size={14} /></button>
-            {outlineOpen && (headings.length === 0 ? <span>暂无标题</span> : headings.map(heading => <button type="button" key={heading.position} style={{ paddingLeft: 6 + (heading.level - 1) * 10 }} onClick={() => navigation?.jump(heading.position)}>{heading.title || '未命名标题'}</button>))}
+            <button
+              type="button"
+              className={css.documentOutlineHeader}
+              aria-expanded={outlineOpen}
+              aria-controls="workspace-document-outline"
+              aria-label={`文档大纲（${headings.length} 个标题）`}
+              onClick={() => setOutlineOpen(value => !value)}
+            >
+              <span>文档大纲</span>
+              <span className={css.documentOutlineHeaderMeta}>
+                <small aria-hidden="true">{headings.length}</small>
+                <ChevronDown size={14} aria-hidden="true" />
+              </span>
+            </button>
+            {outlineOpen && <div id="workspace-document-outline" className={css.documentOutlineList} aria-label="文档大纲条目">
+              {headings.length === 0 ? <span className={css.documentOutlineEmpty}>暂无标题</span> : headings.map(heading => {
+                const title = heading.title || '未命名标题'
+                return <button
+                  type="button"
+                  key={heading.position}
+                  title={title}
+                  style={{ paddingLeft: 10 + Math.min(Math.max(heading.level - 1, 0), 3) * 12 }}
+                  onClick={() => navigation?.jump(heading.position)}
+                >{title}</button>
+              })}
+            </div>}
           </div>}
           <div className={css.paneFooter}>
             <span className={css.agentStatusDot} data-active={structure?.agentId !== undefined || undefined} aria-hidden="true" />
