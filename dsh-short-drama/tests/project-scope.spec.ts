@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
 import { Session } from '@deepseek-ai/dsh-session'
-import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
+import type { PreToolDecision, ToolExecution, ToolDefinition } from '@deepseek-ai/dsh-tools'
 import { apply } from '../src/agent.js'
 import { assertProjectPath, isProjectFileTool, pathArguments } from '../src/project-scope.js'
 
@@ -43,6 +43,66 @@ afterEach(async () => {
 })
 
 describe('project-scoped generic reads', () => {
+  it('allows metadata reads and searches but rejects all mutations, including aliases', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'short-drama-metadata-'))
+    roots.push(root)
+    await mkdir(join(root, '.zenwit-project'))
+    await writeFile(join(root, '.zenwit-project/project.json'), '{}')
+    await symlink(join(root, '.zenwit-project'), join(root, 'metadata-alias'))
+    const current = session('metadata', root)
+    let guard!: (exec: ToolExecution, next: () => Promise<PreToolDecision>) => Promise<PreToolDecision>
+    apply({
+      systemPrompt: { section() {} }, tools: { register() {} },
+      on(event: string, handler: typeof guard) { if (event === 'tools/pre-execute') guard = handler },
+    } as unknown as Context)
+    const check = (name: string, args: Record<string, string>) => guard({ name, arguments: args, agent: { session: current } } as ToolExecution,
+      async () => ({ kind: 'allow' }) as PreToolDecision)
+    for (const file_path of ['.zenwit-project/project.json', 'metadata-alias/project.json']) {
+      expect(await check('read', { file_path })).toEqual({ kind: 'allow' })
+      for (const name of ['write', 'edit', 'delete']) {
+        expect(await check(name, { file_path })).toMatchObject({ kind: 'deny' })
+      }
+      expect(await check('move', { source_path: file_path, destination_path: 'copy.json' })).toMatchObject({ kind: 'deny' })
+      expect(await check('move', { source_path: 'story.md', destination_path: file_path })).toMatchObject({ kind: 'deny' })
+    }
+    for (const name of ['glob', 'grep']) {
+      expect(await check(name, { path: '.zenwit-project' })).toEqual({ kind: 'allow' })
+    }
+    expect(await check('read', { file_path: '../outside.md' })).toMatchObject({ kind: 'deny' })
+    expect(await check('write', { file_path: '总纲.md' })).toMatchObject({ kind: 'deny' })
+    expect(await check('write', { file_path: '大纲/总纲.md' })).toEqual({ kind: 'allow' })
+  })
+
+  it('requires classified destinations while preserving legacy edits and directory moves', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'short-drama-layout-'))
+    roots.push(root)
+    await writeFile(join(root, 'legacy.md'), 'old')
+    await mkdir(join(root, '设定'))
+    await symlink(root, join(root, 'root-alias'))
+    const current = session('layout', root)
+    let guard!: (exec: ToolExecution, next: () => Promise<PreToolDecision>) => Promise<PreToolDecision>
+    apply({
+      systemPrompt: { section() {} }, tools: { register() {} },
+      on(event: string, handler: typeof guard) { if (event === 'tools/pre-execute') guard = handler },
+    } as unknown as Context)
+    const check = (name: string, args: Record<string, string>) => guard({ name, arguments: args, agent: { session: current } } as ToolExecution,
+      async () => ({ kind: 'allow' }) as PreToolDecision)
+    for (const file_path of ['new.md', join(root, 'new.md'), 'root-alias/new.md']) {
+      expect(await check('write', { file_path })).toMatchObject({ kind: 'deny', reason: expect.stringContaining('规则/') })
+    }
+    for (const file_path of ['README.md', 'legacy.md', '规则/写作规范.md', '大纲/分集集纲/第01-20集.md', '人物/主角.md']) {
+      expect(await check('write', { file_path })).toEqual({ kind: 'allow' })
+    }
+    expect(await check('edit', { file_path: 'legacy.md' })).toEqual({ kind: 'allow' })
+    expect(await check('move', { source_path: 'legacy.md', destination_path: 'new.md' })).toMatchObject({ kind: 'deny' })
+    expect(await check('move', { source_path: 'legacy.md', destination_path: '设定/legacy.md' })).toEqual({ kind: 'allow' })
+    const move = projectTools().get('move')!
+    await expect(executeProjectTool(move, { source_path: 'legacy.md', destination_path: 'new.md' }, current))
+      .rejects.toMatchObject({ code: 'INVALID_WORKSPACE' })
+    await expect(readFile(join(root, 'legacy.md'), 'utf8')).resolves.toBe('old')
+    await expect(executeProjectTool(move, { source_path: '设定', destination_path: '人物' }, current)).resolves.toBeDefined()
+  })
+
   it('accepts project-relative files and rejects traversal', async () => {
     const root = await mkdtemp(join(tmpdir(), 'short-drama-scope-'))
     roots.push(root)

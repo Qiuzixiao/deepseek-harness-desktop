@@ -1,5 +1,5 @@
-import { realpath } from 'node:fs/promises'
-import { dirname, isAbsolute, relative, resolve, sep } from 'node:path'
+import { realpath, stat } from 'node:fs/promises'
+import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path'
 import type { Session } from '@deepseek-ai/dsh-session'
 import { ScreenplayError } from './errors.js'
 
@@ -52,15 +52,6 @@ export async function assertProjectPath(
   if (!isInside(root, checked)) {
     throw new ScreenplayError('INVALID_WORKSPACE', 'path escapes the bound project', { candidate })
   }
-  const relativePath = relative(root, absolute)
-  if (
-    relativePath === '.screenplay'
-    || relativePath.startsWith(`.screenplay${sep}`)
-    || relativePath === '.zenwit-project'
-    || relativePath.startsWith(`.zenwit-project${sep}`)
-  ) {
-    throw new ScreenplayError('INVALID_WORKSPACE', 'project metadata is not editable through generic file tools', { candidate })
-  }
   return absolute
 }
 
@@ -71,10 +62,45 @@ export async function assertProjectMutationPath(
   label = 'path',
 ): Promise<string> {
   const absolute = await assertProjectPath(session, projectRoot, candidate, label)
-  if (relative(await realpath(projectRoot), absolute) === '') {
+  const root = await realpath(projectRoot)
+  const checked = await realpathNearestExisting(absolute)
+  for (const target of [absolute, checked]) {
+    const path = relative(root, target)
+    if (['.screenplay', '.zenwit-project'].some(directory => path === directory || path.startsWith(`${directory}${sep}`))) {
+      throw new ScreenplayError('INVALID_WORKSPACE', 'Project metadata is read-only. Generic file tools cannot modify, move, or delete it.', { candidate })
+    }
+  }
+  if (relative(root, absolute) === '') {
     throw new ScreenplayError('INVALID_WORKSPACE', 'the project root cannot be moved or deleted')
   }
   return absolute
+}
+
+/** Keep new creative files below a category; existing root files remain editable. */
+export async function assertProjectFileDestination(
+  projectRoot: string,
+  absolute: string,
+  allowExisting: boolean,
+): Promise<void> {
+  const root = await realpath(projectRoot)
+  let parent: string
+  try {
+    parent = await realpath(dirname(absolute))
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException | undefined)?.code !== 'ENOENT') throw error
+    return // A missing parent is a new category directory, created by the file tool.
+  }
+  if (parent !== root || basename(absolute) === 'README.md') return
+  if (allowExisting) {
+    try {
+      if ((await stat(absolute)).isFile()) return
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException | undefined)?.code !== 'ENOENT') throw error
+    }
+  }
+  throw new ScreenplayError('INVALID_WORKSPACE',
+    'Creative files must be inside a category directory, not the project root. Reuse an existing category or choose 规则/, 设定/, 大纲/, 正文/, 资料/, 修改记录/ and retry. Only README.md may be created at the root; it is a project index, not creative content.',
+    { candidate: absolute })
 }
 
 export function pathArguments(name: string, args: unknown): string[] {
@@ -92,4 +118,8 @@ export function pathArguments(name: string, args: unknown): string[] {
 
 export function isProjectFileTool(name: string): boolean {
   return PROJECT_TOOLS.has(name)
+}
+
+export function isProjectMutationTool(name: string): boolean {
+  return ['write', 'edit', 'move', 'delete'].includes(name)
 }

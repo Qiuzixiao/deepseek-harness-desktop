@@ -4,7 +4,7 @@ import { PERSONA_ORDER, PERSONA_SECTION } from '@deepseek-ai/dsh-system-prompt';
 import { defineTool } from '@deepseek-ai/dsh-tools';
 import { ScreenplayError } from './errors.js';
 import { SCREENPLAY_AGENT_PROMPT } from './prompt.js';
-import { assertProjectMutationPath, assertProjectPath, isProjectFileTool, pathArguments } from './project-scope.js';
+import { assertProjectFileDestination, assertProjectMutationPath, assertProjectPath, isProjectFileTool, isProjectMutationTool, pathArguments } from './project-scope.js';
 export const name = 'screenplay-agent';
 export const inject = ['tools', 'systemPrompt'];
 /** Keep ordinary filesystem operations inside the Session workspace. */
@@ -18,7 +18,19 @@ export function installScreenplayProjectScopeGuard(ctx) {
             return { kind: 'deny', reason: 'open a project before using project files' };
         try {
             for (const candidate of pathArguments(exec.name, exec.arguments)) {
-                await assertProjectPath(session, projectRoot, candidate, `${exec.name} path`);
+                const assertPath = isProjectMutationTool(exec.name) ? assertProjectMutationPath : assertProjectPath;
+                const absolute = await assertPath(session, projectRoot, candidate, `${exec.name} path`);
+                if (exec.name === 'write')
+                    await assertProjectFileDestination(projectRoot, absolute, true);
+            }
+            if (exec.name === 'move') {
+                const [source, destination] = pathArguments(exec.name, exec.arguments);
+                if (source !== undefined && destination !== undefined) {
+                    const sourcePath = await assertProjectMutationPath(session, projectRoot, source);
+                    const destinationPath = await assertProjectMutationPath(session, projectRoot, destination);
+                    if (!(await lstat(sourcePath)).isDirectory())
+                        await assertProjectFileDestination(projectRoot, destinationPath, false);
+                }
             }
         }
         catch (error) {
@@ -58,6 +70,8 @@ function installProjectMutationTools(ctx) {
             const { projectRoot, session } = currentProject(exec);
             const source = await assertProjectMutationPath(session, projectRoot, args.source_path, 'move source_path');
             const destination = await assertProjectMutationPath(session, projectRoot, args.destination_path, 'move destination_path');
+            if (!(await lstat(source)).isDirectory())
+                await assertProjectFileDestination(projectRoot, destination, false);
             if (source === destination)
                 return args;
             try {
