@@ -12,7 +12,7 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
 
 vi.mock('../src/client/Editor.tsx', () => ({
   Editor: () => <div data-testid="editor" />,
-  VisualEditor: ({ initialDoc, onSelectionChange }: { initialDoc: string, onSelectionChange?: (selection: unknown) => void }) => <div contentEditable suppressContentEditableWarning data-testid="visual-editor">{initialDoc}<button type="button" onClick={() => onSelectionChange?.({ text: '第一集', from: 2, to: 5, startLine: 1, endLine: 1, rect: { left: 10, top: 10, right: 40, bottom: 30 } })}>选择文本</button></div>,
+  VisualEditor: ({ initialDoc, onSelectionChange }: { initialDoc: string, onSelectionChange?: (selection: unknown) => void }) => <div contentEditable suppressContentEditableWarning onBlur={() => onSelectionChange?.(null)} data-testid="visual-editor">{initialDoc}<button type="button" onClick={() => onSelectionChange?.({ text: '第一集', from: 2, to: 5, startLine: 1, endLine: 1, rect: { left: 10, top: 10, right: 40, bottom: 30 } })}>选择文本</button></div>,
 }))
 
 afterEach(() => {
@@ -219,15 +219,36 @@ describe('Zenwit workspace layout', () => {
     expect(await owner!.openFileInWorkspace!('/project/../other/notes.md')).toBe(false)
   })
 
-  it('adds a selected passage to the current conversation draft without sending', async () => {
+  it.each(['current', 'new'] as const)('adds a selected passage to the %s conversation draft without losing it on mouse down', async target => {
     const view = mountWorkspace()
     fireEvent.click(await screen.findByRole('treeitem', { name: '剧本' }))
     fireEvent.click(await screen.findByText('episode-1.md'))
     fireEvent.click(await screen.findByRole('button', { name: '选择文本' }))
     const dialog = await screen.findByRole('dialog', { name: '局部编辑' })
-    fireEvent.click(within(dialog).getByRole('button', { name: '添加到当前对话' }))
-    await waitFor(() => expect(view.addSelectionToConversation).toHaveBeenCalledWith('current', expect.not.stringContaining('用户指令')))
-    expect(view.addSelectionToConversation).toHaveBeenCalledWith('current', expect.stringContaining('文件：/project/剧本/episode-1.md'))
+    const editor = screen.getByTestId('visual-editor')
+    editor.focus()
+    const button = within(dialog).getByRole('button', { name: target === 'current' ? '添加到当前对话' : '在新会话打开' })
+    // Model the browser default action between mousedown and click. Previously
+    // blur removed the selection/popover before click could reach the button.
+    if (fireEvent.mouseDown(button)) { fireEvent.blur(editor); button.focus() }
+    expect(screen.getByRole('dialog', { name: '局部编辑' })).toBeTruthy()
+    fireEvent.mouseUp(button)
+    fireEvent.click(button)
+    await waitFor(() => expect(view.addSelectionToConversation).toHaveBeenCalledWith(target, expect.not.stringContaining('用户指令'), '注释', '/project/剧本/episode-1.md'))
+    expect(view.addSelectionToConversation).toHaveBeenCalledWith(target, expect.stringContaining('文件：/project/剧本/episode-1.md'), '注释', '/project/剧本/episode-1.md')
+  })
+
+  it('shows an insertion failure and retains the selection for retry', async () => {
+    const view = mountWorkspace()
+    view.addSelectionToConversation.mockRejectedValueOnce(new Error('新对话尚未就绪'))
+    fireEvent.click(await screen.findByRole('treeitem', { name: '剧本' }))
+    fireEvent.click(await screen.findByText('episode-1.md'))
+    fireEvent.click(await screen.findByRole('button', { name: '选择文本' }))
+    fireEvent.click(screen.getByRole('button', { name: '在新会话打开' }))
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent', '新对话尚未就绪')
+    fireEvent.click(screen.getByRole('button', { name: '在新会话打开' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '局部编辑' })).toBeNull())
+    expect(view.addSelectionToConversation).toHaveBeenCalledTimes(2)
   })
 
   it('keeps multiple documents in independent tabs and reuses an existing tab', async () => {

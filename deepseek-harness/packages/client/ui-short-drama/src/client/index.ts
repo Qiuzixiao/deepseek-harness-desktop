@@ -49,11 +49,16 @@ export function apply(ctx: ClientContext): void {
       candidates: async () => [],
       onPick: () => undefined,
       codec: {
-        clipboardText: () => '选中文本',
+        clipboardText: () => '注释',
         async serialize(ref) {
-          const value = JSON.parse(ref) as { text?: unknown }
+          const value = JSON.parse(ref) as { text?: unknown, label?: unknown, path?: unknown }
           if (typeof value.text !== 'string') throw new Error('局部选区引用无效')
-          return value.text
+          const label = typeof value.label === 'string' ? value.label : '选中文本'
+          const path = typeof value.path === 'string' ? value.path : label
+          const escapeXml = (input: string) => input.replace(/[<>&'"]/gu, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' })[char] ?? char)
+          // Keep the captured selection (including unsaved edits), not a fresh
+          // full-file read. Reuse the existing sent-message file card envelope.
+          return `<file_reference path="${escapeXml(path)}" kind="${label === '文件' ? 'file' : 'annotation'}">\n${value.text.replaceAll('</file_reference>', '&lt;/file_reference&gt;')}\n</file_reference>`
         },
       },
     }
@@ -208,7 +213,7 @@ export function apply(ctx: ClientContext): void {
   }
 
   /** Put an explicit local-edit context into a session draft without submitting it. */
-  const addSelectionToConversation = async (target: 'current' | 'new', context: string): Promise<void> => {
+  const addSelectionToConversation = async (target: 'current' | 'new', context: string, label = '注释', path?: string): Promise<void> => {
     const sessions = ctx.sessions
     const workspaces = (ctx as unknown as { get: (name: string) => {
       list: { getSnapshot(): { items: Array<{ workspaceId: WorkspaceId, sessionIds: readonly SessionId[] }> } }
@@ -227,7 +232,7 @@ export function apply(ctx: ClientContext): void {
     const input = conversation.input.for(scope)
     const draft = input.state.getSnapshot().draft
     if (draft !== '') input.setDraft(draft + '\n')
-    input.appendReference({ source: 'local-selection', ref: JSON.stringify({ text: context }), label: '选中文本', clipboardText: '选中文本', title: context })
+    input.appendReference({ source: 'local-selection', ref: JSON.stringify({ text: context, label, path }), label, clipboardText: label, title: path ?? context })
     if (target === 'new') sessions.open(id)
   }
 

@@ -18,10 +18,6 @@ function fileIcon(name: string): string {
   return '↳'
 }
 
-function fileName(path: string): string {
-  return path.split(/[\\/]/u).at(-1) ?? path
-}
-
 function escapeXml(value: string): string {
   return value.replace(/[<>&'"]/gu, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' })[char] ?? char)
 }
@@ -51,10 +47,10 @@ export function registerProjectFileSource(ctx: ClientContext): () => void {
         insert: {
           source: 'project-file',
           ref: path,
-          label: fileName(relative),
+          label: '文件',
           clipboardText: '@' + relative,
           icon: fileIcon(relative),
-          title: relative,
+          title: path,
         },
       }
     },
@@ -68,8 +64,7 @@ export function registerProjectFileSource(ctx: ClientContext): () => void {
         if (new TextEncoder().encode(body.content).byteLength > MAX_CONTEXT_BYTES) {
           throw new Error('项目文件过大，无法作为上下文引用（上限 120 KB）')
         }
-        const label = ref.split(/[\\/]/u).slice(-2).join('/')
-        return `<file_reference path="${escapeXml(label)}">\n${body.content}\n</file_reference>`
+        return `<file_reference path="${escapeXml(ref)}">\n${body.content}\n</file_reference>`
       },
     },
   }

@@ -50,7 +50,7 @@ export type ZenwitFrameProps = GlobalStandardProps
     closeProject: () => Promise<void>
     openSession: (id: string) => void
     startSession: (workspaceId: string) => void
-    addSelectionToConversation: (target: 'current' | 'new', context: string) => Promise<void>
+    addSelectionToConversation: (target: 'current' | 'new', context: string, label?: string, path?: string) => Promise<void>
   }
 
 /** Root-slot frame (see module doc). */

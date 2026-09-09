@@ -339,8 +339,24 @@ describe('Chat node rendering', () => {
     const view = render(<h.ChatView {...h.props} />)
 
     expect(view.getByText('这个文档讲的是什么')).toBeTruthy()
+    expect(view.getByText('文件').parentElement?.title).toBe('.dsh-uploads/s1/notes.md')
     expect(view.container.querySelector('[data-file-reference=".dsh-uploads/s1/notes.md"]')).toBeTruthy()
     expect(view.queryByText('<file_reference path=".dsh-uploads/s1/notes.md"></file_reference>这个文档讲的是什么')).toBeNull()
+  })
+
+  it('shows a selection reference card separately from the question without exposing its context', () => {
+    const h = makeHarness({ nodes: [user(1, '<file_reference path="/project/提案.md" kind="annotation">文件：/project/提案.md\n选中内容：裁决：有条件通过。</file_reference>这段话是什么意思？')] })
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.getByText('注释').parentElement?.title).toBe('/project/提案.md')
+    expect(view.getByText('这段话是什么意思？')).toBeTruthy()
+    expect(view.queryByText(/选中内容：裁决/)).toBeNull()
+  })
+
+  it('shows decoded paths in the tooltip without expanding the file label', () => {
+    const h = makeHarness({ nodes: [user(1, '<file_reference path="/project/A&amp;B&quot;.md">正文</file_reference>')] })
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.getByText('文件').parentElement?.title).toBe('/project/A&B".md')
+    expect(view.queryByText('正文')).toBeNull()
   })
 
   it('threads the injected file-mention vocabulary into the closing prose only', () => {

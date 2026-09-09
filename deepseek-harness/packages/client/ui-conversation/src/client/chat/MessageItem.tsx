@@ -178,6 +178,7 @@ function projectUserText(text: string): ReactNode {
 interface FileReferenceProjection {
   readonly path: string
   readonly body: string
+  readonly kind: 'file' | 'annotation'
 }
 
 interface UserTextProjection {
@@ -187,20 +188,21 @@ interface UserTextProjection {
 
 /** Split serialized file context from the human-facing part of a user message. */
 function projectFileReferences(text: string): UserTextProjection {
-  const re = /<file_reference\s+path="([^"]+)">([\s\S]*?)<\/file_reference>/gu
+  const re = /<file_reference\s+path="([^"]+)"(?:\s+kind="([^"]+)")?>([\s\S]*?)<\/file_reference>/gu
   const files: FileReferenceProjection[] = []
-  const body = text.replace(re, (_match, path: string, content: string) => {
-    files.push({ path, body: content.trim() })
+  const body = text.replace(re, (_match, path: string, kind: string | undefined, content: string) => {
+    const decodedPath = path.replace(/&(quot|apos|lt|gt|amp);/gu, entity => ({ '&quot;': '"', '&apos;': "'", '&lt;': '<', '&gt;': '>', '&amp;': '&' })[entity] ?? entity)
+    files.push({ path: decodedPath, body: content.trim(), kind: kind === 'annotation' ? 'annotation' : 'file' })
     return ''
   }).replace(/[ \t]{2,}/gu, ' ').trim()
   return { text: body, files }
 }
 
-function FileReferenceCard({ path }: { path: string }): ReactNode {
+function FileReferenceCard({ path, kind }: { path: string, kind: 'file' | 'annotation' }): ReactNode {
   return (
-    <div className={css.fileReferenceCard} title={path} data-file-reference={path}>
+    <div className={css.fileReferenceCard} title={path} data-file-reference={path} data-reference-kind={kind}>
       <span className={css.fileReferenceIcon} aria-hidden="true">M</span>
-      <span className={css.fileReferencePath}>{path}</span>
+      <span className={css.fileReferencePath}>{kind === 'annotation' ? '注释' : '文件'}</span>
     </div>
   )
 }
@@ -226,7 +228,7 @@ function UserStyleBubble({
     <div className={css.userRow} data-pending-steering={pending || undefined} data-time-hover-root>
       <div className={css.userStack}>
         <ImageGallery images={images} load={imageLoader} align="end" labels={messageImageLabels(t)} />
-        {projection.files.map((file, index) => <FileReferenceCard key={`${file.path}:${index}`} path={file.path} />)}
+        {projection.files.map((file, index) => <FileReferenceCard key={`${file.path}:${index}`} path={file.path} kind={file.kind} />)}
         {showBubble && <div className={css.bubble}>
           {projectUserText(text)}
           {rest.map((block, i) => <JsonBlock key={i} label={t('message.extraBlock')} payload={block} truncatedLabel={truncated} />)}

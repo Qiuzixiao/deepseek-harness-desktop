@@ -74,7 +74,7 @@ export interface WorkspaceProps {
   useWorkspaces: GlobalStandardProps['useWorkspaces']
   openSession: (id: string) => void
   startSession: (workspaceId: string) => void
-  addSelectionToConversation: (target: 'current' | 'new', context: string) => Promise<void>
+  addSelectionToConversation: (target: 'current' | 'new', context: string, label?: string, path?: string) => Promise<void>
 }
 
 const LEFT_DEFAULT = 240
@@ -260,6 +260,7 @@ export function Workspace({
     : structure?.agentId ?? '未绑定 Agent'
   const [selection, setSelection] = useState<(DocumentSelection & { path: string }) | null>(null)
   const [selectionBusy, setSelectionBusy] = useState(false)
+  const [selectionError, setSelectionError] = useState<string | null>(null)
   const [nodeDialog, setNodeDialog] = useState<NodeDialogState | null>(null)
   const [nodeName, setNodeName] = useState('')
   const [nodeBusy, setNodeBusy] = useState(false)
@@ -267,6 +268,7 @@ export function Workspace({
   const importPickerRef = useRef<HTMLInputElement | null>(null)
   const importTargetRef = useRef(projectPath)
   const selectionPopoverRef = useRef<HTMLDivElement>(null)
+  useEffect(() => { setSelectionError(null) }, [selection])
   const conversationControlRef = useRef<HTMLDivElement>(null)
   const historyPopoverRef = useRef<HTMLDivElement>(null)
 
@@ -340,9 +342,12 @@ export function Workspace({
   const submitSelection = async (target: 'current' | 'new'): Promise<void> => {
     if (selection === null || selectionBusy) return
     setSelectionBusy(true)
+    setSelectionError(null)
     try {
-      await addSelectionToConversation(target, selectionContext)
+      await addSelectionToConversation(target, selectionContext, '注释', selection.path)
       setSelection(null)
+    } catch (error) {
+      setSelectionError(error instanceof Error ? error.message : '添加选中文本失败，请重试')
     } finally {
       setSelectionBusy(false)
     }
@@ -817,7 +822,7 @@ export function Workspace({
       const response = await fetch('/api/desktop/projects/file?path=' + encodeURIComponent(node.path))
       if (!response.ok) throw new Error('读取文件失败')
       const body = await response.json() as { content: string }
-      await addSelectionToConversation('current', `文件：${node.path}\n\n${body.content}`)
+      await addSelectionToConversation('current', `文件：${node.path}\n\n${body.content}`, '文件', node.path)
     } catch (error) { setLoadError(error instanceof Error ? error.message : String(error)) }
   }
 
@@ -1127,7 +1132,8 @@ export function Workspace({
         </div>}
         {activeDocument !== null && <div className={css.editorMeta} aria-label="文档统计">{wordCount} 字{selection?.path === activePath ? ` · 选中 ${countText(selection.text)} 字` : ''}<span title="可视化模式按正文非空白字符计数，包含标点；源码模式按源码计数。"> ⓘ</span></div>}
         {selection !== null && activeDocument !== null && (
-          <div ref={selectionPopoverRef} className={css.selectionPopover} style={{ left: `clamp(12px, ${selection.rect.left}px, calc(100% - 372px))`, top: `clamp(58px, ${selection.rect.bottom + 8}px, calc(100% - 118px))` }} role="dialog" aria-label="局部编辑">
+          <div ref={selectionPopoverRef} onMouseDown={event => event.preventDefault()} className={css.selectionPopover} style={{ left: `clamp(12px, ${selection.rect.left}px, calc(100% - 372px))`, top: `clamp(58px, ${selection.rect.bottom + 8}px, calc(100% - 118px))` }} role="dialog" aria-label="局部编辑">
+            {selectionError && <p role="alert">{selectionError}</p>}
             <div className={css.selectionPopoverActions}>
               <button type="button" onClick={() => void submitSelection('current')} disabled={selectionBusy}>添加到当前对话</button>
               <button type="button" onClick={() => void submitSelection('new')} disabled={selectionBusy}>在新会话打开</button>
