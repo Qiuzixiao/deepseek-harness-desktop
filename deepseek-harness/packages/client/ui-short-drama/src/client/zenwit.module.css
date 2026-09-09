@@ -436,6 +436,7 @@
 .structureNavRow {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   min-height: 30px;
 }
 .structureIdentity {
@@ -658,12 +659,12 @@
   position: absolute;
   top: 0;
   left: 8px;
-  right: 8px;
+  right: 12px;
   z-index: 4;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 8px;
   min-height: 0;
   padding: 8px 0;
   box-sizing: border-box;
@@ -869,12 +870,12 @@
   box-shadow: -6px 0 12px -6px var(--zw-hairline-strong);
 }
 .structureSearch { display: grid; gap: 4px; flex: none; padding: 8px 12px; border-bottom: 1px solid var(--zw-hairline); color: var(--zw-faint); }
-.panelToggle { display: grid; place-items: center; width: 26px; height: 26px; flex: none; padding: 0; border: 0; border-radius: var(--zw-r-sm); background: transparent; color: var(--zw-muted); cursor: pointer; }
+.panelToggle { display: grid; place-items: center; box-sizing: border-box; width: 32px; height: 32px; flex: none; padding: 0; border: 1px solid var(--zw-hairline-strong); border-radius: var(--zw-r-sm); background: var(--zw-surface-2); color: var(--zw-muted); cursor: pointer; }
 .panelToggle:hover { background: var(--zw-brand-soft); color: var(--zw-brand); }
+.panelToggle:focus-visible { outline: 2px solid var(--zw-brand); outline-offset: 2px; }
 .leftRail, .paneChat { position: relative; }
-.panelToggle { position: absolute; top: 7px; right: 5px; z-index: 2; }
+.leftRail[data-collapsed] > .panelToggle, .paneChat[data-collapsed] > .panelToggle { justify-self: center; align-self: start; margin: 10px auto 0; }
 .leftRail[data-collapsed] > :not(.panelToggle), .paneChat[data-collapsed] > :not(.panelToggle) { display: none; }
-.paneChat:not([data-collapsed]) > .conversationBar { padding-right: 38px; }
 .quickOpenResults button[aria-current="true"] { background: var(--zw-brand-soft); color: var(--zw-brand); }
 .quickOpenResults button { overflow-wrap: anywhere; }
 .quickOpenResults p { padding: 8px; color: var(--zw-muted); }
@@ -1446,10 +1447,14 @@
   --dsh-conversation-hero-bottom-space: 0px;
   background: var(--zw-surface);
 }
-.paneChat > :last-child {
+.workspaceConversation {
+  display: flex;
+  flex-direction: column;
   flex: 1;
+  min-width: 0;
   min-height: 0;
 }
+.workspaceConversation[hidden] { display: none; }
 
 /* buttons / modal / misc */
 .backButton {

@@ -946,10 +946,10 @@ export function Workspace({
     <div
       className={css.workspace}
       data-testid="workspace-grid"
-      style={{ gridTemplateColumns: `${leftCollapsed ? 36 : leftWidth}px 14px minmax(240px, 1fr) 14px ${rightCollapsed ? 36 : rightWidth}px` }}
+      style={{ gridTemplateColumns: `${leftCollapsed ? 48 : leftWidth}px 14px minmax(240px, 1fr) 14px ${rightCollapsed ? 48 : rightWidth}px` }}
     >
       <div className={css.leftRail} data-collapsed={leftCollapsed || undefined}>
-        <button className={css.panelToggle} type="button" aria-label={leftCollapsed ? '展开文件目录' : '折叠文件目录'} aria-expanded={!leftCollapsed} onClick={() => setLeftCollapsed(value => !value)}>{leftCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}</button>
+        {leftCollapsed && <button className={css.panelToggle} type="button" title="展开文件目录" aria-label="展开文件目录" aria-expanded={false} onClick={() => setLeftCollapsed(false)}><PanelLeftOpen size={16} aria-hidden="true" /></button>}
         <aside className={css.paneStructure} aria-label="文件目录">
           <div className={css.structureHeader}>
             <div className={css.structureNavRow}>
@@ -957,6 +957,7 @@ export function Workspace({
                 <ArrowLeft size={15} strokeWidth={2} aria-hidden="true" />
                 <span>项目库</span>
               </button>
+              <button className={css.panelToggle} type="button" title="折叠文件目录" aria-label="折叠文件目录" aria-expanded={true} onClick={() => setLeftCollapsed(true)}><PanelLeftClose size={16} aria-hidden="true" /></button>
             </div>
             <div
               className={css.structureIdentity}
@@ -1224,7 +1225,7 @@ export function Workspace({
         onDrag={resizeRight}
       />
       <aside className={css.paneChat} aria-label="对话" data-collapsed={rightCollapsed || undefined}>
-        <button className={css.panelToggle} type="button" aria-label={rightCollapsed ? '展开对话面板' : '折叠对话面板'} aria-expanded={!rightCollapsed} onClick={() => setRightCollapsed(value => !value)}>{rightCollapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}</button>
+        {rightCollapsed && <button className={css.panelToggle} type="button" title="展开对话面板" aria-label="展开对话面板" aria-expanded={false} onClick={() => setRightCollapsed(false)}><PanelRightOpen size={16} aria-hidden="true" /></button>}
         <div className={css.conversationBar}>
           <div ref={conversationControlRef} className={css.conversationControl}>
             <button
@@ -1252,6 +1253,7 @@ export function Workspace({
               <span className={css.historyCount} aria-hidden="true">{history.length}</span>
             </button>
           </div>
+          <button className={css.panelToggle} type="button" title="折叠对话面板" aria-label="折叠对话面板" aria-expanded={true} onClick={() => setRightCollapsed(true)}><PanelRightClose size={16} aria-hidden="true" /></button>
         </div>
         {historyOpen && (
           <div ref={historyPopoverRef} className={css.historyPopover}>
@@ -1281,11 +1283,13 @@ export function Workspace({
         )}
         {/* The project shell already binds this session to projectPath; keep
             both generic hero controls available for non-Zenwit shells. */}
+        <div className={css.workspaceConversation} hidden={rightCollapsed}>
         {renderSlot('conversation', {
           showWorkspacePicker: false,
           showHeroHeadline: false,
           openFileInWorkspace,
         })}
+        </div>
       </aside>
       {quickOpen && <div className={css.quickOpenOverlay} role="presentation" onClick={() => setQuickOpen(false)}><div className={css.quickOpen} role="dialog" aria-modal="true" aria-label="快速打开文件" onClick={event => event.stopPropagation()}><div className={css.quickOpenHeading}>快速打开文件 <kbd>⌘P / Ctrl+P · Esc 关闭</kbd></div><input autoFocus aria-label="搜索文件" value={quickQuery} onChange={event => { setQuickQuery(event.target.value); setQuickIndex(0) }} onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); setQuickIndex(index => Math.max(0, Math.min(index + 1, quickFiles.length - 1))) } if (event.key === 'ArrowUp') { event.preventDefault(); setQuickIndex(index => Math.max(index - 1, 0)) } if (event.key === 'Enter' && quickFiles[quickIndex]) { const node = quickFiles[quickIndex]!; setQuickOpen(false); void openFilePath(node.path, node.name) } }} placeholder="输入文件名或路径" /><div className={css.quickOpenResults}>{quickFiles.length === 0 && <p>没有匹配的文件</p>}{quickFiles.map((node, index) => <button type="button" data-quick-result={index === quickIndex ? 'true' : undefined} aria-current={index === quickIndex ? 'true' : undefined} key={node.path} onClick={() => { setQuickOpen(false); void openFilePath(node.path, node.name) }}>{node.name}<span>{node.path.slice(projectPath.length + 1)}</span></button>)}</div></div></div>}
     </div>

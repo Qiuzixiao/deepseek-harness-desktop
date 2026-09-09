@@ -90,7 +90,7 @@ function mountWorkspace() {
     closeProject: vi.fn(async () => {}),
     renderSlot: vi.fn((slot: string) => slot === 'sidebar'
       ? <button type="button">原生设置</button>
-      : <div data-testid="conversation" />),
+      : <div data-slot="conversation" style={{ display: 'contents' }}><div data-testid="conversation" /></div>),
     useSessions: (selector: (value: typeof state) => unknown) => selector(state),
     useWorkspaces: (selector: (value: typeof workspaceState) => unknown) => selector(workspaceState),
     openSession,
@@ -107,6 +107,19 @@ function mountWorkspace() {
 }
 
 describe('Zenwit workspace layout', () => {
+  it('hides the entire conversation slot when collapsed and preserves it when expanded', () => {
+    mountWorkspace()
+    const conversation = screen.getByTestId('conversation')
+    const container = conversation.parentElement!.parentElement!
+    expect(container.hidden).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: '折叠对话面板' }))
+    expect(container.hidden).toBe(true)
+    expect(conversation.isConnected).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: '展开对话面板' }))
+    expect(container.hidden).toBe(false)
+    expect(screen.getByTestId('conversation')).toBe(conversation)
+  })
+
   it('refreshes an already open document from disk when returning to the application', async () => {
     mountWorkspace()
     fireEvent.click(await screen.findByRole('treeitem', { name: '剧本' }))
