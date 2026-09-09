@@ -107,6 +107,7 @@
 /* ── workspace: three bento cards on the canvas ────────── */
 
 .workspace {
+  position: relative;
   display: grid;
   flex: 1;
   width: 100%;
@@ -426,6 +427,19 @@
   color: var(--zw-faint);
   font-family: var(--zw-mono);
 }
+
+/* Hide only registered vertical scrollbars, keeping horizontal scrolling native. */
+.workspace [data-scroll-dot] { scrollbar-width: auto; scrollbar-color: auto; }
+.workspace [data-scroll-dot]::-webkit-scrollbar { width: 0; }
+.scrollDotLayer { position: absolute; inset: 0; z-index: 6; pointer-events: none; overflow: hidden; }
+.scrollDot { position: absolute; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; pointer-events: auto; touch-action: none; cursor: grab; }
+.scrollDot span { width: 8px; height: 8px; border-radius: 50%; background: radial-gradient(circle at 30% 25%, var(--zw-brand-deep), var(--zw-brand)); opacity: .5; box-shadow: 0 1px 3px var(--zw-hairline-strong); transition: transform 160ms ease, opacity 160ms ease; pointer-events: none; }
+.scrollDot:hover span, .scrollDot:focus-visible span { transform: scale(1.35); opacity: .85; }
+.scrollDot:active { cursor: grabbing; }
+.scrollDot:active span { transform: scale(1.5); opacity: 1; }
+.scrollDot:focus-visible { outline: 2px solid var(--zw-brand); outline-offset: -2px; }
+@media (prefers-reduced-motion: reduce) { .scrollDot span { transition: none; } }
+@media (forced-colors: active) { .scrollDot span { background: CanvasText; opacity: 1; } }
 
 /* structure tree */
 .structureHeader {
@@ -915,7 +929,6 @@
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  scrollbar-width: thin;
 }
 .documentTabsEmpty {
   padding: 0 4px;

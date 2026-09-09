@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { Editor, VisualEditor, type DocumentSelection, type EditorHistory, type EditorNavigation } from './Editor.tsx'
 import css from './zenwit.module.css'
+import { ScrollDots } from './ScrollDots.tsx'
 
 /** One real tree node: a directory or file under the project root. */
 interface TreeNode {
@@ -227,6 +228,7 @@ export function Workspace({
   const findInput = useRef<HTMLInputElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const quickReturnFocus = useRef<HTMLElement | null>(null)
+  const workspaceRef = useRef<HTMLDivElement>(null)
   const [outlineOpen, setOutlineOpen] = useState(true)
   const [quickOpen, setQuickOpen] = useState(false)
   const [quickQuery, setQuickQuery] = useState('')
@@ -945,6 +947,7 @@ export function Workspace({
   return (
     <div
       className={css.workspace}
+      ref={workspaceRef}
       data-testid="workspace-grid"
       style={{ gridTemplateColumns: `${leftCollapsed ? 48 : leftWidth}px 14px minmax(240px, 1fr) 14px ${rightCollapsed ? 48 : rightWidth}px` }}
     >
@@ -1291,6 +1294,7 @@ export function Workspace({
         })}
         </div>
       </aside>
+      <ScrollDots root={workspaceRef} />
       {quickOpen && <div className={css.quickOpenOverlay} role="presentation" onClick={() => setQuickOpen(false)}><div className={css.quickOpen} role="dialog" aria-modal="true" aria-label="快速打开文件" onClick={event => event.stopPropagation()}><div className={css.quickOpenHeading}>快速打开文件 <kbd>⌘P / Ctrl+P · Esc 关闭</kbd></div><input autoFocus aria-label="搜索文件" value={quickQuery} onChange={event => { setQuickQuery(event.target.value); setQuickIndex(0) }} onKeyDown={event => { if (event.key === 'ArrowDown') { event.preventDefault(); setQuickIndex(index => Math.max(0, Math.min(index + 1, quickFiles.length - 1))) } if (event.key === 'ArrowUp') { event.preventDefault(); setQuickIndex(index => Math.max(index - 1, 0)) } if (event.key === 'Enter' && quickFiles[quickIndex]) { const node = quickFiles[quickIndex]!; setQuickOpen(false); void openFilePath(node.path, node.name) } }} placeholder="输入文件名或路径" /><div className={css.quickOpenResults}>{quickFiles.length === 0 && <p>没有匹配的文件</p>}{quickFiles.map((node, index) => <button type="button" data-quick-result={index === quickIndex ? 'true' : undefined} aria-current={index === quickIndex ? 'true' : undefined} key={node.path} onClick={() => { setQuickOpen(false); void openFilePath(node.path, node.name) }}>{node.name}<span>{node.path.slice(projectPath.length + 1)}</span></button>)}</div></div></div>}
     </div>
   )
