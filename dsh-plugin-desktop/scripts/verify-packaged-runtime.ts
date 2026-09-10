@@ -2,6 +2,9 @@
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import { pathToFileURL } from 'node:url'
 import { tmpdir } from 'node:os'
 import { isAbsolute, join, relative, sep } from 'node:path'
 import { Worker } from 'node:worker_threads'
@@ -62,6 +65,8 @@ export const REQUIRED_PACKAGED_RUNTIME_ENTRIES = [
 
 /** Physical entries required because profile fallback symlinks cannot target ASAR paths. */
 export const REQUIRED_UNPACKED_RUNTIME_ENTRIES = [
+  ...['catalog-source', 'catalog-query', 'catalog-provider-page', 'catalog-snapshot'].map(name =>
+    `node_modules/dsh-community-market/docs/schemas/${name}.schema.json`),
   'package.json',
   'cordis.patch.yml',
   'build/app-icon.png',
@@ -423,6 +428,15 @@ export function verifyPackagedRuntime(
   verifyUnpackedPackageResolution(unpackedRoot, resolvePackage)
 }
 
+/** Import the shipped market entry in an isolated Node process, never from the workspace. */
+export async function smokePackagedMarket(unpackedRoot: string): Promise<void> {
+  const entry = pathToFileURL(join(unpackedRoot, 'node_modules/dsh-community-market/lib/index.js')).href
+  await promisify(execFile)(process.execPath, [
+    '--input-type=module', '--eval',
+    `const plugin = await import(${JSON.stringify(entry)}); if (typeof plugin.apply !== 'function') throw new Error('Packaged market entry is invalid');`,
+  ], { timeout: 30_000, maxBuffer: 1024 * 1024 })
+}
+
 /**
  * Run the static packaged-runtime check as Electron Builder's afterPack hook.
  * @param context - Electron Builder's afterPack context.
@@ -433,11 +447,13 @@ export async function afterPack(
   verify: typeof verifyPackagedRuntime = verifyPackagedRuntime,
   smoke: PackagedDiagnosticWorkerSmoke = smokePackagedDiagnosticWorker,
   verifyHome: typeof verifyPackagedHomePathDefault = verifyPackagedHomePathDefault,
+  marketSmoke: typeof smokePackagedMarket = smokePackagedMarket,
 ): Promise<void> {
   verify(context)
   const unpackedRoot = resolvePackagedUnpackedRoot(context)
   verifyHome(unpackedRoot)
   await smoke(unpackedRoot)
+  await marketSmoke(unpackedRoot)
 }
 
 export default afterPack

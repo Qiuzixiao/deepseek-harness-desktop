@@ -647,7 +647,7 @@ describe('published package surface', () => {
       '!node_modules/node-pty/build/**',
       '!**/*.map',
       '!**/*.d.ts',
-      '!**/{test,tests,__tests__,coverage,examples,docs,documentation}/**',
+      '!**/{test,tests,__tests__,coverage,examples,documentation}/**',
       '!node_modules/@img/sharp-win32-arm64/**',
       '!node_modules/@img/sharp-win32-ia32/**',
       '!node_modules/@napi-rs/canvas-win32-arm64-msvc/**',

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import AdmZip from 'adm-zip'
 import {
   afterPack,
+  smokePackagedMarket,
   REQUIRED_PACKAGED_RUNTIME_ENTRIES,
   REQUIRED_MACOS_UNIVERSAL_ENTRIES,
   REQUIRED_UNPACKED_PACKAGE_SPECIFIERS,
@@ -126,9 +127,20 @@ describe('packaged desktop runtime verification', () => {
       () => { calls.push('static') },
       async (unpackedRoot) => { calls.push(unpackedRoot) },
       () => { calls.push('home') },
+      async () => { calls.push('market') },
     )
 
-    expect(calls).toEqual(['static', 'home', resolvePackagedUnpackedRoot(runtimeContext)])
+    expect(calls).toEqual(['static', 'home', resolvePackagedUnpackedRoot(runtimeContext), 'market'])
+  })
+
+  it('requires every runtime market schema in the packaged application', () => {
+    for (const name of ['catalog-source', 'catalog-query', 'catalog-provider-page', 'catalog-snapshot']) {
+      expect(REQUIRED_UNPACKED_RUNTIME_ENTRIES).toContain(`node_modules/dsh-community-market/docs/schemas/${name}.schema.json`)
+    }
+  })
+
+  it('rejects a packaged market that cannot be imported', async () => {
+    await expect(smokePackagedMarket('/missing-zenwit-runtime')).rejects.toThrow()
   })
 
   it('tracks the ConPTY-only native surface shipped by node-pty 1.2', () => {
