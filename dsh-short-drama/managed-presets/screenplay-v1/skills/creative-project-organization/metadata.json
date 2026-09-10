@@ -1,0 +1,7 @@
+{
+  "name": "creative-project-organization",
+  "description": "从梗概开始创作、生成设定/人物/大纲/正文等文件时，在首批落盘前规划内容分组和保存位置；新增独立交付物时复核布局。自动适配项目语言和命名习惯，也用于用户要求的项目整理。无需用户提出归档要求。",
+  "scope": "user",
+  "version": 2,
+  "referenceCount": 0
+}

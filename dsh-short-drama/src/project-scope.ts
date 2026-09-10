@@ -1,5 +1,5 @@
-import { realpath, stat } from 'node:fs/promises'
-import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path'
+import { realpath } from 'node:fs/promises'
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path'
 import type { Session } from '@deepseek-ai/dsh-session'
 import { ScreenplayError } from './errors.js'
 
@@ -74,33 +74,6 @@ export async function assertProjectMutationPath(
     throw new ScreenplayError('INVALID_WORKSPACE', 'the project root cannot be moved or deleted')
   }
   return absolute
-}
-
-/** Keep new creative files below a category; existing root files remain editable. */
-export async function assertProjectFileDestination(
-  projectRoot: string,
-  absolute: string,
-  allowExisting: boolean,
-): Promise<void> {
-  const root = await realpath(projectRoot)
-  let parent: string
-  try {
-    parent = await realpath(dirname(absolute))
-  } catch (error: unknown) {
-    if ((error as NodeJS.ErrnoException | undefined)?.code !== 'ENOENT') throw error
-    return // A missing parent is a new category directory, created by the file tool.
-  }
-  if (parent !== root || basename(absolute) === 'README.md') return
-  if (allowExisting) {
-    try {
-      if ((await stat(absolute)).isFile()) return
-    } catch (error: unknown) {
-      if ((error as NodeJS.ErrnoException | undefined)?.code !== 'ENOENT') throw error
-    }
-  }
-  throw new ScreenplayError('INVALID_WORKSPACE',
-    'Creative files must be inside a category directory, not the project root. Reuse an existing category or choose 规则/, 设定/, 大纲/, 正文/, 资料/, 修改记录/ and retry. Only README.md may be created at the root; it is a project index, not creative content.',
-    { candidate: absolute })
 }
 
 export function pathArguments(name: string, args: unknown): string[] {

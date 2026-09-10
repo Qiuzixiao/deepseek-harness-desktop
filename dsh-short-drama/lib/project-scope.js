@@ -1,5 +1,5 @@
-import { realpath, stat } from 'node:fs/promises';
-import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { realpath } from 'node:fs/promises';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { ScreenplayError } from './errors.js';
 // `read_document` is the file-upload reader and intentionally accepts an
 // attachment outside the bound project. Project filesystem tools stay scoped.
@@ -60,32 +60,6 @@ export async function assertProjectMutationPath(session, projectRoot, candidate,
         throw new ScreenplayError('INVALID_WORKSPACE', 'the project root cannot be moved or deleted');
     }
     return absolute;
-}
-/** Keep new creative files below a category; existing root files remain editable. */
-export async function assertProjectFileDestination(projectRoot, absolute, allowExisting) {
-    const root = await realpath(projectRoot);
-    let parent;
-    try {
-        parent = await realpath(dirname(absolute));
-    }
-    catch (error) {
-        if (error?.code !== 'ENOENT')
-            throw error;
-        return; // A missing parent is a new category directory, created by the file tool.
-    }
-    if (parent !== root || basename(absolute) === 'README.md')
-        return;
-    if (allowExisting) {
-        try {
-            if ((await stat(absolute)).isFile())
-                return;
-        }
-        catch (error) {
-            if (error?.code !== 'ENOENT')
-                throw error;
-        }
-    }
-    throw new ScreenplayError('INVALID_WORKSPACE', 'Creative files must be inside a category directory, not the project root. Reuse an existing category or choose 规则/, 设定/, 大纲/, 正文/, 资料/, 修改记录/ and retry. Only README.md may be created at the root; it is a project index, not creative content.', { candidate: absolute });
 }
 export function pathArguments(name, args) {
     if (!PROJECT_TOOLS.has(name) || args === null || typeof args !== 'object')

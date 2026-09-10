@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { lstat, mkdir, rename, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
@@ -5,7 +6,7 @@ import { PERSONA_ORDER, PERSONA_SECTION } from '@deepseek-ai/dsh-system-prompt'
 import { defineTool, type PreToolDecision, type ToolExecution, type ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { ScreenplayError } from './errors.js'
 import { SCREENPLAY_AGENT_PROMPT } from './prompt.js'
-import { assertProjectFileDestination, assertProjectMutationPath, assertProjectPath, isProjectFileTool, isProjectMutationTool, pathArguments } from './project-scope.js'
+import { assertProjectMutationPath, assertProjectPath, isProjectFileTool, isProjectMutationTool, pathArguments } from './project-scope.js'
 
 export const name = 'screenplay-agent'
 
@@ -21,16 +22,7 @@ export function installScreenplayProjectScopeGuard(ctx: Context): void {
     try {
       for (const candidate of pathArguments(exec.name, exec.arguments)) {
         const assertPath = isProjectMutationTool(exec.name) ? assertProjectMutationPath : assertProjectPath
-        const absolute = await assertPath(session, projectRoot, candidate, `${exec.name} path`)
-        if (exec.name === 'write') await assertProjectFileDestination(projectRoot, absolute, true)
-      }
-      if (exec.name === 'move') {
-        const [source, destination] = pathArguments(exec.name, exec.arguments)
-        if (source !== undefined && destination !== undefined) {
-          const sourcePath = await assertProjectMutationPath(session, projectRoot, source)
-          const destinationPath = await assertProjectMutationPath(session, projectRoot, destination)
-          if (!(await lstat(sourcePath)).isDirectory()) await assertProjectFileDestination(projectRoot, destinationPath, false)
-        }
+        await assertPath(session, projectRoot, candidate, `${exec.name} path`)
       }
     } catch (error: unknown) {
       return { kind: 'deny', reason: error instanceof Error ? error.message : String(error) }
@@ -71,7 +63,6 @@ function installProjectMutationTools(ctx: Context): void {
       const { projectRoot, session } = currentProject(exec)
       const source = await assertProjectMutationPath(session, projectRoot, args.source_path, 'move source_path')
       const destination = await assertProjectMutationPath(session, projectRoot, args.destination_path, 'move destination_path')
-      if (!(await lstat(source)).isDirectory()) await assertProjectFileDestination(projectRoot, destination, false)
       if (source === destination) return args
       try {
         await lstat(destination)
@@ -113,6 +104,14 @@ export function apply(ctx: Context): void {
     name: PERSONA_SECTION,
     order: PERSONA_ORDER,
     text: SCREENPLAY_AGENT_PROMPT,
+  })
+  // The bundled Skill is also discoverable through each preset's skill catalog.
+  // Load its actual body here so file planning never depends on model selection.
+  const organizationSkill = readFileSync(new URL('../managed-presets/screenplay-v1/skills/creative-project-organization/SKILL.md', import.meta.url), 'utf8')
+  ctx.systemPrompt.section({
+    name: 'skill:creative-project-organization',
+    order: PERSONA_ORDER + 1,
+    text: organizationSkill.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/u, '').trim(),
   })
   installProjectMutationTools(ctx)
   installScreenplayProjectScopeGuard(ctx)

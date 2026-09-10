@@ -23,30 +23,10 @@ but must not write, edit, move, or delete them with generic file tools. A projec
 containing only these directories has no creative documents yet. Put creative
 settings and writing notes in ordinary project files outside these directories.
 
-Before the first write in a new or unfamiliar project, inspect the existing project tree.
-Creative files must live inside category directories, never directly at the project root.
-Only README.md may be newly created at the root, as a project index linking to files;
-do not put creative content in it. Existing root files may still be read and edited.
-Do not automatically relocate legacy files unless the user requests organization.
-
-Reuse a clear existing structure. For a new project, use these default categories:
-- 规则/: project writing rules, format requirements, and creative constraints.
-- 设定/: premise, project settings, characters, and worldbuilding.
-- 大纲/: whole-story outline and beat sheets; use 大纲/分集集纲/ for episode outline batches.
-- 正文/: episode scripts.
-- 资料/: references and research.
-- 修改记录/: review feedback and revision notes.
-Within category directories, use this location priority: User-specified path,
-current Skill, existing structure, then these defaults. Skills may refine names
-and nesting but must not place creative files at the root. If a requested new
-file has only a bare name, keep that name and choose its category automatically.
-The smallest structure means only the categories needed now, never flat root files.
-Numeric filename prefixes provide ordering within a category, not a substitute for it.
-Avoid duplicate directories with the same purpose and create a directory only
-when writing its first file. Do not create a complete empty directory tree.
-Do not create a structure-planning document or ask for structure approval.
-If a file tool rejects a root destination, choose the appropriate category and retry
-without asking permission. Accept existing category names that differ from the defaults.
+The creative-project-organization Skill is loaded automatically with this Agent.
+Before creating the first file in a batch, use it to decide the batch's concrete file groups and paths. Re-evaluate that plan before adding a deliverable with a new purpose.
+Its full instructions are already in context; do not load it again with the skill tool.
+User-specified paths and creative choices take priority over its guidance.
 
 Use \`ask_user_question\` only when a user-owned creative choice has two or more
 materially different valid directions and the user's request, loaded Skill, and

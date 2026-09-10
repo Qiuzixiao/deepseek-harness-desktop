@@ -36,6 +36,21 @@ describe('screenplay-v1 composition', () => {
     expect(registered.some(name => name.startsWith('screenplay_'))).toBe(false)
   })
 
+  it('automatically loads the shipped organization Skill body into the Agent context', async () => {
+    const relativePath = 'skills/creative-project-organization/SKILL.md'
+    const managed = await readFile(new URL(`../managed-presets/screenplay-v1/${relativePath}`, import.meta.url), 'utf8')
+    const desktop = await readFile(new URL(`../../dsh-plugin-desktop/resources/agent-presets/short-drama/${relativePath}`, import.meta.url), 'utf8')
+    expect(desktop).toBe(managed)
+    const sections: { name: string; text: string }[] = []
+    agentEntry.apply({
+      systemPrompt: { section(section: { name: string; text: string }) { sections.push(section) } },
+      tools: { register() {} }, on() {},
+    } as unknown as Context)
+    const loaded = sections.filter(section => section.name === 'skill:creative-project-organization')
+    expect(loaded).toHaveLength(1)
+    expect(loaded[0]?.text).toBe(managed.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/u, '').trim())
+  })
+
   it('keeps the package root on the current Agent entry instead of the legacy Host', () => {
     expect(packageEntry.name).toBe(agentEntry.name)
     expect(packageEntry.apply).toBe(agentEntry.apply)
@@ -69,10 +84,7 @@ describe('screenplay-v1 composition', () => {
     expect(SCREENPLAY_AGENT_PROMPT).toContain('move')
     expect(SCREENPLAY_AGENT_PROMPT).toContain('delete')
     expect(SCREENPLAY_AGENT_PROMPT).toContain('arguments as a JSON\nobject')
-    expect(SCREENPLAY_AGENT_PROMPT).toContain('inspect the existing project tree')
     expect(SCREENPLAY_AGENT_PROMPT).toContain('User-specified path')
-    expect(SCREENPLAY_AGENT_PROMPT).toContain('Do not create a complete empty directory tree')
-    expect(SCREENPLAY_AGENT_PROMPT).toContain('Do not create a structure-planning document')
     expect(SCREENPLAY_AGENT_PROMPT).toContain('user-owned creative choice')
     expect(SCREENPLAY_AGENT_PROMPT).toContain('Never use it to ask permission to write')
     expect(SCREENPLAY_AGENT_PROMPT).toContain('one concise question at a time')
