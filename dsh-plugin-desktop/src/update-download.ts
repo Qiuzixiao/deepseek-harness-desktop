@@ -11,8 +11,8 @@ export type DesktopDownloadPlatform = 'darwin' | 'win32'
 
 /** Fixed download endpoints that record one user-confirmed installer download. */
 export const DESKTOP_DOWNLOAD_URLS: Readonly<Record<DesktopDownloadPlatform, string>> = {
-  darwin: 'https://www.dshdesktop.cn/api/downloads/mac',
-  win32: 'https://www.dshdesktop.cn/api/downloads/windows',
+  darwin: 'https://zenwit.cn/desktop-updates/Zenwit-mac.dmg',
+  win32: 'https://zenwit.cn/desktop-updates/Zenwit-windows.exe',
 }
 
 /** Maximum accepted installer size, in bytes. */
