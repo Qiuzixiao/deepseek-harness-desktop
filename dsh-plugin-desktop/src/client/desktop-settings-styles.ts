@@ -260,7 +260,22 @@ const CSS = `
   padding-left: 14px;
   border-left: 2px solid var(--dsw-alias-border-l1);
 }
+.dshLocalResourceSummary { display: grid; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
+.dshLocalResourceSummary span, .dshLocalResourceSummary small { color: var(--dsw-alias-label-secondary); }
+.dshLocalResourceName { display: grid; gap: 8px; }
+.dshLocalResourceFileList { max-height: 260px; overflow: auto; padding-left: 20px; overflow-wrap: anywhere; }
+.dshLocalResourceFileList small { color: var(--dsw-alias-label-secondary); }
+.dshLocalResourceViewer { display: grid; grid-template-columns: minmax(130px, 26%) minmax(0, 1fr); border: 1px solid var(--dsw-alias-border-l1); border-radius: 10px; overflow: hidden; }
+.dshLocalResourceViewer nav { padding: 8px; max-height: 480px; overflow: auto; border-right: 1px solid var(--dsw-alias-border-l1); }
+.dshLocalResourceFile { display: block; width: 100%; padding: 9px; border: 0; border-radius: 5px; color: inherit; background: transparent; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
+.dshLocalResourceFile[aria-current], .dshLocalResourceFile:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.dshLocalResourceContent { padding: 16px; min-width: 0; }
+.dshLocalResourceContent strong { overflow-wrap: anywhere; }
+.dshLocalResourceContent pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 440px; overflow: auto; font-size: 12px; line-height: 1.7; }
+.dshLocalResources button[aria-pressed="true"] { border-color: var(--dsw-alias-brand-primary); }
 @media (max-width: 720px) {
+  .dshLocalResourceViewer { grid-template-columns: 1fr; }
+  .dshLocalResourceViewer nav { max-height: 150px; border-right: 0; border-bottom: 1px solid var(--dsw-alias-border-l1); }
   .dshDesktopSettingsChoice,
   .dshDesktopSettingsToggleRow { align-items: flex-start; }
   .dshDesktopSettingsForm { align-items: stretch; flex-direction: column; }

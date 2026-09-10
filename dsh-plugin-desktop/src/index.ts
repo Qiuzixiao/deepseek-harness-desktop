@@ -1,6 +1,13 @@
 /** Zenwit Host plugin: owns the selected native shell generation. */
 
 import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
+import { homedir } from 'node:os'
+import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
+import type {} from '@deepseek-ai/dsh-agent-presets'
+import { LocalResources, type ResourceRoot } from './local-resources.ts'
+import { handleLocalResourcesRequest } from './local-resources-route.ts'
+import { LOCAL_RESOURCES_PATH } from './local-resources-contract.ts'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
@@ -242,7 +249,28 @@ export function apply(ctx: Context, config: Config): void {
       }
       ctx.logger.info('document-sync ' + JSON.stringify(event))
     }
+    const resources = new LocalResources(() => {
+      const roots: ResourceRoot[] = [
+        { path: join(resolveDshHome(), 'skills'), kind: 'skill', scope: 'user', install: true },
+        { path: join(process.env.DSH_AGENTS_HOME ?? join(homedir(), '.agents'), 'skills'), kind: 'skill', scope: 'shared' },
+      ]
+      const presets = ctx.get('agentPresets')
+      let writable = false
+      for (const root of presets?.roots ?? []) {
+        const install: boolean = root.trust === 'user' && !writable
+        writable ||= install
+        roots.push({ path: root.path, kind: 'preset', scope: 'user', hidden: root.trust !== 'user', install })
+      }
+      const registry = ctx.get('workspaceRegistry')
+      for (const project of registry?.list() ?? []) {
+        for (const folder of ['.zenwit', '.agents']) {
+          roots.push({ path: join(project.path, folder, 'skills'), kind: 'skill', scope: project.path })
+        }
+      }
+      return roots
+    })
     const settingsRoutes = [
+      [LOCAL_RESOURCES_PATH, (req: IncomingMessage, res: ServerResponse, origin: string) => handleLocalResourcesRequest(req, res, origin, resources)],
       [DESKTOP_SETTINGS_PATH, handleDesktopSettingsRequest],
       [DESKTOP_PROJECT_LIBRARY_PATH, handleProjectLibraryRequest],
       [DESKTOP_PROJECT_DELETE_PATH, handleProjectLibraryDeleteRequest],
